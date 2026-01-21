@@ -1,4 +1,8 @@
-# Build results
+# ========================
+# Build / Binary Files
+# ========================
+bin/
+obj/
 [Dd]ebug/
 [Dd]ebugPublic/
 [Rr]elease/
@@ -9,61 +13,90 @@ x86/
 [Aa][Rr][Mm]/
 [Aa][Rr][Mm]64/
 bld/
-[Bb]in/
-[Oo]bj/
 [Ll]og/
 [Ll]ogs/
+*.exe
+*.dll
+*.pdb
+*.app
+*.so
+*.dylib
+*.class
 
-# Visual Studio cache/options directory
-.vs/
-
-# Visual Studio Code
+# ========================
+# Visual Studio / Rider / VSCode
+# ========================
 .vscode/
 .vscode-test/
 *.code-workspace
-
-# User-specific files
-*.rsuser
+.vs/
+.idea/
 *.suo
 *.user
 *.userosscache
 *.sln.docstates
-
-# ReSharper is a .NET coding add-in
-.idea/
 *.sln.iml
 _ReSharper*/
 *.[Rr]e[Ss]harper
 *.DotSettings.user
 
-# Test Results
-TestResults/
-
-# NuGet
+# ========================
+# .NET / NuGet
+# ========================
 *.nupkg
+*.nuspec
 *.snupkg
 *.nuget.props
 *.nuget.targets
-
-# dotnet user secrets
+project.lock.json
+packages/
+*.vsix
 .NET.user.secrets
 secrets.json
 
-# Environment variables
+# ========================
+# Entity Framework / Migrations
+# ========================
+*.db
+*.db-journal
+*.sql
+
+# ========================
+# Docker / Local Secrets / Environment
+# ========================
 .env
 .env.local
 .env.*.local
+docker-compose.override.yml
+*.local
 
-# OS Files
+# ========================
+# Logs / Temp
+# ========================
+logs/
+temp/
+*.tmp
+*.bak
+*.log
+TestResults/
+
+# ========================
+# JetBrains IDE
+# ========================
+*.iml
+out/
+
+# ========================
+# Mac / System Files
+# ========================
 .DS_Store
+.AppleDouble
+.LSOverride
 Thumbs.db
 
-# Node modules (if using npm packages)
-node_modules/
-npm-debug.log
-yarn-error.log
-
+# ========================
 # Misc
+# ========================
 *.swp
 *.swo
 *~
@@ -72,3 +105,6 @@ yarn-error.log
 .c9/
 *.launch
 .settings/
+node_modules/
+npm-debug.log
+yarn-error.log
