@@ -1,0 +1,52 @@
+4. User Stories and Tasks (Fully Detailed)
+US-1.1: Create the Backend Solution Skeleton
+
+Story: As a system owner, I want a properly structured ASP.NET Core 10 solution so that the system can grow without becoming unmaintainable.
+
+Why this exists: If the solution starts as a monolith with everything in one project, technical debt becomes irreversible. This story exists to prevent that outcome.
+
+Tasks:
+
+Create a new ASP.NET Core 10 solution with separate projects for Api, Application, Domain, and Infrastructure.
+
+This enforces architectural boundaries from day one.
+Project references must be strictly one-directional: Api → Application → Domain, and Infrastructure → Application/Domain.
+Configure dependency injection and composition root in Api.
+
+This ensures Infrastructure is pluggable and testable.
+Add global exception handling middleware.
+
+This ensures the API never leaks stack traces and always returns controlled error responses.
+Add health check endpoint.
+
+This is required for Azure monitoring and uptime validation.
+Acceptance Criteria:
+
+Solution builds
+API runs
+Health endpoint responds
+
+
+
+
+
+
+
+
+
+
+Backend Tasks
+Create solution structure
+Configure EF Core + SQL Server
+Create Users, Roles tables
+Implement JWT auth
+Implement policies
+Implement endpoints
+Add logging
+Each task must include:
+
+Tests
+Migration
+
+
+I prefer do the validations using model binding validations

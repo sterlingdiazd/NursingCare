@@ -1,0 +1,11 @@
+/Users/sterlingdiazd/Projects/NursingCare/src/NursingCare.Domain/bin/Debug/net10.0/NursingCare.Domain.deps.json
+/Users/sterlingdiazd/Projects/NursingCare/src/NursingCare.Domain/bin/Debug/net10.0/NursingCare.Domain.dll
+/Users/sterlingdiazd/Projects/NursingCare/src/NursingCare.Domain/bin/Debug/net10.0/NursingCare.Domain.pdb
+/Users/sterlingdiazd/Projects/NursingCare/src/NursingCare.Domain/obj/Debug/net10.0/NursingCare.Domain.GeneratedMSBuildEditorConfig.editorconfig
+/Users/sterlingdiazd/Projects/NursingCare/src/NursingCare.Domain/obj/Debug/net10.0/NursingCare.Domain.AssemblyInfoInputs.cache
+/Users/sterlingdiazd/Projects/NursingCare/src/NursingCare.Domain/obj/Debug/net10.0/NursingCare.Domain.AssemblyInfo.cs
+/Users/sterlingdiazd/Projects/NursingCare/src/NursingCare.Domain/obj/Debug/net10.0/NursingCare.Domain.csproj.CoreCompileInputs.cache
+/Users/sterlingdiazd/Projects/NursingCare/src/NursingCare.Domain/obj/Debug/net10.0/NursingCare.Domain.dll
+/Users/sterlingdiazd/Projects/NursingCare/src/NursingCare.Domain/obj/Debug/net10.0/refint/NursingCare.Domain.dll
+/Users/sterlingdiazd/Projects/NursingCare/src/NursingCare.Domain/obj/Debug/net10.0/NursingCare.Domain.pdb
+/Users/sterlingdiazd/Projects/NursingCare/src/NursingCare.Domain/obj/Debug/net10.0/ref/NursingCare.Domain.dll
