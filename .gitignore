@@ -1,110 +1,134 @@
-# ========================
-# Build / Binary Files
-# ========================
-bin/
-obj/
-[Dd]ebug/
-[Dd]ebugPublic/
-[Rr]elease/
-[Rr]eleases/
-x64/
-x86/
-[Ww][Ii][Nn]32/
-[Aa][Rr][Mm]/
-[Aa][Rr][Mm]64/
-bld/
-[Ll]og/
-[Ll]ogs/
-*.exe
-*.dll
-*.pdb
-*.app
-*.so
-*.dylib
-*.class
+# =====================================================
+# GLOBAL RECURSIVE IGNORE RULES (MONOREPO SAFE)
+# =====================================================
 
-# ========================
-# Visual Studio / Rider / VSCode
-# ========================
-.vscode/
-.vscode-test/
-*.code-workspace
-.vs/
-.idea/
-*.suo
-*.user
-*.userosscache
-*.sln.docstates
-*.sln.iml
-_ReSharper*/
-*.[Rr]e[Ss]harper
-*.DotSettings.user
+# ------------------------
+# Build Artifacts (NORMAL + BROKEN WINDOWS PATHS)
+# ------------------------
 
-# ========================
-# .NET / NuGet
-# ========================
-*.nupkg
-*.nuspec
-*.snupkg
-*.nuget.props
-*.nuget.targets
-project.lock.json
-packages/
-*.vsix
-.NET.user.secrets
-secrets.json
+# Normal paths
+**/bin/**
+**/obj/**
+**/[Dd]ebug/**
+**/[Rr]elease/**
+**/[Rr]eleases/**
+**/x64/**
+**/x86/**
+**/[Ww][Ii][Nn]32/**
+**/[Aa][Rr][Mm]/**
+**/[Aa][Rr][Mm]64/**
+**/bld/**
+**/TestResults/**
+**/out/**
+**/[Ll]og/**
+**/[Ll]ogs/**
 
-# ========================
-# Entity Framework / Migrations
-# ========================
-*.db
-*.db-journal
-*.sql
+# Broken Windows-style paths committed on Unix (e.g. "bin\Debug")
+**/bin\\**
+**/obj\\**
+**/*\\bin\\**
+**/*\\obj\\**
+**/*\\[Dd]ebug\\**
+**/*\\[Rr]elease\\**
 
-# ========================
-# Docker / Local Secrets / Environment
-# ========================
-.env
-.env.local
-.env.*.local
-docker-compose.override.yml
-*.local
+# Explicit MSBuild / Roslyn junk
+**/BuildHost*
+**/*BuildHost*
 
-# ========================
-# Logs / Temp
-# ========================
-logs/
-temp/
-*.tmp
-*.bak
-*.log
-TestResults/
+# ------------------------
+# .NET / MSBuild / NuGet
+# ------------------------
+**/*.nupkg
+**/*.snupkg
+**/*.nuspec
+**/*.vsix
+**/project.lock.json
+**/.nuget.props
+**/.nuget.targets
+**/.NET.user.secrets
+**/secrets.json
+**/packages/**
+**/artifacts/**
+**/*.deps.json
+**/*.runtimeconfig.json
+**/Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost*
 
-# ========================
-# JetBrains IDE
-# ========================
-*.iml
-out/
+# ------------------------
+# IDEs / Editors
+# ------------------------
+**/.vs/**
+**/.vscode/**
+**/.idea/**
+**/_ReSharper*/**
+**/*.suo
+**/*.user
+**/*.userosscache
+**/*.sln.docstates
+**/*.DotSettings.user
+**/*.code-workspace
+**/*.iml
 
-# ========================
-# Mac / System Files
-# ========================
-.DS_Store
-.AppleDouble
-.LSOverride
-Thumbs.db
+# ------------------------
+# OS / System / Temp
+# ------------------------
+**/.DS_Store
+**/.AppleDouble
+**/.LSOverride
+**/Thumbs.db
+**/*.tmp
+**/*.bak
+**/*.log
+**/*.swp
+**/*.swo
+**/*~
 
-# ========================
+# ------------------------
+# Node / Frontend (if ever used)
+# ------------------------
+**/node_modules/**
+**/npm-debug.log
+**/yarn-error.log
+
+# ------------------------
+# Docker / Environment / Secrets
+# ------------------------
+**/.env
+**/.env.*
+**/*.local
+**/docker-compose.override.yml
+
+# ------------------------
+# Databases / Local State
+# ------------------------
+**/*.db
+**/*.db-journal
+**/*.sqlite
+**/*.sqlite3
+
+# ------------------------
+# Test / Coverage
+# ------------------------
+**/coverage/**
+**/*.coverage
+**/*.coveragexml
+**/*.trx
+
+# ------------------------
+# Publish Output
+# ------------------------
+**/publish/**
+**/app.publish/**
+
+# ------------------------
+# JetBrains
+# ------------------------
+**/.idea/**
+**/out/**
+
+# ------------------------
 # Misc
-# ========================
-*.swp
-*.swo
-*~
-.classpath
-.project
-.c9/
-*.launch
-.settings/
-node_modules/
-npm-debug.log
-yarn-error.log
+# ------------------------
+**/.classpath
+**/.project
+**/.settings/**
+**/*.launch
