@@ -1,11 +1,11 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/NursingCare.Api/NursingCare.Api.csproj" />
-    <Project Path="src/NursingCare.Application/NursingCare.Application.csproj" />
-    <Project Path="src/NursingCare.Domain/NursingCare.Domain.csproj" />
-    <Project Path="src/NursingCare.Infrastructure/NursingCare.Infrastructure.csproj" />
+    <Project Path="src/NursingCareBackend.Api/NursingCareBackend.Api.csproj" />
+    <Project Path="src/NursingCareBackend.Application/NursingCareBackend.Application.csproj" />
+    <Project Path="src/NursingCareBackend.Domain/NursingCareBackend.Domain.csproj" />
+    <Project Path="src/NursingCareBackend.Infrastructure/NursingCareBackend.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/NursingCare.Domain.Tests/NursingCare.Domain.Tests.csproj" />
+    <Project Path="tests/NursingCareBackend.Domain.Tests/NursingCareBackend.Domain.Tests.csproj" />
   </Folder>
 </Solution>
