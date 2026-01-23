@@ -50,3 +50,79 @@ Migration
 
 
 I prefer do the validations using model binding validations
+
+
+
+Phase Plan (High Level)
+
+We will do this in phases:
+
+Phase 1 — Persistence (SQL Server)
+
+Replace InMemory with SQL Server
+
+Add EF Core migrations
+
+Create real tables
+
+Verify data is actually persisted
+
+Phase 2 — Quality Gates
+
+Add:
+
+Domain unit tests
+
+Application handler tests
+
+API integration test
+
+Add:
+
+dotnet test to pipeline
+
+Phase 3 — Production Hardening
+
+Proper:
+
+Configuration
+
+Logging
+
+Validation
+
+Error handling
+
+Health checks
+
+Phase 4 — CI/CD
+
+GitHub Actions / Azure DevOps:
+
+Build
+
+Test
+
+Publish
+
+Deploy
+
+Phase 5 — Cloud
+
+Azure:
+
+App Service
+
+Azure SQL
+
+Secrets
+
+Environments
+
+Phase 6 — Frontends
+
+React (Web)
+
+React Native (Mobile)
+
+Call the same endpoint
