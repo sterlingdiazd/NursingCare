@@ -36,12 +36,14 @@ namespace NursingCareBackend.Api.Controllers
 
             var overallStatus = dbHealthy ? "Healthy" : "Unhealthy";
 
-            return Ok(new
+            var response = new
             {
                 status = overallStatus,
                 timestamp = DateTime.UtcNow,
                 database = dbMessage
-            });
+            };
+
+            return dbHealthy ? Ok(response) : StatusCode(503, response);
         }
     }
 }

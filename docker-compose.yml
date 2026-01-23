@@ -6,7 +6,7 @@ services:
       SA_PASSWORD: "1202lingSter89*"
       ACCEPT_EULA: "Y"
     ports:
-      - "${DB_PORT}:${DB_PORT}"  
+      - "${DB_PORT}:1433"
     restart: always
     volumes:
       - sqlserver-data:/var/opt/mssql
@@ -16,16 +16,17 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-        - "${API_PORT}:${API_PORT}"  # host:container
+        - "${API_PORT}:${API_PORT}" # map host port to container port
     environment:
       ASPNETCORE_URLS: "http://+:${API_PORT}"  # listen on all interfaces inside container
       ConnectionStrings__DefaultConnection: "Server=${DB_HOST},1433;Database=${DB_NAME};User Id=${DB_USER};Password=${SQL_PASSWORD};TrustServerCertificate=True;"
       LOCALHOST_URL: "${LOCALHOST_URL}"
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT}"
     depends_on:
       - sqlserver
 
     healthcheck:
-      test: ["CMD-SHELL", "curl -f ${LOCALHOST_URL}:${API_PORT}/api/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:${API_PORT}/api/health || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
