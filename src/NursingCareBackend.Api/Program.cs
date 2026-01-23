@@ -1,30 +1,39 @@
 using NursingCareBackend.Infrastructure;
-
-using Microsoft.EntityFrameworkCore;
+using NursingCareBackend.Api;
+using NursingCareBackend.Api.Extensions;
 using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
-using NursingCareBackend.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// CORS
+builder.Services.AddCorsPolicy();
+
 // Controllers
 builder.Services.AddControllers();
+   // .AddApplicationPart(typeof(NursingCareBackend.Api.Controllers.HealthController).Assembly);
+
 
 // Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-
+// Infrastructure
 builder.Services.AddInfrastructure(builder.Configuration);
+
 // Use cases
 builder.Services.AddScoped<CreateCareRequestHandler>();
 
-
-// Database (SQL Server via Docker)
-builder.Services.AddDbContext<NursingCareDbContext>(options =>
-    options.UseSqlServer(
-        builder.Configuration.GetConnectionString("DefaultConnection")));
-
 var app = builder.Build();
+
+// --- Begin automatic migration ---
+app.ApplyMigrations();
+// --- End automatic migration ---
+
+// CORS
+app.UseCors("AllowAllDev");
+// app.UseCors("AllowWebApp");
+// app.UseCors("AllowMobileApp");
+
 
 app.UseSwagger();
 app.UseSwaggerUI();
