@@ -1,0 +1,55 @@
+﻿using NursingCareBackend.Domain.CareRequests;
+using Xunit;
+
+namespace NursingCareBackend.Domain.Tests;
+
+public class CareRequestTests
+{
+    [Fact]
+    public void Create_Should_Create_CareRequest_With_Pending_Status()
+    {
+        // Arrange
+        var residentId = Guid.NewGuid();
+        var description = "Help with daily activities";
+
+        // Act
+        var careRequest = CareRequest.Create(residentId, description);
+
+        // Assert
+        Assert.NotEqual(Guid.Empty, careRequest.Id);
+        Assert.Equal(residentId, careRequest.ResidentId);
+        Assert.Equal(description, careRequest.Description);
+        Assert.Equal(CareRequestStatus.Pending, careRequest.Status);
+    }
+
+    [Fact]
+    public void Create_With_Empty_ResidentId_Should_Throw()
+    {
+        // Act
+        var act = () => CareRequest.Create(Guid.Empty, "Valid description");
+
+        // Assert
+        Assert.ThrowsAny<Exception>(act);
+    }
+
+    [Fact]
+    public void Create_With_Empty_Description_Should_Throw()
+    {
+        // Act
+        var act = () => CareRequest.Create(Guid.NewGuid(), "");
+
+        // Assert
+        Assert.ThrowsAny<Exception>(act);
+    }
+
+    [Fact]
+    public void Create_With_Null_Description_Should_Throw()
+    {
+        // Act
+        var act = () => CareRequest.Create(Guid.NewGuid(), null!);
+
+        // Assert
+        Assert.ThrowsAny<Exception>(act);
+    }
+
+}
