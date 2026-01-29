@@ -6,6 +6,8 @@
     <Project Path="src/NursingCareBackend.Infrastructure/NursingCareBackend.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/NursingCareBackend.Api.Tests/NursingCareBackend.Api.Tests.csproj" />
+    <Project Path="tests/NursingCareBackend.Application.Tests/NursingCareBackend.Application.Tests.csproj" />
     <Project Path="tests/NursingCareBackend.Domain.Tests/NursingCareBackend.Domain.Tests.csproj" />
   </Folder>
 </Solution>
