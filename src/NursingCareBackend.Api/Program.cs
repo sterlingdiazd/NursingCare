@@ -6,7 +6,7 @@ using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
 var builder = WebApplication.CreateBuilder(args);
 
 // CORS
-builder.Services.AddCorsPolicy();
+builder.Services.AddCorsPolicy(builder.Configuration);
 
 // Controllers
 builder.Services.AddControllers();
