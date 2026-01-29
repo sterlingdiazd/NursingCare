@@ -132,3 +132,4 @@
 **/.project
 **/.settings/**
 **/*.launch
+.env
