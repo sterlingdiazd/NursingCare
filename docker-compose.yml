@@ -3,7 +3,7 @@ services:
     image: mcr.microsoft.com/mssql/server:2022-latest
     container_name: nursingcare-sql
     environment:
-      SA_PASSWORD: "1202lingSter89*"
+      SA_PASSWORD: "${SQL_PASSWORD}"
       ACCEPT_EULA: "Y"
     ports:
       - "${DB_PORT}:1433"
@@ -19,9 +19,8 @@ services:
         - "${API_PORT}:${API_PORT}" # map host port to container port
     environment:
       ASPNETCORE_URLS: "http://+:${API_PORT}"  # listen on all interfaces inside container
-      ConnectionStrings__DefaultConnection: "Server=${DB_HOST},1433;Database=${DB_NAME};User Id=${DB_USER};Password=${SQL_PASSWORD};TrustServerCertificate=True;"
-      LOCALHOST_URL: "${LOCALHOST_URL}"
-      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT}"
+      ASPNETCORE_ENVIRONMENT: "${ASPNETCORE_ENVIRONMENT}"
+      ConnectionStrings__DefaultConnection: "Server=sqlserver,1433;Database=NursingCareDb;User Id=sa;Password=${SQL_PASSWORD};TrustServerCertificate=True;"
     depends_on:
       - sqlserver
 
