@@ -1,4 +1,5 @@
-﻿using System.Net.Http.Json;
+using System.Net;
+using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using NursingCareBackend.Infrastructure.Persistence;
@@ -20,6 +21,8 @@ public sealed class CreateCareRequestApiTests : IClassFixture<CustomWebApplicati
   {
     // Arrange
     var client = _factory.CreateClient();
+    client.DefaultRequestHeaders.Authorization =
+      new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", JwtTestTokens.CreateWriterToken(_factory.Services));
 
     var payload = new
     {
@@ -39,5 +42,49 @@ public sealed class CreateCareRequestApiTests : IClassFixture<CustomWebApplicati
     var exists = await db.CareRequests.AnyAsync();
 
     Assert.True(exists);
+  }
+
+  [Fact]
+  public async Task POST_CareRequests_Should_Return_BadRequest_When_Description_Is_Missing()
+  {
+    // Arrange
+    var client = _factory.CreateClient();
+    client.DefaultRequestHeaders.Authorization =
+      new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", JwtTestTokens.CreateWriterToken(_factory.Services));
+
+    var payload = new
+    {
+      residentId = Guid.NewGuid(),
+      // description omitted to trigger model validation error
+    };
+
+    // Act
+    var response = await client.PostAsJsonAsync("/api/care-requests", payload);
+
+    // Assert
+    Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+  }
+
+  [Fact]
+  public async Task POST_CareRequests_Should_Return_BadRequest_When_ResidentId_Is_Invalid_Guid()
+  {
+    // Arrange
+    var client = _factory.CreateClient();
+    client.DefaultRequestHeaders.Authorization =
+      new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", JwtTestTokens.CreateWriterToken(_factory.Services));
+
+    var payload = new
+    {
+      residentId = "not-a-guid",
+      description = "Invalid resident id"
+    };
+
+    // Act
+    var response = await client.PostAsJsonAsync("/api/care-requests", payload);
+
+    // Assert
+    Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
   }
 }
