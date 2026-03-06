@@ -1,0 +1,52 @@
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.Tokens;
+
+namespace NursingCareBackend.Api.Extensions;
+
+public static class AuthenticationExtensions
+{
+  public static IServiceCollection AddJwtAuthentication(
+    this IServiceCollection services,
+    IConfiguration configuration)
+  {
+    var jwtSection = configuration.GetSection("Jwt");
+    var jwtKey = jwtSection["Key"];
+    var jwtIssuer = jwtSection["Issuer"];
+    var jwtAudience = jwtSection["Audience"];
+
+    if (string.IsNullOrWhiteSpace(jwtKey))
+    {
+      throw new InvalidOperationException("JWT configuration is missing 'Jwt:Key'.");
+    }
+
+    var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
+
+    services
+      .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+      .AddJwtBearer(options =>
+      {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+          ValidateIssuer = true,
+          ValidateAudience = true,
+          ValidateLifetime = true,
+          ValidateIssuerSigningKey = true,
+          ValidIssuer = jwtIssuer,
+          ValidAudience = jwtAudience,
+          IssuerSigningKey = signingKey
+        };
+      });
+
+    services.AddAuthorization(options =>
+    {
+      options.AddPolicy("CareRequestWriter", policy =>
+        policy.RequireRole("Nurse", "Admin"));
+    });
+
+    return services;
+  }
+}
+

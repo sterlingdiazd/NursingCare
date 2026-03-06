@@ -1,4 +1,5 @@
-﻿using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
+using Microsoft.EntityFrameworkCore;
+using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
 using NursingCareBackend.Domain.CareRequests;
 using NursingCareBackend.Infrastructure.Persistence;
 
@@ -17,5 +18,18 @@ public sealed class CareRequestRepository : ICareRequestRepository
   {
     await _dbContext.CareRequests.AddAsync(careRequest, cancellationToken);
     await _dbContext.SaveChangesAsync(cancellationToken);
+  }
+
+  public async Task<IReadOnlyList<CareRequest>> GetAllAsync(CancellationToken cancellationToken)
+  {
+    return await _dbContext.CareRequests
+      .OrderByDescending(x => x.CreatedAtUtc)
+      .ToListAsync(cancellationToken);
+  }
+
+  public Task<CareRequest?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
+  {
+    return _dbContext.CareRequests
+      .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
   }
 }
