@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -8,6 +8,18 @@ namespace NursingCareBackend.Api.Tests;
 
 public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
+  private static string GetTestConnectionString()
+  {
+    var connectionString = Environment.GetEnvironmentVariable("NursingCare_TestSqlConnection");
+
+    if (string.IsNullOrWhiteSpace(connectionString))
+    {
+      throw new InvalidOperationException("Environment variable 'NursingCare_TestSqlConnection' must be set for API tests.");
+    }
+
+    return connectionString;
+  }
+
   protected override void ConfigureWebHost(IWebHostBuilder builder)
   {
     builder.UseEnvironment("Test");
@@ -21,8 +33,7 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
       services.AddDbContext<NursingCareDbContext>(options =>
           {
-          options.UseSqlServer(
-                  "Server=localhost,1433;Database=NursingCareDb_ApiTests;User Id=sa;Password=1202lingSter89*;TrustServerCertificate=True;");
+          options.UseSqlServer(GetTestConnectionString());
         });
 
       var sp = services.BuildServiceProvider();

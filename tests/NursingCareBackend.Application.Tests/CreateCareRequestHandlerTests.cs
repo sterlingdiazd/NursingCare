@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
 using NursingCareBackend.Domain.CareRequests;
 using NursingCareBackend.Infrastructure.CareRequests;
@@ -9,8 +9,9 @@ namespace NursingCareBackend.Application.Tests;
 
 public sealed class CreateCareRequestHandlerTests
 {
-  private const string ConnectionString =
-      "Server=localhost,1433;Database=NursingCareDb_Test;User Id=sa;Password=1202lingSter89*;TrustServerCertificate=True;";
+  private static readonly string ConnectionString =
+      Environment.GetEnvironmentVariable("NursingCare_TestSqlConnection")
+      ?? throw new InvalidOperationException("Environment variable 'NursingCare_TestSqlConnection' must be set for application tests.");
 
   private static NursingCareDbContext CreateDbContext()
   {
