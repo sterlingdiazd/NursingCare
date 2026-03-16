@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
+using NursingCareBackend.Infrastructure;
+
 
 namespace NursingCareBackend.Api.Controllers
 {
@@ -9,23 +11,23 @@ namespace NursingCareBackend.Api.Controllers
     [Route("api/[controller]")]
     public class HealthController : ControllerBase
     {
-        private readonly IConfiguration _configuration;
+        private readonly string _connectionString;
 
-        public HealthController(IConfiguration configuration)
+        public HealthController(ResolvedConnectionString connectionString)
         {
-            _configuration = configuration;
+            _connectionString = connectionString.Value;
         }
+
 
         [HttpGet]
         public IActionResult Get()
         {
-            var dbConnectionString = _configuration.GetConnectionString("DefaultConnection");
             bool dbHealthy = false;
             string dbMessage = "Unknown";
 
             try
             {
-                using var connection = new SqlConnection(dbConnectionString);
+                using var connection = new SqlConnection(_connectionString);
                 connection.Open();
                 dbHealthy = connection.State == System.Data.ConnectionState.Open;
                 dbMessage = "Connected";
