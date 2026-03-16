@@ -5,8 +5,6 @@ using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
 using NursingCareBackend.Infrastructure.CareRequests;
 using NursingCareBackend.Infrastructure.Persistence;
 
-
-
 namespace NursingCareBackend.Infrastructure;
 
 public static class DependencyInjection
@@ -15,23 +13,13 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        var connectionString = configuration.GetConnectionString("DefaultConnection");
+        var rawConnectionString = configuration.GetConnectionString("DefaultConnection")!;
+        var resolvedConnectionString = ConnectionStringResolver.Resolve(rawConnectionString);
 
-        if (string.IsNullOrWhiteSpace(connectionString))
-        {
-            throw new InvalidOperationException("Connection string 'DefaultConnection' is not configured.");
-        }
-
-        var sqlPassword = Environment.GetEnvironmentVariable("SQL_PASSWORD");
-
-        if (!string.IsNullOrEmpty(sqlPassword) &&
-            connectionString.Contains("{SQL_PASSWORD}", StringComparison.Ordinal))
-        {
-            connectionString = connectionString.Replace("{SQL_PASSWORD}", sqlPassword, StringComparison.Ordinal);
-        }
+        services.AddSingleton(new ResolvedConnectionString(resolvedConnectionString));
 
         services.AddDbContext<NursingCareDbContext>(options =>
-            options.UseSqlServer(connectionString));
+            options.UseSqlServer(resolvedConnectionString));
 
         services.AddScoped<ICareRequestRepository, CareRequestRepository>();
 
