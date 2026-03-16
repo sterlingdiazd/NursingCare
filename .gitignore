@@ -133,3 +133,4 @@
 **/.settings/**
 **/*.launch
 .env
+.vscode/launch.json
