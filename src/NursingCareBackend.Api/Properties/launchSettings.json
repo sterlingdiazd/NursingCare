@@ -6,14 +6,14 @@
       "dotnetRunMessages": true,
       "launchBrowser": true,
       "launchUrl": "swagger",
-      "applicationUrl": "http://localhost:5050",
+      "applicationUrl": "http://localhost:8080",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
         "DB_SERVER": "localhost,1433",
         "DB_NAME": "NursingCareDb",
         "DB_USER": "sa",
-        "DB_PASSWORD": "1202lingSter89*",
-        "JWT_KEY": "3Hd0fglhCjHDXU/ncyfeAyR2mvh9y2UnSk3uUX3Wz+0="
+        "DB_PASSWORD": "YourStrong!Passw0rd",
+        "JWT_KEY": "DevelopmentOnlyJwtSigningKey12345678901234567890"
       }
     },
     "https": {
@@ -21,14 +21,14 @@
       "dotnetRunMessages": true,
       "launchBrowser": true,
       "launchUrl": "swagger",
-      "applicationUrl": "https://localhost:5050;http://localhost:5051",
+      "applicationUrl": "https://localhost:8443;http://localhost:8080",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
         "DB_SERVER": "localhost,1433",
         "DB_NAME": "NursingCareDb",
         "DB_USER": "sa",
-        "DB_PASSWORD": "1202lingSter89*",
-        "JWT_KEY": "3Hd0fglhCjHDXU/ncyfeAyR2mvh9y2UnSk3uUX3Wz+0="
+        "DB_PASSWORD": "YourStrong!Passw0rd",
+        "JWT_KEY": "DevelopmentOnlyJwtSigningKey12345678901234567890"
       }
     }
   }

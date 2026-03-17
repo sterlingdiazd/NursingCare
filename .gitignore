@@ -94,8 +94,14 @@
 # ------------------------
 **/.env
 **/.env.*
+!/.env.example
 **/*.local
 **/docker-compose.override.yml
+/.caddy/
+/nginx/certs/
+/nginx/ca/
+/src/NursingCareBackend.Api/Logs/
+/.claude/
 
 # ------------------------
 # Databases / Local State

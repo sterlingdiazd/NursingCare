@@ -2,6 +2,10 @@
 
 Backend service for managing nursing care requests. This project is implemented in ASP.NET Core with a layered architecture (`Api`, `Application`, `Domain`, `Infrastructure`) and SQL Server persistence via Entity Framework Core.
 
+Additional setup guide:
+
+- `DEV_REVERSE_PROXY_SETUP.md` for the fixed-port HTTPS proxy, local certificate trust, and cross-device development setup
+
 ## Overview
 
 - Framework: .NET `net10.0`
@@ -10,6 +14,7 @@ Backend service for managing nursing care requests. This project is implemented 
 - ORM: Entity Framework Core
 - API docs: Swagger UI enabled in all environments
 - Migration strategy: Pending EF Core migrations are applied automatically on application startup
+- Observability: Serilog request logging with correlation IDs
 
 ## Solution Structure
 
@@ -28,9 +33,15 @@ The solution follows a clean/layered approach:
 3. `Domain` enforces invariants in entities.
 4. `Infrastructure` persists domain objects and integrates external concerns (SQL Server).
 
-Current implemented flow:
+Current implemented flows:
 
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `POST /api/auth/setup-admin`
+- `POST /api/auth/assign-role`
 - `POST /api/care-requests`
+- `GET /api/care-requests`
+- `GET /api/care-requests/{id}`
 - Controller creates `CreateCareRequestCommand`
 - `CreateCareRequestHandler` builds a `CareRequest` domain entity
 - `ICareRequestRepository` persists via `CareRequestRepository`
@@ -90,6 +101,7 @@ Example success payload:
 
 - Method: `POST`
 - Route: `/api/care-requests`
+- Authentication: Bearer token required, `Nurse` or `Admin` role required
 - Request body:
 
 ```json
@@ -111,7 +123,11 @@ Example success payload:
 
 ## Configuration
 
-Main settings file: `NursingCareBackend.Api/appsettings.json`
+Main settings files:
+
+- `src/NursingCareBackend.Api/appsettings.json`
+- `src/NursingCareBackend.Api/appsettings.Development.json`
+- `.env` for Docker/reverse-proxy development
 
 Key sections:
 
@@ -123,12 +139,12 @@ Key sections:
 
 - **Database**:
 
-  - `ConnectionStrings:DefaultConnection` in `appsettings*.json` uses a placeholder password: `Password={SQL_PASSWORD}`.
-  - At runtime, the `SQL_PASSWORD` environment variable is read and substituted into the connection string in `NursingCareBackend.Infrastructure/DependencyInjection.cs`.
+  - `ConnectionStrings:DefaultConnection` in `appsettings*.json` uses placeholders such as `{DB_SERVER}` and `{DB_PASSWORD}`.
+  - At runtime, environment variables are substituted into the connection string in `NursingCareBackend.Infrastructure/ConnectionStringResolver.cs`.
   - Alternatively, you can override the entire connection string via `ConnectionStrings__DefaultConnection` (standard .NET configuration).
   - In CI and local/dev, you must set **either**:
     - `ConnectionStrings__DefaultConnection` **or**
-    - `SQL_PASSWORD` (plus matching SQL Server `sa` password).
+    - the required DB environment variables (`DB_SERVER`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`).
 
 - **Tests**:
 
@@ -156,21 +172,28 @@ Default allowed origins:
 
 ### Run
 
-From the `src` directory:
+Preferred local development uses Docker Compose plus the Nginx reverse proxy documented in `DEV_REVERSE_PROXY_SETUP.md`.
+
+For direct API debugging:
 
 ```bash
-dotnet restore src.sln
-dotnet run --project NursingCareBackend.Api
+dotnet restore NursingCareBackend.slnx
+dotnet run --project src/NursingCareBackend.Api/NursingCareBackend.Api.csproj
 ```
 
-By default (launch profiles), API URLs are:
+Direct launch profile URLs are:
 
-- `http://localhost:5050` (http profile)
-- `https://localhost:5050` and `http://localhost:5051` (https profile)
+- `http://localhost:8080` (http profile)
+- `https://localhost:8443` and `http://localhost:8080` (https profile)
 
 Swagger UI:
 
-- `http://localhost:5050/swagger` (or active host/port)
+- `http://localhost:8080/swagger`
+- `https://localhost:8443/swagger`
+
+For shared local development across web and mobile, use the reverse proxy endpoint:
+
+- `https://<lan-ip>:5050/swagger/index.html`
 
 ## Database & Migrations
 
@@ -202,11 +225,9 @@ Implemented:
 
 Not currently implemented:
 
-- Automated tests
-- Authentication/authorization
-- Update/read/list/delete endpoints for care requests
-- Input validation pipeline beyond domain constructor checks
-- Observability setup (structured logging, tracing, metrics)
+- Automated tests for the new auth/logging/proxy behavior
+- Update/delete care request endpoints
+- Metrics and distributed tracing
 
 ## Security Note
 
