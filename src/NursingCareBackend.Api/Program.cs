@@ -49,7 +49,24 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.UseSwagger();
-app.UseSwaggerUI();
+app.UseSwaggerUI(c =>
+{
+    c.ConfigObject.AdditionalItems["securitySchemes"] = new Dictionary<string, object>
+    {
+        ["Bearer"] = new
+        {
+            type = "http",
+            scheme = "bearer",
+            bearerFormat = "JWT",
+            description = "Enter your JWT token in the format: Bearer {token}"
+        }
+    };
+
+    c.ConfigObject.AdditionalItems["security"] = new List<Dictionary<string, List<string>>>
+    {
+        new() { { "Bearer", new List<string>() } }
+    };
+});
 
 app.MapControllers();
 
