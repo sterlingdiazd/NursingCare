@@ -4,6 +4,7 @@ using NursingCareBackend.Api.Middleware;
 using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
 using NursingCareBackend.Application.CareRequests.Queries;
 using NursingCareBackend.Infrastructure;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -45,27 +46,21 @@ app.UseCors("AllowAllDev");
 // app.UseCors("AllowWebApp");
 // app.UseCors("AllowMobileApp");
 
+// Enable static files for custom Swagger UI
+app.UseStaticFiles();
+
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.UseSwagger();
-app.UseSwaggerUI(c =>
+app.UseSwaggerUI(options =>
 {
-    c.ConfigObject.AdditionalItems["securitySchemes"] = new Dictionary<string, object>
-    {
-        ["Bearer"] = new
-        {
-            type = "http",
-            scheme = "bearer",
-            bearerFormat = "JWT",
-            description = "Enter your JWT token in the format: Bearer {token}"
-        }
-    };
-
-    c.ConfigObject.AdditionalItems["security"] = new List<Dictionary<string, List<string>>>
-    {
-        new() { { "Bearer", new List<string>() } }
-    };
+  options.SwaggerEndpoint("/swagger/v1/swagger.json", "Nursing Care API v1");
+  
+  // Inject custom JavaScript for JWT Authorize button
+  options.HeadContent = @"
+    <script src='/swagger-ui-custom.js'></script>
+  ";
 });
 
 app.MapControllers();
