@@ -45,13 +45,37 @@ public sealed class AuthController : ControllerBase
     /// <response code="400">Invalid credentials</response>
     [HttpPost("login")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Login(
         [FromBody] LoginRequest request,
         CancellationToken cancellationToken)
     {
-        var response = await _authenticationService.LoginAsync(request, cancellationToken);
-        return Ok(response);
+        try
+        {
+            var response = await _authenticationService.LoginAsync(request, cancellationToken);
+            return Ok(response);
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "Invalid email or password.")
+        {
+            return Unauthorized(new ProblemDetails
+            {
+                Status = StatusCodes.Status401Unauthorized,
+                Title = "Login failed",
+                Detail = ex.Message,
+                Instance = HttpContext.Request.Path
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Title = "Login failed",
+                Detail = ex.Message,
+                Instance = HttpContext.Request.Path
+            });
+        }
     }
 
     /// <summary>

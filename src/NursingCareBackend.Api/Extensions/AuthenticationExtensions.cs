@@ -1,4 +1,5 @@
 using System.Text;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -34,6 +35,8 @@ public static class AuthenticationExtensions
           ValidateAudience = true,
           ValidateLifetime = true,
           ValidateIssuerSigningKey = true,
+          NameClaimType = ClaimTypes.Email,
+          RoleClaimType = ClaimTypes.Role,
           ValidIssuer = jwtIssuer,
           ValidAudience = jwtAudience,
           IssuerSigningKey = signingKey
@@ -49,4 +52,3 @@ public static class AuthenticationExtensions
     return services;
   }
 }
-

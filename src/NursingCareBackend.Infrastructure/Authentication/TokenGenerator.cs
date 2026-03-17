@@ -45,6 +45,7 @@ public sealed class TokenGenerator : ITokenGenerator
         var claims = new List<Claim>
         {
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new Claim(ClaimTypes.Name, user.Email),
             new Claim(ClaimTypes.Email, user.Email),
         };
 
