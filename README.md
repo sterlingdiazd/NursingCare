@@ -119,6 +119,25 @@ Key sections:
 - `Cors:WebOrigins`
 - `Cors:MobileOrigins`
 
+### Secrets and environment variables
+
+- **Database**:
+
+  - `ConnectionStrings:DefaultConnection` in `appsettings*.json` uses a placeholder password: `Password={SQL_PASSWORD}`.
+  - At runtime, the `SQL_PASSWORD` environment variable is read and substituted into the connection string in `NursingCareBackend.Infrastructure/DependencyInjection.cs`.
+  - Alternatively, you can override the entire connection string via `ConnectionStrings__DefaultConnection` (standard .NET configuration).
+  - In CI and local/dev, you must set **either**:
+    - `ConnectionStrings__DefaultConnection` **or**
+    - `SQL_PASSWORD` (plus matching SQL Server `sa` password).
+
+- **Tests**:
+
+  - Integration tests use `NursingCare_TestSqlConnection` to connect to a separate test database.
+
+- **JWT**:
+  - JWT settings are configured under `Jwt` in `appsettings.json`.
+  - For production, set `Jwt__Key` (and optionally `Jwt__Issuer`, `Jwt__Audience`) via environment variables rather than committing real secrets.
+
 Note: In `appsettings.Development.json` and `appsettings.Docker.json`, `ConnectionStrings` and `Cors` are currently nested under `Logging`. The active default root-level values are defined in `appsettings.json`.
 
 Default CORS policy configured and applied: `AllowAllDev`.
@@ -191,7 +210,11 @@ Not currently implemented:
 
 ## Security Note
 
-Current configuration files include a SQL Server credential in plaintext. For production and shared environments, move secrets to secure configuration providers (for example: environment variables, user secrets, or a secret manager) and rotate exposed credentials.
+- App settings and CI workflow files are designed to use **placeholders only** (`{SQL_PASSWORD}`, example passwords) and expect real secrets from environment variables.
+- For production and shared environments, always provide:
+  - Database secrets via `ConnectionStrings__DefaultConnection` or `SQL_PASSWORD`.
+  - JWT signing key via `Jwt__Key`.
+  - Test-only connection strings via `NursingCare_TestSqlConnection` (for CI/test environments only).
 
 ## Quick Links
 
