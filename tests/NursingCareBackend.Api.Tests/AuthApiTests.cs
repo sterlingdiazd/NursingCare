@@ -113,6 +113,64 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
   }
 
   [Fact]
+  public async Task GET_GoogleStart_Should_Redirect_To_Google()
+  {
+    var client = _factory.CreateClient(new WebApplicationFactoryClientOptions
+    {
+      AllowAutoRedirect = false
+    });
+
+    var response = await client.GetAsync("/api/auth/google/start");
+
+    Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+    Assert.NotNull(response.Headers.Location);
+    Assert.StartsWith(
+      "https://accounts.google.com/o/oauth2/v2/auth",
+      response.Headers.Location!.ToString(),
+      StringComparison.Ordinal);
+  }
+
+  [Fact]
+  public async Task GET_GoogleCallback_Should_Redirect_Back_To_Login_With_Tokens()
+  {
+    var client = _factory.CreateClient(new WebApplicationFactoryClientOptions
+    {
+      AllowAutoRedirect = false
+    });
+
+    var response = await client.GetAsync("/api/auth/google/callback?code=google-success");
+
+    Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+    Assert.NotNull(response.Headers.Location);
+
+    var location = response.Headers.Location!.ToString();
+    Assert.StartsWith("http://localhost:3000/login#", location, StringComparison.Ordinal);
+    Assert.Contains("oauth=success", location, StringComparison.Ordinal);
+    Assert.Contains("email=google-success%40example.com", location, StringComparison.Ordinal);
+    Assert.Contains("roles=User", location, StringComparison.Ordinal);
+    Assert.Contains("token=", location, StringComparison.Ordinal);
+    Assert.Contains("refreshToken=", location, StringComparison.Ordinal);
+  }
+
+  [Fact]
+  public async Task GET_GoogleCallback_Should_Redirect_Back_To_Login_With_Error_When_Google_Fails()
+  {
+    var client = _factory.CreateClient(new WebApplicationFactoryClientOptions
+    {
+      AllowAutoRedirect = false
+    });
+
+    var response = await client.GetAsync("/api/auth/google/callback?error=access_denied");
+
+    Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+    Assert.NotNull(response.Headers.Location);
+
+    var location = response.Headers.Location!.ToString();
+    Assert.StartsWith("http://localhost:3000/login#", location, StringComparison.Ordinal);
+    Assert.Contains("oauth=error", location, StringComparison.Ordinal);
+  }
+
+  [Fact]
   public async Task GET_CareRequests_Should_Return_Unauthorized_When_Token_Is_Missing()
   {
     var client = _factory.CreateClient();
