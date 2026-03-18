@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+cd "$ROOT_DIR"
+
+if [[ -f ".env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source ".env"
+  set +a
+fi
+
+DB_HOST="${DB_HOST:-localhost}"
+DB_PORT="${DB_PORT:-1433}"
+DB_NAME="${DB_NAME:-NursingCareDb_Test}"
+DB_USER="${DB_USER:-sa}"
+SQL_PASSWORD="${SQL_PASSWORD:-YourStrong!Passw0rd}"
+
+export NursingCare_TestSqlConnection="Server=${DB_HOST},${DB_PORT};Database=${DB_NAME}_Test;User Id=${DB_USER};Password=${SQL_PASSWORD};TrustServerCertificate=True;"
+
+dotnet test src/src.sln --configuration Release

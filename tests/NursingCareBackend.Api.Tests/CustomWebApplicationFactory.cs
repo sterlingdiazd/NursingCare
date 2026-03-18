@@ -27,14 +27,14 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
     builder.ConfigureServices(services =>
     {
       var descriptor = services.Single(
-              d => d.ServiceType == typeof(DbContextOptions<NursingCareDbContext>));
+        d => d.ServiceType == typeof(DbContextOptions<NursingCareDbContext>));
 
       services.Remove(descriptor);
 
       services.AddDbContext<NursingCareDbContext>(options =>
-          {
-          options.UseSqlServer(GetTestConnectionString());
-        });
+      {
+        options.UseSqlServer(GetTestConnectionString());
+      });
 
       var sp = services.BuildServiceProvider();
 

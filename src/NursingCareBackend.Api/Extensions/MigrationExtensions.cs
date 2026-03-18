@@ -16,6 +16,16 @@ namespace NursingCareBackend.Api.Extensions
 
       try
       {
+        if (string.Equals(
+          db.Database.ProviderName,
+          "Microsoft.EntityFrameworkCore.InMemory",
+          StringComparison.Ordinal))
+        {
+          db.Database.EnsureCreated();
+          Console.WriteLine("In-memory database created successfully.");
+          return;
+        }
+
         db.Database.Migrate();
         Console.WriteLine("Database created and migrations applied successfully.");
       }

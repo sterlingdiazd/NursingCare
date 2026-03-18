@@ -1,5 +1,9 @@
 # Development HTTPS And Logging Setup
 
+Shared cross-project source of truth:
+
+- [Environment Matrix](./ENVIRONMENT_MATRIX.md)
+
 This backend is designed to run behind a local Nginx reverse proxy so the web app, Swagger, and Expo Go can all use the same stable public endpoint:
 
 - Public API: `https://<your-lan-ip>:5050`

@@ -10,6 +10,12 @@ namespace NursingCareBackend.Api.Tests;
 internal static class JwtTestTokens
 {
   public static string CreateWriterToken(IServiceProvider services)
+    => CreateToken(services, "Nurse");
+
+  public static string CreateAdminToken(IServiceProvider services)
+    => CreateToken(services, "Admin");
+
+  public static string CreateToken(IServiceProvider services, params string[] roles)
   {
     var configuration = services.GetRequiredService<IConfiguration>();
     var jwtSection = configuration.GetSection("Jwt");
@@ -26,8 +32,9 @@ internal static class JwtTestTokens
     var claims = new[]
     {
       new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
-      new Claim(ClaimTypes.Role, "Nurse")
-    };
+      new Claim(ClaimTypes.Email, "test.user@nursingcare.local")
+    }
+    .Concat(roles.Select(role => new Claim(ClaimTypes.Role, role)));
 
     var token = new JwtSecurityToken(
       issuer: issuer,
@@ -39,4 +46,3 @@ internal static class JwtTestTokens
     return new JwtSecurityTokenHandler().WriteToken(token);
   }
 }
-
