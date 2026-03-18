@@ -56,6 +56,16 @@ public sealed class NursingCareDbContext : DbContext
       builder.HasIndex(x => x.Email)
              .IsUnique();
 
+      builder.Property(x => x.DisplayName)
+                 .HasMaxLength(256);
+
+      builder.Property(x => x.GoogleSubjectId)
+                 .HasMaxLength(256);
+
+      builder.HasIndex(x => x.GoogleSubjectId)
+             .IsUnique()
+             .HasFilter("[GoogleSubjectId] IS NOT NULL");
+
       builder.Property(x => x.PasswordHash)
                  .IsRequired();
 

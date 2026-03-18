@@ -1,8 +1,10 @@
 using NursingCareBackend.Application.Identity.Authentication;
+using NursingCareBackend.Application.Identity.OAuth;
 using NursingCareBackend.Application.Identity.Commands;
 using NursingCareBackend.Application.Identity.Repositories;
 using NursingCareBackend.Application.Identity.Responses;
 using NursingCareBackend.Domain.Identity;
+using System.Security.Cryptography;
 
 namespace NursingCareBackend.Application.Identity.Services;
 
@@ -13,19 +15,22 @@ public sealed class AuthenticationService : IAuthenticationService
     private readonly IRefreshTokenRepository _refreshTokenRepository;
     private readonly IPasswordHasher _passwordHasher;
     private readonly ITokenGenerator _tokenGenerator;
+    private readonly IGoogleOAuthClient _googleOAuthClient;
 
     public AuthenticationService(
         IUserRepository userRepository,
         IRoleRepository roleRepository,
         IRefreshTokenRepository refreshTokenRepository,
         IPasswordHasher passwordHasher,
-        ITokenGenerator tokenGenerator)
+        ITokenGenerator tokenGenerator,
+        IGoogleOAuthClient googleOAuthClient)
     {
         _userRepository = userRepository;
         _roleRepository = roleRepository;
         _refreshTokenRepository = refreshTokenRepository;
         _passwordHasher = passwordHasher;
         _tokenGenerator = tokenGenerator;
+        _googleOAuthClient = googleOAuthClient;
     }
 
     public async Task<AuthResponse> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default)
@@ -130,6 +135,64 @@ public sealed class AuthenticationService : IAuthenticationService
         }
 
         // Check if user is active
+        if (!user.IsActive)
+        {
+            throw new InvalidOperationException("User account is not active.");
+        }
+
+        return await CreateAuthResponseAsync(user, cancellationToken);
+    }
+
+    public async Task<AuthResponse> LoginWithGoogleAsync(
+        string authorizationCode,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(authorizationCode))
+        {
+            throw new ArgumentException("Google authorization code is required.", nameof(authorizationCode));
+        }
+
+        var googleUser = await _googleOAuthClient.GetUserInfoAsync(authorizationCode, cancellationToken);
+
+        if (!googleUser.EmailVerified)
+        {
+            throw new InvalidOperationException("Google account email is not verified.");
+        }
+
+        var user = await _userRepository.GetByGoogleSubjectIdAsync(googleUser.Subject, cancellationToken);
+
+        if (user is null)
+        {
+            var existingUser = await _userRepository.GetByEmailAsync(googleUser.Email, cancellationToken);
+
+            if (existingUser is not null)
+            {
+                if (!string.IsNullOrWhiteSpace(existingUser.GoogleSubjectId)
+                    && !string.Equals(existingUser.GoogleSubjectId, googleUser.Subject, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Google sign-in is already linked to a different account.");
+                }
+
+                if (!existingUser.IsActive)
+                {
+                    throw new InvalidOperationException("User account is not active.");
+                }
+
+                existingUser.GoogleSubjectId = googleUser.Subject;
+                if (string.IsNullOrWhiteSpace(existingUser.DisplayName))
+                {
+                    existingUser.DisplayName = googleUser.Name;
+                }
+
+                await _userRepository.UpdateAsync(existingUser, cancellationToken);
+                user = existingUser;
+            }
+            else
+            {
+                user = await CreateGoogleUserAsync(googleUser, cancellationToken);
+            }
+        }
+
         if (!user.IsActive)
         {
             throw new InvalidOperationException("User account is not active.");
@@ -322,5 +385,36 @@ public sealed class AuthenticationService : IAuthenticationService
             Email: user.Email,
             Roles: user.UserRoles.Select(ur => ur.Role.Name)
         );
+    }
+
+    private async Task<User> CreateGoogleUserAsync(
+        GoogleOAuthUserInfo googleUser,
+        CancellationToken cancellationToken)
+    {
+        var userRole = await _roleRepository.GetByNameAsync("User", cancellationToken);
+        if (userRole is null)
+        {
+            throw new InvalidOperationException("User role not found in the system.");
+        }
+
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Email = googleUser.Email,
+            DisplayName = googleUser.Name,
+            GoogleSubjectId = googleUser.Subject,
+            PasswordHash = _passwordHasher.Hash(Convert.ToHexString(RandomNumberGenerator.GetBytes(16))),
+            IsActive = true,
+            CreatedAtUtc = DateTime.UtcNow
+        };
+
+        user.UserRoles.Add(new UserRole
+        {
+            UserId = user.Id,
+            RoleId = userRole.Id,
+            Role = userRole
+        });
+
+        return await _userRepository.CreateAsync(user, cancellationToken);
     }
 }

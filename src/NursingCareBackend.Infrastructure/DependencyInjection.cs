@@ -1,8 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
 using NursingCareBackend.Application.Identity.Authentication;
+using NursingCareBackend.Application.Identity.OAuth;
 using NursingCareBackend.Application.Identity.Repositories;
 using NursingCareBackend.Application.Identity.Services;
 using NursingCareBackend.Infrastructure.Authentication;
@@ -26,6 +28,23 @@ public static class DependencyInjection
         services.AddDbContext<NursingCareDbContext>(options =>
             options.UseSqlServer(resolvedConnectionString));
 
+        services.Configure<GoogleOAuthOptions>(options =>
+        {
+            var section = configuration.GetSection(GoogleOAuthOptions.SectionName);
+            options.ClientId = Environment.GetEnvironmentVariable("GOOGLE_CLIENT_ID")
+                ?? section["ClientId"]
+                ?? string.Empty;
+            options.ClientSecret = Environment.GetEnvironmentVariable("GOOGLE_CLIENT_SECRET")
+                ?? section["ClientSecret"]
+                ?? string.Empty;
+            options.RedirectUri = Environment.GetEnvironmentVariable("GOOGLE_OAUTH_REDIRECT_URI")
+                ?? section["RedirectUri"]
+                ?? string.Empty;
+            options.FrontendRedirectUrl = Environment.GetEnvironmentVariable("GOOGLE_OAUTH_FRONTEND_REDIRECT_URL")
+                ?? section["FrontendRedirectUrl"]
+                ?? string.Empty;
+        });
+
         // Care Request Repository
         services.AddScoped<ICareRequestRepository, CareRequestRepository>();
 
@@ -37,6 +56,10 @@ public static class DependencyInjection
         // Authentication Services
         services.AddScoped<IPasswordHasher, PasswordHasher>();
         services.AddScoped<ITokenGenerator, TokenGenerator>();
+        services.AddScoped<IGoogleOAuthClient>(serviceProvider =>
+            new GoogleOAuthClient(
+                new HttpClient(),
+                serviceProvider.GetRequiredService<IOptions<GoogleOAuthOptions>>()));
         services.AddScoped<IAuthenticationService, AuthenticationService>();
 
         return services;
