@@ -34,7 +34,8 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         ["GoogleOAuth:ClientId"] = "test-google-client-id",
         ["GoogleOAuth:ClientSecret"] = "test-google-client-secret",
         ["GoogleOAuth:RedirectUri"] = "https://localhost/api/auth/google/callback",
-        ["GoogleOAuth:FrontendRedirectUrl"] = "http://localhost:3000/login"
+        ["GoogleOAuth:FrontendRedirectUrl"] = "http://localhost:3000/login",
+        ["GoogleOAuth:MobileRedirectUrl"] = "nursingcaremobile://login"
       });
     });
 
@@ -64,8 +65,10 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
   private sealed class FakeGoogleOAuthClient : IGoogleOAuthClient
   {
-    public string BuildAuthorizationUrl()
-      => "https://accounts.google.com/o/oauth2/v2/auth?client_id=test-google-client-id";
+    public string BuildAuthorizationUrl(string? state = null)
+      => state is null
+        ? "https://accounts.google.com/o/oauth2/v2/auth?client_id=test-google-client-id"
+        : $"https://accounts.google.com/o/oauth2/v2/auth?client_id=test-google-client-id&state={state}";
 
     public Task<GoogleOAuthUserInfo> GetUserInfoAsync(
       string authorizationCode,

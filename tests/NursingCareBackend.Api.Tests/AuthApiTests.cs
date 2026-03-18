@@ -131,6 +131,21 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
   }
 
   [Fact]
+  public async Task GET_GoogleStart_Should_Include_Mobile_Target_In_State()
+  {
+    var client = _factory.CreateClient(new WebApplicationFactoryClientOptions
+    {
+      AllowAutoRedirect = false
+    });
+
+    var response = await client.GetAsync("/api/auth/google/start?target=mobile");
+
+    Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+    Assert.NotNull(response.Headers.Location);
+    Assert.Contains("state=mobile", response.Headers.Location!.ToString(), StringComparison.Ordinal);
+  }
+
+  [Fact]
   public async Task GET_GoogleCallback_Should_Redirect_Back_To_Login_With_Tokens()
   {
     var client = _factory.CreateClient(new WebApplicationFactoryClientOptions
@@ -168,6 +183,26 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
     var location = response.Headers.Location!.ToString();
     Assert.StartsWith("http://localhost:3000/login#", location, StringComparison.Ordinal);
     Assert.Contains("oauth=error", location, StringComparison.Ordinal);
+  }
+
+  [Fact]
+  public async Task GET_GoogleCallback_Should_Redirect_Back_To_Mobile_Deep_Link()
+  {
+    var client = _factory.CreateClient(new WebApplicationFactoryClientOptions
+    {
+      AllowAutoRedirect = false
+    });
+
+    var response = await client.GetAsync("/api/auth/google/callback?code=google-success&state=mobile");
+
+    Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+    Assert.NotNull(response.Headers.Location);
+
+    var location = response.Headers.Location!.ToString();
+    Assert.StartsWith("nursingcaremobile://login?", location, StringComparison.Ordinal);
+    Assert.Contains("oauth=success", location, StringComparison.Ordinal);
+    Assert.Contains("email=google-success%40example.com", location, StringComparison.Ordinal);
+    Assert.Contains("roles=User", location, StringComparison.Ordinal);
   }
 
   [Fact]

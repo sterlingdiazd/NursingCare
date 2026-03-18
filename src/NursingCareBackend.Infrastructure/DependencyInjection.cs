@@ -43,6 +43,9 @@ public static class DependencyInjection
             options.FrontendRedirectUrl = Environment.GetEnvironmentVariable("GOOGLE_OAUTH_FRONTEND_REDIRECT_URL")
                 ?? section["FrontendRedirectUrl"]
                 ?? string.Empty;
+            options.MobileRedirectUrl = Environment.GetEnvironmentVariable("GOOGLE_OAUTH_MOBILE_REDIRECT_URL")
+                ?? section["MobileRedirectUrl"]
+                ?? string.Empty;
         });
 
         // Care Request Repository

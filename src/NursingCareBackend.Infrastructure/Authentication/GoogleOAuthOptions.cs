@@ -8,4 +8,5 @@ public sealed class GoogleOAuthOptions
     public string ClientSecret { get; set; } = string.Empty;
     public string RedirectUri { get; set; } = string.Empty;
     public string FrontendRedirectUrl { get; set; } = string.Empty;
+    public string MobileRedirectUrl { get; set; } = string.Empty;
 }

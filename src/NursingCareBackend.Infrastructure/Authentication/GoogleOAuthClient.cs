@@ -21,7 +21,7 @@ public sealed class GoogleOAuthClient : IGoogleOAuthClient
         _options = options.Value;
     }
 
-    public string BuildAuthorizationUrl()
+    public string BuildAuthorizationUrl(string? state = null)
     {
         EnsureConfigured();
 
@@ -35,6 +35,11 @@ public sealed class GoogleOAuthClient : IGoogleOAuthClient
             ["include_granted_scopes"] = "true",
             ["prompt"] = "select_account"
         };
+
+        if (!string.IsNullOrWhiteSpace(state))
+        {
+            parameters["state"] = state;
+        }
 
         var query = string.Join(
             "&",

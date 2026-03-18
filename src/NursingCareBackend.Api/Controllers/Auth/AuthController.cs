@@ -99,11 +99,12 @@ public sealed class AuthController : ControllerBase
     [HttpGet("google/start")]
     [ProducesResponseType(StatusCodes.Status302Found)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public IActionResult StartGoogleLogin()
+    public IActionResult StartGoogleLogin([FromQuery] string? target)
     {
         try
         {
-            return Redirect(_googleOAuthClient.BuildAuthorizationUrl());
+            var redirectTarget = NormalizeRedirectTarget(target);
+            return Redirect(_googleOAuthClient.BuildAuthorizationUrl(redirectTarget));
         }
         catch (InvalidOperationException ex)
         {
@@ -125,29 +126,38 @@ public sealed class AuthController : ControllerBase
     public async Task<IActionResult> GoogleCallback(
         [FromQuery] string? code,
         [FromQuery] string? error,
+        [FromQuery] string? state,
         CancellationToken cancellationToken)
     {
+        var redirectTarget = NormalizeRedirectTarget(state);
+
         if (!string.IsNullOrWhiteSpace(error))
         {
             _logger.LogWarning("Google OAuth returned an error: {OAuthError}", error);
-            return Redirect(BuildFrontendFailureRedirect("Error al iniciar sesión con Google. Por favor intenta de nuevo."));
+            return Redirect(BuildFailureRedirect(
+                "Error al iniciar sesión con Google. Por favor intenta de nuevo.",
+                redirectTarget));
         }
 
         if (string.IsNullOrWhiteSpace(code))
         {
             _logger.LogWarning("Google OAuth callback arrived without an authorization code.");
-            return Redirect(BuildFrontendFailureRedirect("Error al iniciar sesión con Google. Por favor intenta de nuevo."));
+            return Redirect(BuildFailureRedirect(
+                "Error al iniciar sesión con Google. Por favor intenta de nuevo.",
+                redirectTarget));
         }
 
         try
         {
             var response = await _authenticationService.LoginWithGoogleAsync(code, cancellationToken);
-            return Redirect(BuildFrontendSuccessRedirect(response));
+            return Redirect(BuildSuccessRedirect(response, redirectTarget));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "OAuth error: {OAuthError}", ex.Message);
-            return Redirect(BuildFrontendFailureRedirect("Error al iniciar sesión con Google. Por favor intenta de nuevo."));
+            return Redirect(BuildFailureRedirect(
+                "Error al iniciar sesión con Google. Por favor intenta de nuevo.",
+                redirectTarget));
         }
     }
 
@@ -289,9 +299,9 @@ public sealed class AuthController : ControllerBase
         }
     }
 
-    private string BuildFrontendSuccessRedirect(AuthResponse response)
+    private string BuildSuccessRedirect(AuthResponse response, string redirectTarget)
     {
-        return BuildFrontendRedirect(new Dictionary<string, string?>
+        return BuildRedirect(new Dictionary<string, string?>
         {
             ["oauth"] = "success",
             ["token"] = response.Token,
@@ -299,19 +309,28 @@ public sealed class AuthController : ControllerBase
             ["expiresAtUtc"] = response.ExpiresAtUtc?.ToString("O"),
             ["email"] = response.Email,
             ["roles"] = string.Join(",", response.Roles)
-        });
+        }, redirectTarget);
     }
 
-    private string BuildFrontendFailureRedirect(string message)
+    private string BuildFailureRedirect(string message, string redirectTarget)
     {
-        return BuildFrontendRedirect(new Dictionary<string, string?>
+        return BuildRedirect(new Dictionary<string, string?>
         {
             ["oauth"] = "error",
             ["message"] = message
-        });
+        }, redirectTarget);
     }
 
-    private string BuildFrontendRedirect(IReadOnlyDictionary<string, string?> fragmentParameters)
+    private string BuildRedirect(
+        IReadOnlyDictionary<string, string?> parameters,
+        string redirectTarget)
+    {
+        return string.Equals(redirectTarget, "mobile", StringComparison.OrdinalIgnoreCase)
+            ? BuildMobileRedirect(parameters)
+            : BuildWebRedirect(parameters);
+    }
+
+    private string BuildWebRedirect(IReadOnlyDictionary<string, string?> fragmentParameters)
     {
         if (string.IsNullOrWhiteSpace(_googleOAuthOptions.FrontendRedirectUrl))
         {
@@ -325,4 +344,18 @@ public sealed class AuthController : ControllerBase
 
         return $"{baseUri}#{fragment}";
     }
+
+    private string BuildMobileRedirect(IReadOnlyDictionary<string, string?> queryParameters)
+    {
+        if (string.IsNullOrWhiteSpace(_googleOAuthOptions.MobileRedirectUrl))
+        {
+            throw new InvalidOperationException(
+                "Google OAuth mobile redirect is not configured. Set GOOGLE_OAUTH_MOBILE_REDIRECT_URL.");
+        }
+
+        return QueryHelpers.AddQueryString(_googleOAuthOptions.MobileRedirectUrl, queryParameters);
+    }
+
+    private static string NormalizeRedirectTarget(string? target)
+        => string.Equals(target, "mobile", StringComparison.OrdinalIgnoreCase) ? "mobile" : "web";
 }
