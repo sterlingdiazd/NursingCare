@@ -1,5 +1,6 @@
 using NursingCareBackend.Application.Identity.Authentication;
 using NursingCareBackend.Application.Identity.Commands;
+using NursingCareBackend.Application.Identity.OAuth;
 using NursingCareBackend.Application.Identity.Repositories;
 using NursingCareBackend.Application.Identity.Services;
 using NursingCareBackend.Domain.Identity;
@@ -106,19 +107,100 @@ public sealed class AuthenticationServiceTests
     Assert.Equal("Refresh token is invalid or expired.", exception.Message);
   }
 
+  [Fact]
+  public async Task LoginWithGoogleAsync_Should_Create_A_New_Active_Client_User()
+  {
+    var userRole = new Role
+    {
+      Id = Guid.NewGuid(),
+      Name = "User"
+    };
+
+    var userRepository = new FakeUserRepository();
+    var service = CreateService(
+      userRepository: userRepository,
+      roleRepository: new FakeRoleRepository(userRole),
+      googleOAuthClient: new FakeGoogleOAuthClient(
+        new GoogleOAuthUserInfo("google-subject-1", "google-user@example.com", "Google User", true)));
+
+    var response = await service.LoginWithGoogleAsync("google-auth-code");
+
+    Assert.Equal("jwt-token-1", response.Token);
+    Assert.Equal("google-user@example.com", response.Email);
+    Assert.Contains("User", response.Roles);
+
+    var createdUser = Assert.Single(userRepository.CreatedUsers);
+    Assert.True(createdUser.IsActive);
+    Assert.Equal("google-subject-1", createdUser.GoogleSubjectId);
+    Assert.Equal("Google User", createdUser.DisplayName);
+    Assert.Contains(createdUser.UserRoles, userRoleLink => userRoleLink.Role.Name == "User");
+  }
+
+  [Fact]
+  public async Task LoginWithGoogleAsync_Should_Link_An_Existing_Active_User_By_Email()
+  {
+    var userRole = new Role
+    {
+      Id = Guid.NewGuid(),
+      Name = "User"
+    };
+
+    var existingUser = CreateUser("existing@example.com", userRole);
+    var userRepository = new FakeUserRepository(existingUser);
+    var service = CreateService(
+      userRepository: userRepository,
+      roleRepository: new FakeRoleRepository(userRole),
+      googleOAuthClient: new FakeGoogleOAuthClient(
+        new GoogleOAuthUserInfo("google-subject-2", "existing@example.com", "Existing User", true)));
+
+    var response = await service.LoginWithGoogleAsync("google-auth-code");
+
+    Assert.Equal("existing@example.com", response.Email);
+    Assert.Empty(userRepository.CreatedUsers);
+    Assert.Equal("google-subject-2", existingUser.GoogleSubjectId);
+    Assert.Equal("Existing User", existingUser.DisplayName);
+  }
+
+  [Fact]
+  public async Task LoginWithGoogleAsync_Should_Reject_Inactive_Existing_User_By_Email()
+  {
+    var nurseRole = new Role
+    {
+      Id = Guid.NewGuid(),
+      Name = "Nurse"
+    };
+
+    var existingUser = CreateUser("pending@example.com", nurseRole);
+    existingUser.IsActive = false;
+
+    var service = CreateService(
+      userRepository: new FakeUserRepository(existingUser),
+      roleRepository: new FakeRoleRepository(nurseRole),
+      googleOAuthClient: new FakeGoogleOAuthClient(
+        new GoogleOAuthUserInfo("google-subject-3", "pending@example.com", "Pending User", true)));
+
+    var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+      service.LoginWithGoogleAsync("google-auth-code"));
+
+    Assert.Equal("User account is not active.", exception.Message);
+  }
+
   private static AuthenticationService CreateService(
     IUserRepository? userRepository = null,
     IRoleRepository? roleRepository = null,
     IRefreshTokenRepository? refreshTokenRepository = null,
     IPasswordHasher? passwordHasher = null,
-    ITokenGenerator? tokenGenerator = null)
+    ITokenGenerator? tokenGenerator = null,
+    IGoogleOAuthClient? googleOAuthClient = null)
   {
     return new AuthenticationService(
       userRepository ?? new FakeUserRepository(),
       roleRepository ?? new FakeRoleRepository(),
       refreshTokenRepository ?? new FakeRefreshTokenRepository(),
       passwordHasher ?? new FakePasswordHasher(),
-      tokenGenerator ?? new FakeTokenGenerator());
+      tokenGenerator ?? new FakeTokenGenerator(),
+      googleOAuthClient ?? new FakeGoogleOAuthClient(
+        new GoogleOAuthUserInfo("default-google-subject", "default@example.com", "Default User", true)));
   }
 
   private static User CreateUser(string email, Role role)
@@ -147,19 +229,41 @@ public sealed class AuthenticationServiceTests
   {
     private readonly Dictionary<Guid, User> _usersById = new();
     private readonly Dictionary<string, User> _usersByEmail = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, User> _usersByGoogleSubjectId = new(StringComparer.Ordinal);
 
     public List<User> CreatedUsers { get; } = [];
+
+    public FakeUserRepository(params User[] users)
+    {
+      foreach (var user in users)
+      {
+        _usersById[user.Id] = user;
+        _usersByEmail[user.Email] = user;
+        if (!string.IsNullOrWhiteSpace(user.GoogleSubjectId))
+        {
+          _usersByGoogleSubjectId[user.GoogleSubjectId] = user;
+        }
+      }
+    }
 
     public Task<User> CreateAsync(User user, CancellationToken cancellationToken = default)
     {
       _usersById[user.Id] = user;
       _usersByEmail[user.Email] = user;
+      if (!string.IsNullOrWhiteSpace(user.GoogleSubjectId))
+      {
+        _usersByGoogleSubjectId[user.GoogleSubjectId] = user;
+      }
+
       CreatedUsers.Add(user);
       return Task.FromResult(user);
     }
 
     public Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
       => Task.FromResult(_usersByEmail.TryGetValue(email, out var user) ? user : null);
+
+    public Task<User?> GetByGoogleSubjectIdAsync(string googleSubjectId, CancellationToken cancellationToken = default)
+      => Task.FromResult(_usersByGoogleSubjectId.TryGetValue(googleSubjectId, out var user) ? user : null);
 
     public Task<User?> GetByIdAsync(Guid userId, CancellationToken cancellationToken = default)
       => Task.FromResult(_usersById.TryGetValue(userId, out var user) ? user : null);
@@ -168,6 +272,11 @@ public sealed class AuthenticationServiceTests
     {
       _usersById[user.Id] = user;
       _usersByEmail[user.Email] = user;
+      if (!string.IsNullOrWhiteSpace(user.GoogleSubjectId))
+      {
+        _usersByGoogleSubjectId[user.GoogleSubjectId] = user;
+      }
+
       return Task.CompletedTask;
     }
   }
@@ -258,5 +367,22 @@ public sealed class AuthenticationServiceTests
         Token: $"jwt-token-{_calls}",
         ExpiresAtUtc: DateTime.UtcNow.AddHours(1));
     }
+  }
+
+  private sealed class FakeGoogleOAuthClient : IGoogleOAuthClient
+  {
+    private readonly GoogleOAuthUserInfo _userInfo;
+
+    public FakeGoogleOAuthClient(GoogleOAuthUserInfo userInfo)
+    {
+      _userInfo = userInfo;
+    }
+
+    public string BuildAuthorizationUrl() => "https://accounts.google.com/o/oauth2/v2/auth";
+
+    public Task<GoogleOAuthUserInfo> GetUserInfoAsync(
+      string authorizationCode,
+      CancellationToken cancellationToken = default)
+      => Task.FromResult(_userInfo);
   }
 }

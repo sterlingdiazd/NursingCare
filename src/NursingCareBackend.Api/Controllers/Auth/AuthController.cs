@@ -1,7 +1,12 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.Extensions.Options;
 using NursingCareBackend.Application.Identity.Commands;
+using NursingCareBackend.Application.Identity.OAuth;
 using NursingCareBackend.Application.Identity.Services;
+using NursingCareBackend.Application.Identity.Responses;
+using NursingCareBackend.Infrastructure.Authentication;
 
 namespace NursingCareBackend.Api.Controllers.Auth;
 
@@ -10,10 +15,20 @@ namespace NursingCareBackend.Api.Controllers.Auth;
 public sealed class AuthController : ControllerBase
 {
     private readonly IAuthenticationService _authenticationService;
+    private readonly IGoogleOAuthClient _googleOAuthClient;
+    private readonly GoogleOAuthOptions _googleOAuthOptions;
+    private readonly ILogger<AuthController> _logger;
 
-    public AuthController(IAuthenticationService authenticationService)
+    public AuthController(
+        IAuthenticationService authenticationService,
+        IGoogleOAuthClient googleOAuthClient,
+        IOptions<GoogleOAuthOptions> googleOAuthOptions,
+        ILogger<AuthController> logger)
     {
         _authenticationService = authenticationService;
+        _googleOAuthClient = googleOAuthClient;
+        _googleOAuthOptions = googleOAuthOptions.Value;
+        _logger = logger;
     }
 
     /// <summary>
@@ -75,6 +90,74 @@ public sealed class AuthController : ControllerBase
                 Detail = ex.Message,
                 Instance = HttpContext.Request.Path
             });
+        }
+    }
+
+    /// <summary>
+    /// Redirect the browser to Google OAuth2.
+    /// </summary>
+    [HttpGet("google/start")]
+    [ProducesResponseType(StatusCodes.Status302Found)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public IActionResult StartGoogleLogin([FromQuery] string? target)
+    {
+        try
+        {
+            var redirectTarget = NormalizeRedirectTarget(target);
+            return Redirect(_googleOAuthClient.BuildAuthorizationUrl(redirectTarget));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Title = "Google OAuth is not configured",
+                Detail = ex.Message,
+                Instance = HttpContext.Request.Path
+            });
+        }
+    }
+
+    /// <summary>
+    /// Handle Google OAuth2 callback and redirect back to the SPA with auth details.
+    /// </summary>
+    [HttpGet("google/callback")]
+    [ProducesResponseType(StatusCodes.Status302Found)]
+    public async Task<IActionResult> GoogleCallback(
+        [FromQuery] string? code,
+        [FromQuery] string? error,
+        [FromQuery] string? state,
+        CancellationToken cancellationToken)
+    {
+        var redirectTarget = NormalizeRedirectTarget(state);
+
+        if (!string.IsNullOrWhiteSpace(error))
+        {
+            _logger.LogWarning("Google OAuth returned an error: {OAuthError}", error);
+            return Redirect(BuildFailureRedirect(
+                "Error al iniciar sesión con Google. Por favor intenta de nuevo.",
+                redirectTarget));
+        }
+
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            _logger.LogWarning("Google OAuth callback arrived without an authorization code.");
+            return Redirect(BuildFailureRedirect(
+                "Error al iniciar sesión con Google. Por favor intenta de nuevo.",
+                redirectTarget));
+        }
+
+        try
+        {
+            var response = await _authenticationService.LoginWithGoogleAsync(code, cancellationToken);
+            return Redirect(BuildSuccessRedirect(response, redirectTarget));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "OAuth error: {OAuthError}", ex.Message);
+            return Redirect(BuildFailureRedirect(
+                "Error al iniciar sesión con Google. Por favor intenta de nuevo.",
+                redirectTarget));
         }
     }
 
@@ -215,4 +298,64 @@ public sealed class AuthController : ControllerBase
             return BadRequest(new { error = ex.Message });
         }
     }
+
+    private string BuildSuccessRedirect(AuthResponse response, string redirectTarget)
+    {
+        return BuildRedirect(new Dictionary<string, string?>
+        {
+            ["oauth"] = "success",
+            ["token"] = response.Token,
+            ["refreshToken"] = response.RefreshToken,
+            ["expiresAtUtc"] = response.ExpiresAtUtc?.ToString("O"),
+            ["email"] = response.Email,
+            ["roles"] = string.Join(",", response.Roles)
+        }, redirectTarget);
+    }
+
+    private string BuildFailureRedirect(string message, string redirectTarget)
+    {
+        return BuildRedirect(new Dictionary<string, string?>
+        {
+            ["oauth"] = "error",
+            ["message"] = message
+        }, redirectTarget);
+    }
+
+    private string BuildRedirect(
+        IReadOnlyDictionary<string, string?> parameters,
+        string redirectTarget)
+    {
+        return string.Equals(redirectTarget, "mobile", StringComparison.OrdinalIgnoreCase)
+            ? BuildMobileRedirect(parameters)
+            : BuildWebRedirect(parameters);
+    }
+
+    private string BuildWebRedirect(IReadOnlyDictionary<string, string?> fragmentParameters)
+    {
+        if (string.IsNullOrWhiteSpace(_googleOAuthOptions.FrontendRedirectUrl))
+        {
+            throw new InvalidOperationException(
+                "Google OAuth frontend redirect is not configured. Set GOOGLE_OAUTH_FRONTEND_REDIRECT_URL.");
+        }
+
+        var baseUri = _googleOAuthOptions.FrontendRedirectUrl.Split('#')[0];
+        var fragment = QueryHelpers.AddQueryString(string.Empty, fragmentParameters)
+            .TrimStart('?');
+
+        return $"{baseUri}#{fragment}";
+    }
+
+    private string BuildMobileRedirect(IReadOnlyDictionary<string, string?> queryParameters)
+    {
+        if (string.IsNullOrWhiteSpace(_googleOAuthOptions.MobileRedirectUrl))
+        {
+            throw new InvalidOperationException(
+                "Google OAuth mobile redirect is not configured. Set GOOGLE_OAUTH_MOBILE_REDIRECT_URL.");
+        }
+
+        return QueryHelpers.AddQueryString(_googleOAuthOptions.MobileRedirectUrl, queryParameters);
+    }
+
+    private static string NormalizeRedirectTarget(string? target)
+        => string.Equals(target, "mobile", StringComparison.OrdinalIgnoreCase) ? "mobile" : "web";
 }
