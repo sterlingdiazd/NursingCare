@@ -15,6 +15,7 @@ public sealed class NursingCareDbContext : DbContext
   public DbSet<User> Users => Set<User>();
   public DbSet<Role> Roles => Set<Role>();
   public DbSet<UserRole> UserRoles => Set<UserRole>();
+  public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
   protected override void OnModelCreating(ModelBuilder modelBuilder)
   {
@@ -33,6 +34,13 @@ public sealed class NursingCareDbContext : DbContext
 
       builder.Property(x => x.CreatedAtUtc)
                  .IsRequired();
+
+      builder.Property(x => x.UpdatedAtUtc)
+                 .IsRequired();
+
+      builder.Property(x => x.ApprovedAtUtc);
+      builder.Property(x => x.RejectedAtUtc);
+      builder.Property(x => x.CompletedAtUtc);
     });
 
     modelBuilder.Entity<User>(builder =>
@@ -85,6 +93,33 @@ public sealed class NursingCareDbContext : DbContext
       builder.HasOne(x => x.Role)
              .WithMany(r => r.UserRoles)
              .HasForeignKey(x => x.RoleId);
+    });
+
+    modelBuilder.Entity<RefreshToken>(builder =>
+    {
+      builder.ToTable("RefreshTokens");
+
+      builder.HasKey(x => x.Id);
+
+      builder.Property(x => x.Token)
+             .IsRequired()
+             .HasMaxLength(512);
+
+      builder.HasIndex(x => x.Token)
+             .IsUnique();
+
+      builder.Property(x => x.CreatedAtUtc)
+             .IsRequired();
+
+      builder.Property(x => x.ExpiresAtUtc)
+             .IsRequired();
+
+      builder.Property(x => x.RevokedAtUtc);
+
+      builder.HasOne(x => x.User)
+             .WithMany(user => user.RefreshTokens)
+             .HasForeignKey(x => x.UserId)
+             .OnDelete(DeleteBehavior.Cascade);
     });
   }
 }

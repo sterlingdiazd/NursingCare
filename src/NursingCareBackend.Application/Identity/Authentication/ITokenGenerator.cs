@@ -4,5 +4,5 @@ namespace NursingCareBackend.Application.Identity.Authentication;
 
 public interface ITokenGenerator
 {
-    string GenerateToken(User user);
+    TokenResult GenerateToken(User user);
 }

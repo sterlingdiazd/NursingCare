@@ -79,6 +79,49 @@ public sealed class AuthController : ControllerBase
     }
 
     /// <summary>
+    /// Refresh an access token using a valid refresh token
+    /// </summary>
+    /// <param name="request">Refresh token payload</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Authentication token and user details</returns>
+    /// <response code="200">Refresh successful</response>
+    /// <response code="401">Refresh token invalid or expired</response>
+    [HttpPost("refresh")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Refresh(
+        [FromBody] RefreshTokenRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var response = await _authenticationService.RefreshAsync(request, cancellationToken);
+            return Ok(response);
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "Refresh token is invalid or expired.")
+        {
+            return Unauthorized(new ProblemDetails
+            {
+                Status = StatusCodes.Status401Unauthorized,
+                Title = "Refresh failed",
+                Detail = ex.Message,
+                Instance = HttpContext.Request.Path
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Title = "Refresh failed",
+                Detail = ex.Message,
+                Instance = HttpContext.Request.Path
+            });
+        }
+    }
+
+    /// <summary>
     /// Assign a role to an existing user (Admin only)
     /// </summary>
     /// <param name="request">User ID and role name to assign</param>
@@ -130,6 +173,42 @@ public sealed class AuthController : ControllerBase
                 message = "Admin user created successfully. Please save this token and disable the /setup-admin endpoint in production.",
                 data = response
             });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Activate a user account (Admin only) - Required for nurses before they can login
+    /// </summary>
+    /// <param name="request">User ID to activate</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Success message</returns>
+    /// <response code="200">User activated successfully</response>
+    /// <response code="400">Invalid input or user already active</response>
+    /// <response code="401">Unauthorized - not authenticated</response>
+    /// <response code="403">Forbidden - only admins can activate users</response>
+    [HttpPost("activate-user")]
+    [Authorize(Roles = "Admin")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ActivateUser(
+        [FromBody] ActivateUserRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!Guid.TryParse(request.UserId, out var userId))
+        {
+            return BadRequest(new { error = "Invalid user ID format." });
+        }
+
+        try
+        {
+            await _authenticationService.ActivateUserAsync(userId, cancellationToken);
+            return Ok(new { message = "User account activated successfully." });
         }
         catch (InvalidOperationException ex)
         {

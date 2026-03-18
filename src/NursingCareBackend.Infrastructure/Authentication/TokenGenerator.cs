@@ -17,7 +17,7 @@ public sealed class TokenGenerator : ITokenGenerator
         _configuration = configuration;
     }
 
-    public string GenerateToken(User user)
+    public TokenResult GenerateToken(User user)
     {
         var jwtSection = _configuration.GetSection("Jwt");
         var jwtKey = jwtSection["Key"];
@@ -41,6 +41,7 @@ public sealed class TokenGenerator : ITokenGenerator
 
         var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
         var signingCredentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);
+        var expiresAtUtc = DateTime.UtcNow.AddHours(1);
 
         var claims = new List<Claim>
         {
@@ -59,10 +60,12 @@ public sealed class TokenGenerator : ITokenGenerator
             issuer: jwtIssuer,
             audience: jwtAudience,
             claims: claims,
-            expires: DateTime.UtcNow.AddHours(1),
+            expires: expiresAtUtc,
             signingCredentials: signingCredentials
         );
 
-        return new JwtSecurityTokenHandler().WriteToken(token);
+        return new TokenResult(
+            new JwtSecurityTokenHandler().WriteToken(token),
+            expiresAtUtc);
     }
 }

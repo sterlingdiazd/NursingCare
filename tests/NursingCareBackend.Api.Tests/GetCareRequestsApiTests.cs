@@ -105,6 +105,9 @@ public sealed class GetCareRequestsApiTests : IClassFixture<CustomWebApplication
     public string Description { get; set; } = default!;
     public string Status { get; set; } = default!;
     public DateTime CreatedAtUtc { get; set; }
+    public DateTime UpdatedAtUtc { get; set; }
+    public DateTime? ApprovedAtUtc { get; set; }
+    public DateTime? RejectedAtUtc { get; set; }
+    public DateTime? CompletedAtUtc { get; set; }
   }
 }
-

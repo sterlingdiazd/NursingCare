@@ -2,6 +2,7 @@ using NursingCareBackend.Api;
 using NursingCareBackend.Api.Extensions;
 using NursingCareBackend.Api.Middleware;
 using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
+using NursingCareBackend.Application.CareRequests.Commands.TransitionCareRequest;
 using NursingCareBackend.Application.CareRequests.Queries;
 using NursingCareBackend.Infrastructure;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -53,6 +54,7 @@ builder.Services.AddJwtAuthentication(builder.Configuration);
 
 // Use cases
 builder.Services.AddScoped<CreateCareRequestHandler>();
+builder.Services.AddScoped<TransitionCareRequestHandler>();
 builder.Services.AddScoped<GetCareRequestsHandler>();
 builder.Services.AddScoped<GetCareRequestByIdHandler>();
 
