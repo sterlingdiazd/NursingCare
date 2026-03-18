@@ -21,6 +21,10 @@ services:
       ASPNETCORE_URLS: "http://+:${API_INTERNAL_PORT}"
       ASPNETCORE_ENVIRONMENT: "${ASPNETCORE_ENVIRONMENT}"
       ConnectionStrings__DefaultConnection: "Server=sqlserver,1433;Database=NursingCareDb;User Id=sa;Password=${SQL_PASSWORD};TrustServerCertificate=True;"
+      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID}"
+      GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET}"
+      GOOGLE_OAUTH_REDIRECT_URI: "${GOOGLE_OAUTH_REDIRECT_URI}"
+      GOOGLE_OAUTH_FRONTEND_REDIRECT_URL: "${GOOGLE_OAUTH_FRONTEND_REDIRECT_URL}"
     depends_on:
       - sqlserver
 
