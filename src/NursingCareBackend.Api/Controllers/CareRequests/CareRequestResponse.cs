@@ -7,7 +7,11 @@ public sealed record CareRequestResponse(
   Guid ResidentId,
   string Description,
   string Status,
-  DateTime CreatedAtUtc)
+  DateTime CreatedAtUtc,
+  DateTime UpdatedAtUtc,
+  DateTime? ApprovedAtUtc,
+  DateTime? RejectedAtUtc,
+  DateTime? CompletedAtUtc)
 {
   public static CareRequestResponse FromDomain(CareRequest careRequest)
   {
@@ -16,7 +20,10 @@ public sealed record CareRequestResponse(
       careRequest.ResidentId,
       careRequest.Description,
       careRequest.Status.ToString(),
-      careRequest.CreatedAtUtc);
+      careRequest.CreatedAtUtc,
+      careRequest.UpdatedAtUtc,
+      careRequest.ApprovedAtUtc,
+      careRequest.RejectedAtUtc,
+      careRequest.CompletedAtUtc);
   }
 }
-

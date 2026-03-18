@@ -20,6 +20,12 @@ public sealed class CareRequestRepository : ICareRequestRepository
     await _dbContext.SaveChangesAsync(cancellationToken);
   }
 
+  public async Task UpdateAsync(CareRequest careRequest, CancellationToken cancellationToken)
+  {
+    _dbContext.CareRequests.Update(careRequest);
+    await _dbContext.SaveChangesAsync(cancellationToken);
+  }
+
   public async Task<IReadOnlyList<CareRequest>> GetAllAsync(CancellationToken cancellationToken)
   {
     return await _dbContext.CareRequests
