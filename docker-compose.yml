@@ -3,7 +3,7 @@ services:
     image: mcr.microsoft.com/mssql/server:2022-latest
     container_name: nursingcare-sql
     environment:
-      SA_PASSWORD: "${SQL_PASSWORD}"
+      SA_PASSWORD: "${DB_PASSWORD}"
       ACCEPT_EULA: "Y"
     ports:
       - "${DB_PORT}:1433"
@@ -20,7 +20,7 @@ services:
     environment:
       ASPNETCORE_URLS: "http://+:${API_INTERNAL_PORT}"
       ASPNETCORE_ENVIRONMENT: "${ASPNETCORE_ENVIRONMENT}"
-      ConnectionStrings__DefaultConnection: "Server=sqlserver,1433;Database=NursingCareDb;User Id=sa;Password=${SQL_PASSWORD};TrustServerCertificate=True;"
+      ConnectionStrings__DefaultConnection: "Server=sqlserver,1433;Database=NursingCareDb;User Id=sa;Password=${DB_PASSWORD};TrustServerCertificate=True;"
       GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID}"
       GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET}"
       GOOGLE_OAUTH_REDIRECT_URI: "${GOOGLE_OAUTH_REDIRECT_URI}"

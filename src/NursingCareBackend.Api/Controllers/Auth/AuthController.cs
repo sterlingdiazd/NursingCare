@@ -307,6 +307,7 @@ public sealed class AuthController : ControllerBase
             ["token"] = response.Token,
             ["refreshToken"] = response.RefreshToken,
             ["expiresAtUtc"] = response.ExpiresAtUtc?.ToString("O"),
+            ["userId"] = response.UserId.ToString(),
             ["email"] = response.Email,
             ["roles"] = string.Join(",", response.Roles)
         }, redirectTarget);
@@ -353,7 +354,23 @@ public sealed class AuthController : ControllerBase
                 "Google OAuth mobile redirect is not configured. Set GOOGLE_OAUTH_MOBILE_REDIRECT_URL.");
         }
 
-        return QueryHelpers.AddQueryString(_googleOAuthOptions.MobileRedirectUrl, queryParameters);
+        var query = string.Join(
+            "&",
+            queryParameters
+                .Where(parameter => parameter.Value is not null)
+                .Select(parameter =>
+                    $"{Uri.EscapeDataString(parameter.Key)}={Uri.EscapeDataString(parameter.Value!)}"));
+
+        if (string.IsNullOrEmpty(query))
+        {
+            return _googleOAuthOptions.MobileRedirectUrl;
+        }
+
+        var separator = _googleOAuthOptions.MobileRedirectUrl.Contains('?', StringComparison.Ordinal)
+            ? "&"
+            : "?";
+
+        return $"{_googleOAuthOptions.MobileRedirectUrl}{separator}{query}";
     }
 
     private static string NormalizeRedirectTarget(string? target)

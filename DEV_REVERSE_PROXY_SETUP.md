@@ -41,7 +41,7 @@ Update these values in `.env`:
 - `PUBLIC_API_HOST`: your Mac LAN IP, for example `10.0.0.33`
 - `PUBLIC_API_PORT`: usually `5050`
 - `API_INTERNAL_PORT`: usually `8080`
-- `SQL_PASSWORD`
+- `DB_PASSWORD`
 - `JWT_KEY`
 
 ## 2. Generate Local TLS Assets
