@@ -16,8 +16,8 @@ DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-1433}"
 DB_NAME="${DB_NAME:-NursingCareDb_Test}"
 DB_USER="${DB_USER:-sa}"
-SQL_PASSWORD="${SQL_PASSWORD:-YourStrong!Passw0rd}"
+DB_PASSWORD="${DB_PASSWORD:-YourStrong!Passw0rd}"
 
-export NursingCare_TestSqlConnection="Server=${DB_HOST},${DB_PORT};Database=${DB_NAME}_Test;User Id=${DB_USER};Password=${SQL_PASSWORD};TrustServerCertificate=True;"
+export NursingCare_TestSqlConnection="Server=${DB_HOST},${DB_PORT};Database=${DB_NAME}_Test;User Id=${DB_USER};Password=${DB_PASSWORD};TrustServerCertificate=True;"
 
 dotnet test src/src.sln --configuration Release

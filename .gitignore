@@ -140,3 +140,4 @@
 **/*.launch
 .env
 .vscode/launch.json
+**/.int/**

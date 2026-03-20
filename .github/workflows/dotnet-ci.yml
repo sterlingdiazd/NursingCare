@@ -22,7 +22,7 @@ jobs:
     env:
       DOTNET_NOLOGO: true
       NursingCare_TestSqlConnection: "Server=localhost,1433;Database=NursingCareDb_Test;User Id=sa;Password=YourStrong!Passw0rd;TrustServerCertificate=True;"
-      SQL_PASSWORD: "YourStrong!Passw0rd"
+      DB_PASSWORD: "YourStrong!Passw0rd"
 
     steps:
       - name: Checkout
