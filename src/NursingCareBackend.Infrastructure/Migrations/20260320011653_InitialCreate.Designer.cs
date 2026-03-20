@@ -12,8 +12,8 @@ using NursingCareBackend.Infrastructure.Persistence;
 namespace NursingCareBackend.Infrastructure.Migrations
 {
     [DbContext(typeof(NursingCareDbContext))]
-    [Migration("20260316225309_SeedDefaultRoles")]
-    partial class SeedDefaultRoles
+    [Migration("20260320011653_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -31,6 +31,34 @@ namespace NursingCareBackend.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTime?>("ApprovedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("AssignedNurse")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateOnly?>("CareRequestDate")
+                        .HasColumnType("date")
+                        .HasColumnName("ServiceDate");
+
+                    b.Property<string>("CareRequestReason")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("ServiceReason");
+
+                    b.Property<string>("CareRequestType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("ServiceType");
+
+                    b.Property<decimal?>("ClientBasePrice")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<DateTime?>("CompletedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ComplexityLevel")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("datetime2");
 
@@ -39,15 +67,80 @@ namespace NursingCareBackend.Infrastructure.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
-                    b.Property<Guid>("ResidentId")
+                    b.Property<string>("DistanceFactor")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal?>("MedicalSuppliesCost")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<Guid?>("NurseId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Price")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<DateTime?>("RejectedAtUtc")
+                        .HasColumnType("datetime2");
 
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
+                    b.Property<string>("SuggestedNurse")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("Total")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<int>("Unit")
+                        .HasColumnType("int");
+
+                    b.Property<string>("UnitType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("UserID")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("ResidentId");
+
                     b.HasKey("Id");
 
                     b.ToTable("CareRequests", (string)null);
+                });
+
+            modelBuilder.Entity("NursingCareBackend.Domain.Identity.RefreshToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("RevokedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Token")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("RefreshTokens", (string)null);
                 });
 
             modelBuilder.Entity("NursingCareBackend.Domain.Identity.Role", b =>
@@ -78,8 +171,16 @@ namespace NursingCareBackend.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("DisplayName")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
                     b.Property<string>("Email")
                         .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("GoogleSubjectId")
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
 
@@ -94,6 +195,10 @@ namespace NursingCareBackend.Infrastructure.Migrations
 
                     b.HasIndex("Email")
                         .IsUnique();
+
+                    b.HasIndex("GoogleSubjectId")
+                        .IsUnique()
+                        .HasFilter("[GoogleSubjectId] IS NOT NULL");
 
                     b.ToTable("Users", (string)null);
                 });
@@ -111,6 +216,17 @@ namespace NursingCareBackend.Infrastructure.Migrations
                     b.HasIndex("RoleId");
 
                     b.ToTable("UserRoles", (string)null);
+                });
+
+            modelBuilder.Entity("NursingCareBackend.Domain.Identity.RefreshToken", b =>
+                {
+                    b.HasOne("NursingCareBackend.Domain.Identity.User", "User")
+                        .WithMany("RefreshTokens")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("NursingCareBackend.Domain.Identity.UserRole", b =>
@@ -139,6 +255,8 @@ namespace NursingCareBackend.Infrastructure.Migrations
 
             modelBuilder.Entity("NursingCareBackend.Domain.Identity.User", b =>
                 {
+                    b.Navigation("RefreshTokens");
+
                     b.Navigation("UserRoles");
                 });
 #pragma warning restore 612, 618

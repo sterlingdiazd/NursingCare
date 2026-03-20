@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
 using NursingCareBackend.Application.CareRequests.Commands.TransitionCareRequest;
 using NursingCareBackend.Application.CareRequests.Queries;
@@ -33,10 +34,34 @@ public sealed class CareRequestsController : ControllerBase
         [FromBody] CreateCareRequestRequest request,
         CancellationToken cancellationToken)
     {
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(new ProblemDetails
+            {
+                Status = StatusCodes.Status401Unauthorized,
+                Title = "Authenticated user identifier is missing",
+                Detail = "The current session does not include a valid user identifier.",
+                Instance = HttpContext.Request.Path
+            });
+        }
+
         var command = new CreateCareRequestCommand
         {
-            ResidentId = request.ResidentId,
-            Description = request.Description
+            UserID = userId,
+            Description = request.CareRequestDescription,
+            CareRequestReason = null,
+            CareRequestType = request.CareRequestType,
+            NurseId = request.NurseId,
+            SuggestedNurse = request.SuggestedNurse,
+            AssignedNurse = request.AssignedNurse,
+            Unit = request.Unit,
+            Price = request.Price,
+            ClientBasePriceOverride = request.ClientBasePriceOverride,
+            DistanceFactor = request.DistanceFactor,
+            ComplexityLevel = request.ComplexityLevel,
+            MedicalSuppliesCost = request.MedicalSuppliesCost,
+            CareRequestDate = request.CareRequestDate
         };
 
         var id = await _createHandler.Handle(command, cancellationToken);
@@ -105,6 +130,16 @@ public sealed class CareRequestsController : ControllerBase
         catch (KeyNotFoundException)
         {
             return NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Title = "Care request transition failed",
+                Detail = ex.Message,
+                Instance = HttpContext.Request.Path
+            });
         }
     }
 }

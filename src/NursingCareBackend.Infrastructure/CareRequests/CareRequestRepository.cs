@@ -38,4 +38,13 @@ public sealed class CareRequestRepository : ICareRequestRepository
     return _dbContext.CareRequests
       .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
   }
+
+  public Task<int> CountByUserAndUnitTypeAsync(
+    Guid userID,
+    string unitType,
+    CancellationToken cancellationToken)
+  {
+    return _dbContext.CareRequests
+      .CountAsync(x => x.UserID == userID && x.UnitType == unitType, cancellationToken);
+  }
 }

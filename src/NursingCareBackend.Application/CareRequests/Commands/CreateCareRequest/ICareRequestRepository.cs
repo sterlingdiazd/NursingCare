@@ -9,4 +9,6 @@ public interface ICareRequestRepository
   Task<IReadOnlyList<CareRequest>> GetAllAsync(CancellationToken cancellationToken);
 
   Task<CareRequest?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
+
+  Task<int> CountByUserAndUnitTypeAsync(Guid userID, string unitType, CancellationToken cancellationToken);
 }

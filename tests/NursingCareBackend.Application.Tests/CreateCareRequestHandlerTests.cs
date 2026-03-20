@@ -3,25 +3,25 @@ using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
 using NursingCareBackend.Domain.CareRequests;
 using NursingCareBackend.Infrastructure.CareRequests;
 using NursingCareBackend.Infrastructure.Persistence;
+using NursingCareBackend.Tests.Infrastructure;
 using Xunit;
 
 namespace NursingCareBackend.Application.Tests;
 
 public sealed class CreateCareRequestHandlerTests
 {
-  private static readonly string ConnectionString =
-      Environment.GetEnvironmentVariable("NursingCare_TestSqlConnection")
-      ?? throw new InvalidOperationException("Environment variable 'NursingCare_TestSqlConnection' must be set for application tests.");
-
   private static NursingCareDbContext CreateDbContext()
   {
+    var connectionString = TestSqlConnectionResolver.CreateUniqueDatabaseConnectionString();
     var options = new DbContextOptionsBuilder<NursingCareDbContext>()
-        .UseSqlServer(ConnectionString)
+        .UseSqlServer(connectionString)
         .Options;
 
     var context = new NursingCareDbContext(options);
     context.Database.EnsureDeleted();
-    context.Database.Migrate();
+    // EnsureCreated uses the current EF model to create the database schema.
+    // This avoids failures when migrations are applied to an unexpected pre-existing DB state.
+    context.Database.EnsureCreated();
 
     return context;
   }
@@ -34,13 +34,15 @@ public sealed class CreateCareRequestHandlerTests
     var repository = new CareRequestRepository(dbContext);
     var handler = new CreateCareRequestHandler(repository);
 
-    var residentId = Guid.NewGuid();
+    var userID = Guid.NewGuid();
     var description = "Help with daily activities";
 
     var command = new CreateCareRequestCommand
     {
-      ResidentId = residentId,
-      Description = description
+      UserID = userID,
+      Description = description,
+      CareRequestType = "domicilio_24h",
+      Unit = 1
     };
 
     // Act
@@ -50,8 +52,11 @@ public sealed class CreateCareRequestHandlerTests
     var saved = await dbContext.CareRequests.FirstOrDefaultAsync(x => x.Id == id);
 
     Assert.NotNull(saved);
-    Assert.Equal(residentId, saved!.ResidentId);
+    Assert.Equal(userID, saved!.UserID);
     Assert.Equal(description, saved.Description);
     Assert.Equal(CareRequestStatus.Pending, saved.Status);
+    Assert.Equal("domicilio_24h", saved.CareRequestType);
+    Assert.Equal("dia_completo", saved.UnitType);
+    Assert.Equal(1, saved.Unit);
   }
 }

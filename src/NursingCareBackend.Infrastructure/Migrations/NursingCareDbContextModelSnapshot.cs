@@ -31,8 +31,27 @@ namespace NursingCareBackend.Infrastructure.Migrations
                     b.Property<DateTime?>("ApprovedAtUtc")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("AssignedNurse")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateOnly?>("CareRequestDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("CareRequestReason")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CareRequestType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal?>("ClientBasePrice")
+                        .HasColumnType("decimal(10,2)");
+
                     b.Property<DateTime?>("CompletedAtUtc")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("ComplexityLevel")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("datetime2");
@@ -42,17 +61,42 @@ namespace NursingCareBackend.Infrastructure.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
+                    b.Property<string>("DistanceFactor")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal?>("MedicalSuppliesCost")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<Guid?>("NurseId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Price")
+                        .HasColumnType("decimal(10,2)");
+
                     b.Property<DateTime?>("RejectedAtUtc")
                         .HasColumnType("datetime2");
-
-                    b.Property<Guid>("ResidentId")
-                        .HasColumnType("uniqueidentifier");
 
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
+                    b.Property<string>("SuggestedNurse")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("Total")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<int>("Unit")
+                        .HasColumnType("int");
+
+                    b.Property<string>("UnitType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("datetime2");
+
+                    b.Property<Guid>("UserID")
+                        .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
 

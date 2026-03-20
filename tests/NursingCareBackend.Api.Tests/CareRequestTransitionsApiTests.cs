@@ -23,8 +23,9 @@ public sealed class CareRequestTransitionsApiTests : IClassFixture<CustomWebAppl
 
     var createResponse = await client.PostAsJsonAsync("/api/care-requests", new
     {
-      residentId = Guid.NewGuid(),
-      description = "Transition me"
+      careRequestDescription = "Transition me",
+      careRequestType = "domicilio_24h",
+      unit = 1
     });
 
     createResponse.EnsureSuccessStatusCode();
@@ -54,8 +55,9 @@ public sealed class CareRequestTransitionsApiTests : IClassFixture<CustomWebAppl
 
     var createResponse = await client.PostAsJsonAsync("/api/care-requests", new
     {
-      residentId = Guid.NewGuid(),
-      description = "Admin only approve"
+      careRequestDescription = "Admin only approve",
+      careRequestType = "domicilio_24h",
+      unit = 1
     });
 
     createResponse.EnsureSuccessStatusCode();
@@ -76,8 +78,9 @@ public sealed class CareRequestTransitionsApiTests : IClassFixture<CustomWebAppl
 
     var createResponse = await client.PostAsJsonAsync("/api/care-requests", new
     {
-      residentId = Guid.NewGuid(),
-      description = "Reject me"
+      careRequestDescription = "Reject me",
+      careRequestType = "domicilio_24h",
+      unit = 1
     });
 
     createResponse.EnsureSuccessStatusCode();
@@ -107,8 +110,9 @@ public sealed class CareRequestTransitionsApiTests : IClassFixture<CustomWebAppl
 
     var createResponse = await client.PostAsJsonAsync("/api/care-requests", new
     {
-      residentId = Guid.NewGuid(),
-      description = "Complete me"
+      careRequestDescription = "Complete me",
+      careRequestType = "domicilio_24h",
+      unit = 1
     });
 
     createResponse.EnsureSuccessStatusCode();
@@ -143,8 +147,9 @@ public sealed class CareRequestTransitionsApiTests : IClassFixture<CustomWebAppl
 
     var createResponse = await client.PostAsJsonAsync("/api/care-requests", new
     {
-      residentId = Guid.NewGuid(),
-      description = "Pending request"
+      careRequestDescription = "Pending request",
+      careRequestType = "domicilio_24h",
+      unit = 1
     });
 
     createResponse.EnsureSuccessStatusCode();

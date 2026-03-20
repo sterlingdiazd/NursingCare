@@ -9,7 +9,22 @@ public sealed class TransitionCareRequestHandlerTests
   [Fact]
   public async Task Handle_Should_Approve_And_Persist_Pending_Request()
   {
-    var careRequest = CareRequest.Create(Guid.NewGuid(), "Approve me");
+    var careRequest = CareRequest.Create(
+      userID: Guid.NewGuid(),
+      description: "Approve me",
+      careRequestReason: null,
+      careRequestType: "domicilio_24h",
+      nurseId: null,
+      suggestedNurse: null,
+      assignedNurse: null,
+      unit: 1,
+      price: null,
+      clientBasePrice: null,
+      distanceFactor: null,
+      complexityLevel: null,
+      medicalSuppliesCost: null,
+      careRequestDate: null,
+      existingSameUnitTypeCount: 0);
     var repository = new FakeCareRequestRepository(careRequest);
     var handler = new TransitionCareRequestHandler(repository);
 
@@ -25,7 +40,22 @@ public sealed class TransitionCareRequestHandlerTests
   [Fact]
   public async Task Handle_Should_Reject_And_Persist_Pending_Request()
   {
-    var careRequest = CareRequest.Create(Guid.NewGuid(), "Reject me");
+    var careRequest = CareRequest.Create(
+      userID: Guid.NewGuid(),
+      description: "Reject me",
+      careRequestReason: null,
+      careRequestType: "domicilio_24h",
+      nurseId: null,
+      suggestedNurse: null,
+      assignedNurse: null,
+      unit: 1,
+      price: null,
+      clientBasePrice: null,
+      distanceFactor: null,
+      complexityLevel: null,
+      medicalSuppliesCost: null,
+      careRequestDate: null,
+      existingSameUnitTypeCount: 0);
     var repository = new FakeCareRequestRepository(careRequest);
     var handler = new TransitionCareRequestHandler(repository);
 
@@ -41,7 +71,22 @@ public sealed class TransitionCareRequestHandlerTests
   [Fact]
   public async Task Handle_Should_Complete_And_Persist_Approved_Request()
   {
-    var careRequest = CareRequest.Create(Guid.NewGuid(), "Complete me");
+    var careRequest = CareRequest.Create(
+      userID: Guid.NewGuid(),
+      description: "Complete me",
+      careRequestReason: null,
+      careRequestType: "domicilio_24h",
+      nurseId: null,
+      suggestedNurse: null,
+      assignedNurse: null,
+      unit: 1,
+      price: null,
+      clientBasePrice: null,
+      distanceFactor: null,
+      complexityLevel: null,
+      medicalSuppliesCost: null,
+      careRequestDate: null,
+      existingSameUnitTypeCount: 0);
     careRequest.Approve(DateTime.UtcNow.AddMinutes(-5));
 
     var repository = new FakeCareRequestRepository(careRequest);
@@ -101,5 +146,11 @@ public sealed class TransitionCareRequestHandlerTests
       _items[careRequest.Id] = careRequest;
       return Task.CompletedTask;
     }
+
+    public Task<int> CountByUserAndUnitTypeAsync(
+      Guid clientId,
+      string unitType,
+      CancellationToken cancellationToken)
+      => Task.FromResult(0);
   }
 }

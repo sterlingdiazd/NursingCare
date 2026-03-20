@@ -26,8 +26,9 @@ public sealed class CreateCareRequestApiTests : IClassFixture<CustomWebApplicati
 
     var payload = new
     {
-      residentId = Guid.NewGuid(),
-      description = "Help with API integration test"
+      careRequestDescription = "Help with API integration test",
+      careRequestType = "domicilio_24h",
+      unit = 1
     };
 
     // Act
@@ -54,8 +55,9 @@ public sealed class CreateCareRequestApiTests : IClassFixture<CustomWebApplicati
 
     var payload = new
     {
-      residentId = Guid.NewGuid(),
-      // description omitted to trigger model validation error
+      // careRequestDescription omitted to trigger model validation error
+      careRequestType = "domicilio_24h",
+      unit = 1
     };
 
     // Act
@@ -67,7 +69,7 @@ public sealed class CreateCareRequestApiTests : IClassFixture<CustomWebApplicati
   }
 
   [Fact]
-  public async Task POST_CareRequests_Should_Return_BadRequest_When_ResidentId_Is_Invalid_Guid()
+  public async Task POST_CareRequests_Should_Ignore_Unexpected_UserId_Field()
   {
     // Arrange
     var client = _factory.CreateClient();
@@ -76,15 +78,16 @@ public sealed class CreateCareRequestApiTests : IClassFixture<CustomWebApplicati
 
     var payload = new
     {
-      residentId = "not-a-guid",
-      description = "Invalid resident id"
+      userID = "not-a-guid",
+      careRequestDescription = "Unexpected user id should be ignored",
+      careRequestType = "domicilio_24h",
+      unit = 1
     };
 
     // Act
     var response = await client.PostAsJsonAsync("/api/care-requests", payload);
 
     // Assert
-    Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-    Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    response.EnsureSuccessStatusCode();
   }
 }
