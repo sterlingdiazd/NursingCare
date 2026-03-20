@@ -1,4 +1,4 @@
-﻿using NursingCareBackend.Domain.CareRequests;
+using NursingCareBackend.Domain.CareRequests;
 
 namespace NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
 
@@ -13,10 +13,28 @@ public sealed class CreateCareRequestHandler
 
     public async Task<Guid> Handle(CreateCareRequestCommand command, CancellationToken cancellationToken)
     {
+        var unitType = CareRequest.GetUnitTypeForCareRequestType(command.CareRequestType);
+        var existingSameUnitTypeCount = await _repository.CountByUserAndUnitTypeAsync(
+            command.UserID,
+            unitType,
+            cancellationToken);
+
         var careRequest = CareRequest.Create(
-            command.ResidentId,
-            command.Description
-        );
+            userID: command.UserID,
+            description: command.Description,
+            careRequestReason: command.CareRequestReason,
+            careRequestType: command.CareRequestType,
+            nurseId: command.NurseId,
+            suggestedNurse: command.SuggestedNurse,
+            assignedNurse: command.AssignedNurse,
+            unit: command.Unit,
+            price: command.Price,
+            clientBasePrice: command.ClientBasePriceOverride,
+            distanceFactor: command.DistanceFactor,
+            complexityLevel: command.ComplexityLevel,
+            medicalSuppliesCost: command.MedicalSuppliesCost,
+            careRequestDate: command.CareRequestDate,
+            existingSameUnitTypeCount: existingSameUnitTypeCount);
 
         await _repository.AddAsync(careRequest, cancellationToken);
 

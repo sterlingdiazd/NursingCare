@@ -1,4 +1,4 @@
-﻿using NursingCareBackend.Domain.CareRequests;
+using NursingCareBackend.Domain.CareRequests;
 using Xunit;
 
 namespace NursingCareBackend.Domain.Tests;
@@ -9,15 +9,15 @@ public class CareRequestTests
     public void Create_Should_Create_CareRequest_With_Pending_Status()
     {
         // Arrange
-        var residentId = Guid.NewGuid();
+        var userID = Guid.NewGuid();
         var description = "Help with daily activities";
 
         // Act
-        var careRequest = CareRequest.Create(residentId, description);
+        var careRequest = CreateForTest(userID, description);
 
         // Assert
         Assert.NotEqual(Guid.Empty, careRequest.Id);
-        Assert.Equal(residentId, careRequest.ResidentId);
+        Assert.Equal(userID, careRequest.UserID);
         Assert.Equal(description, careRequest.Description);
         Assert.Equal(CareRequestStatus.Pending, careRequest.Status);
         Assert.Equal(careRequest.CreatedAtUtc, careRequest.UpdatedAtUtc);
@@ -27,7 +27,7 @@ public class CareRequestTests
     public void Create_With_Empty_ResidentId_Should_Throw()
     {
         // Act
-        var act = () => CareRequest.Create(Guid.Empty, "Valid description");
+        var act = () => CreateForTest(Guid.Empty, "Valid description");
 
         // Assert
         Assert.ThrowsAny<Exception>(act);
@@ -37,7 +37,7 @@ public class CareRequestTests
     public void Create_With_Empty_Description_Should_Throw()
     {
         // Act
-        var act = () => CareRequest.Create(Guid.NewGuid(), "");
+        var act = () => CreateForTest(Guid.NewGuid(), "");
 
         // Assert
         Assert.ThrowsAny<Exception>(act);
@@ -47,7 +47,7 @@ public class CareRequestTests
     public void Create_With_Null_Description_Should_Throw()
     {
         // Act
-        var act = () => CareRequest.Create(Guid.NewGuid(), null!);
+        var act = () => CreateForTest(Guid.NewGuid(), null!);
 
         // Assert
         Assert.ThrowsAny<Exception>(act);
@@ -56,7 +56,7 @@ public class CareRequestTests
     [Fact]
     public void Approve_Should_Transition_Request_To_Approved()
     {
-        var careRequest = CareRequest.Create(Guid.NewGuid(), "Needs approval");
+        var careRequest = CreateForTest(Guid.NewGuid(), "Needs approval");
         var approvedAtUtc = new DateTime(2026, 3, 18, 12, 0, 0, DateTimeKind.Utc);
 
         careRequest.Approve(approvedAtUtc);
@@ -69,7 +69,7 @@ public class CareRequestTests
     [Fact]
     public void Reject_Should_Transition_Request_To_Rejected()
     {
-        var careRequest = CareRequest.Create(Guid.NewGuid(), "Needs rejection");
+        var careRequest = CreateForTest(Guid.NewGuid(), "Needs rejection");
         var rejectedAtUtc = new DateTime(2026, 3, 18, 12, 5, 0, DateTimeKind.Utc);
 
         careRequest.Reject(rejectedAtUtc);
@@ -82,7 +82,7 @@ public class CareRequestTests
     [Fact]
     public void Complete_Should_Transition_Approved_Request_To_Completed()
     {
-        var careRequest = CareRequest.Create(Guid.NewGuid(), "Needs completion");
+        var careRequest = CreateForTest(Guid.NewGuid(), "Needs completion");
         var approvedAtUtc = new DateTime(2026, 3, 18, 12, 0, 0, DateTimeKind.Utc);
         var completedAtUtc = new DateTime(2026, 3, 18, 12, 15, 0, DateTimeKind.Utc);
 
@@ -97,7 +97,7 @@ public class CareRequestTests
     [Fact]
     public void Complete_Before_Approval_Should_Throw()
     {
-        var careRequest = CareRequest.Create(Guid.NewGuid(), "Needs completion");
+        var careRequest = CreateForTest(Guid.NewGuid(), "Needs completion");
 
         var act = () => careRequest.Complete(DateTime.UtcNow);
 
@@ -107,7 +107,7 @@ public class CareRequestTests
     [Fact]
     public void Reject_After_Approval_Should_Throw()
     {
-        var careRequest = CareRequest.Create(Guid.NewGuid(), "Already approved");
+        var careRequest = CreateForTest(Guid.NewGuid(), "Already approved");
         careRequest.Approve(DateTime.UtcNow);
 
         var act = () => careRequest.Reject(DateTime.UtcNow.AddMinutes(5));
@@ -115,4 +115,23 @@ public class CareRequestTests
         Assert.Throws<InvalidOperationException>(act);
     }
 
+    private static CareRequest CreateForTest(Guid userID, string description)
+    {
+        return CareRequest.Create(
+            userID: userID,
+            description: description,
+            careRequestReason: null,
+            careRequestType: "domicilio_24h",
+            nurseId: null,
+            suggestedNurse: null,
+            assignedNurse: null,
+            unit: 1,
+            price: null,
+            clientBasePrice: null,
+            distanceFactor: null,
+            complexityLevel: null,
+            medicalSuppliesCost: null,
+            careRequestDate: null,
+            existingSameUnitTypeCount: 0);
+    }
 }

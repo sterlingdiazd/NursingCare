@@ -23,8 +23,9 @@ public sealed class GetCareRequestsApiTests : IClassFixture<CustomWebApplication
 
     var createPayload = new
     {
-      residentId = Guid.NewGuid(),
-      description = "List endpoint test"
+      careRequestDescription = "List endpoint test",
+      careRequestType = "domicilio_24h",
+      unit = 1
     };
 
     var createResponse = await client.PostAsJsonAsync("/api/care-requests", createPayload);
@@ -52,8 +53,9 @@ public sealed class GetCareRequestsApiTests : IClassFixture<CustomWebApplication
 
     var createPayload = new
     {
-      residentId = Guid.NewGuid(),
-      description = "Get by id endpoint test"
+      careRequestDescription = "Get by id endpoint test",
+      careRequestType = "domicilio_24h",
+      unit = 1
     };
 
     var createResponse = await client.PostAsJsonAsync("/api/care-requests", createPayload);
@@ -73,7 +75,7 @@ public sealed class GetCareRequestsApiTests : IClassFixture<CustomWebApplication
 
     Assert.NotNull(item);
     Assert.Equal(created.Id, item!.Id);
-    Assert.Equal(createPayload.description, item.Description);
+    Assert.Equal(createPayload.careRequestDescription, item.CareRequestDescription);
   }
 
   [Fact]
@@ -101,8 +103,8 @@ public sealed class GetCareRequestsApiTests : IClassFixture<CustomWebApplication
   private sealed class CareRequestItem
   {
     public Guid Id { get; set; }
-    public Guid ResidentId { get; set; }
-    public string Description { get; set; } = default!;
+    public Guid UserID { get; set; }
+    public string CareRequestDescription { get; set; } = default!;
     public string Status { get; set; } = default!;
     public DateTime CreatedAtUtc { get; set; }
     public DateTime UpdatedAtUtc { get; set; }

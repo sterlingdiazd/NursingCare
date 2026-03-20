@@ -34,4 +34,8 @@
     <ProjectReference Include="..\..\src\NursingCareBackend.Domain\NursingCareBackend.Domain.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="..\TestInfrastructure\TestSqlConnectionResolver.cs" Link="TestInfrastructure\TestSqlConnectionResolver.cs" />
+  </ItemGroup>
+
 </Project>
