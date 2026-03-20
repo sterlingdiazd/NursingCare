@@ -6,22 +6,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using NursingCareBackend.Application.Identity.OAuth;
 using NursingCareBackend.Infrastructure.Persistence;
+using NursingCareBackend.Tests.Infrastructure;
 
 namespace NursingCareBackend.Api.Tests;
 
 public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
-  private static string GetTestConnectionString()
-  {
-    var connectionString = Environment.GetEnvironmentVariable("NursingCare_TestSqlConnection");
-
-    if (string.IsNullOrWhiteSpace(connectionString))
-    {
-      throw new InvalidOperationException("Environment variable 'NursingCare_TestSqlConnection' must be set for API tests.");
-    }
-
-    return connectionString;
-  }
+  private readonly string _testConnectionString = TestSqlConnectionResolver.CreateUniqueDatabaseConnectionString();
 
   protected override void ConfigureWebHost(IWebHostBuilder builder)
   {
@@ -51,15 +42,8 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
       services.AddDbContext<NursingCareDbContext>(options =>
       {
-        options.UseSqlServer(GetTestConnectionString());
+        options.UseSqlServer(_testConnectionString);
       });
-
-      var sp = services.BuildServiceProvider();
-
-      using var scope = sp.CreateScope();
-      var db = scope.ServiceProvider.GetRequiredService<NursingCareDbContext>();
-      db.Database.EnsureDeleted();
-      db.Database.Migrate();
     });
   }
 

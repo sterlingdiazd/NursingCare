@@ -29,4 +29,8 @@
     <ProjectReference Include="..\..\src\NursingCareBackend.Application\NursingCareBackend.Application.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="..\TestInfrastructure\TestSqlConnectionResolver.cs" Link="TestInfrastructure\TestSqlConnectionResolver.cs" />
+  </ItemGroup>
+
 </Project>

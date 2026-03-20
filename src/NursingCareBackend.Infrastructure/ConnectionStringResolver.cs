@@ -15,16 +15,6 @@ public static class ConnectionStringResolver
     connectionString = ReplaceEnvVariable(connectionString, "DB_PASSWORD", "YourStrong!Passw0rd");
     connectionString = ReplaceEnvVariable(connectionString, "JWT_KEY", "ChangeThisDevelopmentKeyToARealSecret");
 
-    // Keep legacy SQL_PASSWORD support for backward compatibility
-    if (connectionString.Contains("{SQL_PASSWORD}", StringComparison.Ordinal))
-    {
-      var sqlPassword = Environment.GetEnvironmentVariable("SQL_PASSWORD");
-      if (string.IsNullOrEmpty(sqlPassword))
-        throw new InvalidOperationException(
-            "Connection string contains {SQL_PASSWORD} placeholder but SQL_PASSWORD environment variable is not set.");
-      connectionString = connectionString.Replace("{SQL_PASSWORD}", sqlPassword, StringComparison.Ordinal);
-    }
-
     return connectionString;
   }
 

@@ -34,8 +34,7 @@ public static class ApplicationBuilderExtensions
       resolved.Value.Contains("{DB_SERVER}", StringComparison.Ordinal)
       || resolved.Value.Contains("{DB_NAME}", StringComparison.Ordinal)
       || resolved.Value.Contains("{DB_USER}", StringComparison.Ordinal)
-      || resolved.Value.Contains("{DB_PASSWORD}", StringComparison.Ordinal)
-      || resolved.Value.Contains("{SQL_PASSWORD}", StringComparison.Ordinal);
+      || resolved.Value.Contains("{DB_PASSWORD}", StringComparison.Ordinal);
 
     logger.LogInformation(
       "Database connection ready. HasUnresolvedPlaceholder={HasPlaceholder}",
