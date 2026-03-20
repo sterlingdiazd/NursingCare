@@ -29,7 +29,7 @@ The goal is that web and mobile switch environments by configuration only, with 
 - `DB_PORT`
 - `DB_NAME`
 - `DB_USER`
-- `SQL_PASSWORD`
+- `DB_PASSWORD`
 - `JWT_KEY`
 
 ### Web

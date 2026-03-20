@@ -231,9 +231,9 @@ Not currently implemented:
 
 ## Security Note
 
-- App settings and CI workflow files are designed to use **placeholders only** (`{SQL_PASSWORD}`, example passwords) and expect real secrets from environment variables.
+- App settings and CI workflow files are designed to use **placeholders only** (`{DB_PASSWORD}`, example passwords) and expect real secrets from environment variables.
 - For production and shared environments, always provide:
-  - Database secrets via `ConnectionStrings__DefaultConnection` or `SQL_PASSWORD`.
+  - Database secrets via `ConnectionStrings__DefaultConnection` or `DB_PASSWORD`.
   - JWT signing key via `Jwt__Key`.
   - Test-only connection strings via `NursingCare_TestSqlConnection` (for CI/test environments only).
 

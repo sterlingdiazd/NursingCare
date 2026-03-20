@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace NursingCareBackend.Api.Tests;
 
@@ -160,11 +162,13 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
 
     var location = response.Headers.Location!.ToString();
     Assert.StartsWith("http://localhost:3000/login#", location, StringComparison.Ordinal);
-    Assert.Contains("oauth=success", location, StringComparison.Ordinal);
-    Assert.Contains("email=google-success%40example.com", location, StringComparison.Ordinal);
-    Assert.Contains("roles=User", location, StringComparison.Ordinal);
-    Assert.Contains("token=", location, StringComparison.Ordinal);
-    Assert.Contains("refreshToken=", location, StringComparison.Ordinal);
+
+    var parameters = QueryHelpers.ParseQuery("?" + response.Headers.Location.Fragment.TrimStart('#'));
+    Assert.Equal("success", parameters["oauth"].ToString());
+    Assert.Equal("google-success@example.com", parameters["email"].ToString());
+    Assert.Equal("User", parameters["roles"].ToString());
+    Assert.False(string.IsNullOrWhiteSpace(parameters["token"].ToString()));
+    Assert.False(string.IsNullOrWhiteSpace(parameters["refreshToken"].ToString()));
   }
 
   [Fact]
@@ -182,7 +186,9 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
 
     var location = response.Headers.Location!.ToString();
     Assert.StartsWith("http://localhost:3000/login#", location, StringComparison.Ordinal);
-    Assert.Contains("oauth=error", location, StringComparison.Ordinal);
+
+    var parameters = QueryHelpers.ParseQuery("?" + response.Headers.Location.Fragment.TrimStart('#'));
+    Assert.Equal("error", parameters["oauth"].ToString());
   }
 
   [Fact]
@@ -199,10 +205,12 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
     Assert.NotNull(response.Headers.Location);
 
     var location = response.Headers.Location!.ToString();
-    Assert.StartsWith("nursingcaremobile://login?", location, StringComparison.Ordinal);
-    Assert.Contains("oauth=success", location, StringComparison.Ordinal);
-    Assert.Contains("email=google-success%40example.com", location, StringComparison.Ordinal);
-    Assert.Contains("roles=User", location, StringComparison.Ordinal);
+    Assert.StartsWith("nursingcaremobile://login", location, StringComparison.Ordinal);
+
+    var parameters = QueryHelpers.ParseQuery(response.Headers.Location.Query);
+    Assert.Equal("success", parameters["oauth"].ToString());
+    Assert.Equal("google-success@example.com", parameters["email"].ToString());
+    Assert.Equal("User", parameters["roles"].ToString());
   }
 
   [Fact]
@@ -323,6 +331,7 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
     public string Token { get; set; } = string.Empty;
     public string RefreshToken { get; set; } = string.Empty;
     public DateTime? ExpiresAtUtc { get; set; }
+    public Guid UserId { get; set; }
     public string Email { get; set; } = string.Empty;
     public string[] Roles { get; set; } = [];
   }

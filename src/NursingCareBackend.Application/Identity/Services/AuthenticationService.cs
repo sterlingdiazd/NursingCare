@@ -78,17 +78,19 @@ public sealed class AuthenticationService : IAuthenticationService
         };
 
         // Add appropriate role based on profile type
-        string roleName = request.ProfileType == UserProfileType.Nurse ? "Nurse" : "User";
+        string roleName = request.ProfileType == UserProfileType.Nurse ? SystemRoles.Nurse : SystemRoles.User;
         var role = await _roleRepository.GetByNameAsync(roleName, cancellationToken);
-        if (role is not null)
+        if (role is null)
         {
-            user.UserRoles.Add(new UserRole
-            {
-                UserId = user.Id,
-                RoleId = role.Id,
-                Role = role
-            });
+            throw new InvalidOperationException($"{roleName} role not found in the system.");
         }
+
+        user.UserRoles.Add(new UserRole
+        {
+            UserId = user.Id,
+            RoleId = role.Id,
+            Role = role
+        });
 
         // Save user
         await _userRepository.CreateAsync(user, cancellationToken);
@@ -100,6 +102,7 @@ public sealed class AuthenticationService : IAuthenticationService
                 Token: string.Empty,
                 RefreshToken: string.Empty,
                 ExpiresAtUtc: null,
+                UserId: user.Id,
                 Email: user.Email,
                 Roles: new[] { roleName }
             );
@@ -303,7 +306,7 @@ public sealed class AuthenticationService : IAuthenticationService
         }
 
         // Get Admin role
-        var adminRole = await _roleRepository.GetByNameAsync("Admin", cancellationToken);
+        var adminRole = await _roleRepository.GetByNameAsync(SystemRoles.Admin, cancellationToken);
         if (adminRole is null)
         {
             throw new InvalidOperationException("Admin role not found in the system.");
@@ -382,6 +385,7 @@ public sealed class AuthenticationService : IAuthenticationService
             Token: tokenResult.Token,
             RefreshToken: refreshToken.Token,
             ExpiresAtUtc: tokenResult.ExpiresAtUtc,
+            UserId: user.Id,
             Email: user.Email,
             Roles: user.UserRoles.Select(ur => ur.Role.Name)
         );
@@ -391,7 +395,7 @@ public sealed class AuthenticationService : IAuthenticationService
         GoogleOAuthUserInfo googleUser,
         CancellationToken cancellationToken)
     {
-        var userRole = await _roleRepository.GetByNameAsync("User", cancellationToken);
+        var userRole = await _roleRepository.GetByNameAsync(SystemRoles.User, cancellationToken);
         if (userRole is null)
         {
             throw new InvalidOperationException("User role not found in the system.");

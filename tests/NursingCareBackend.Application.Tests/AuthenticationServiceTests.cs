@@ -40,6 +40,21 @@ public sealed class AuthenticationServiceTests
   }
 
   [Fact]
+  public async Task RegisterAsync_Should_Reject_When_Default_User_Role_Is_Missing()
+  {
+    var service = CreateService(roleRepository: new FakeRoleRepository());
+
+    var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+      service.RegisterAsync(new RegisterRequest(
+        Email: "client@example.com",
+        Password: "Pass123!",
+        ConfirmPassword: "Pass123!",
+        ProfileType: UserProfileType.Client)));
+
+    Assert.Equal("User role not found in the system.", exception.Message);
+  }
+
+  [Fact]
   public async Task RefreshAsync_Should_Revoke_Previous_Token_And_Issue_A_New_One()
   {
     var adminRole = new Role
@@ -378,7 +393,7 @@ public sealed class AuthenticationServiceTests
       _userInfo = userInfo;
     }
 
-    public string BuildAuthorizationUrl() => "https://accounts.google.com/o/oauth2/v2/auth";
+    public string BuildAuthorizationUrl(string? state = null) => "https://accounts.google.com/o/oauth2/v2/auth";
 
     public Task<GoogleOAuthUserInfo> GetUserInfoAsync(
       string authorizationCode,
