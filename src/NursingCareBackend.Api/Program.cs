@@ -12,9 +12,8 @@ using Serilog;
 using Serilog.Events;
 
 var builder = WebApplication.CreateBuilder(args);
-var logsDirectory = Path.Combine(builder.Environment.ContentRootPath, "Logs");
-
-Directory.CreateDirectory(logsDirectory);
+var logsDirectory = ResolveLogsDirectory(builder.Environment);
+var fileLoggingEnabled = EnsureDirectoryExists(logsDirectory);
 
 builder.Host.UseSerilog((context, services, configuration) =>
 {
@@ -26,14 +25,18 @@ builder.Host.UseSerilog((context, services, configuration) =>
     .Enrich.WithEnvironmentName()
     .MinimumLevel.Information()
     .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
-    .WriteTo.Console()
-    .WriteTo.File(
+    .WriteTo.Console();
+
+  if (fileLoggingEnabled)
+  {
+    configuration.WriteTo.File(
       Path.Combine(logsDirectory, "backend-.log"),
       rollingInterval: RollingInterval.Day,
       retainedFileCountLimit: 14,
       shared: true,
       outputTemplate:
         "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] ({CorrelationId}) {Message:lj} {Properties:j}{NewLine}{Exception}");
+  }
 });
 
 // CORS
@@ -137,3 +140,28 @@ app.UseSwaggerUI(options =>
 app.MapControllers();
 
 app.Run();
+
+static string ResolveLogsDirectory(IWebHostEnvironment environment)
+{
+  var homeDirectory = Environment.GetEnvironmentVariable("HOME");
+  if (!string.IsNullOrWhiteSpace(homeDirectory))
+  {
+    return Path.Combine(homeDirectory, "LogFiles", "Application");
+  }
+
+  return Path.Combine(environment.ContentRootPath, "Logs");
+}
+
+static bool EnsureDirectoryExists(string path)
+{
+  try
+  {
+    Directory.CreateDirectory(path);
+    return true;
+  }
+  catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+  {
+    Log.Warning(ex, "File logging disabled because the log directory could not be created: {LogsDirectory}", path);
+    return false;
+  }
+}
