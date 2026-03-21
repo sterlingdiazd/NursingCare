@@ -23,6 +23,10 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
 
     var response = await client.PostAsJsonAsync("/api/auth/register", new
     {
+      name = "Maria",
+      lastName = "Perez",
+      identificationNumber = "001-1234567-8",
+      phone = "8095550101",
       email,
       password = "Pass123!",
       confirmPassword = "Pass123!"
@@ -48,6 +52,10 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
 
     await client.PostAsJsonAsync("/api/auth/register", new
     {
+      name = "Carlos",
+      lastName = "Diaz",
+      identificationNumber = "001-2233445-6",
+      phone = "8095550102",
       email,
       password = "Pass123!",
       confirmPassword = "Pass123!"
@@ -78,6 +86,10 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
 
     var registerResponse = await client.PostAsJsonAsync("/api/auth/register", new
     {
+      name = "Luisa",
+      lastName = "Martinez",
+      identificationNumber = "001-3344556-7",
+      phone = "8095550103",
       email,
       password = "Pass123!",
       confirmPassword = "Pass123!",
@@ -155,7 +167,7 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
       AllowAutoRedirect = false
     });
 
-    var response = await client.GetAsync("/api/auth/google/callback?code=google-success");
+    var response = await client.GetAsync("/api/auth/google/callback?code=google-success-web");
 
     Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
     Assert.NotNull(response.Headers.Location);
@@ -165,8 +177,9 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
 
     var parameters = QueryHelpers.ParseQuery("?" + response.Headers.Location.Fragment.TrimStart('#'));
     Assert.Equal("success", parameters["oauth"].ToString());
-    Assert.Equal("google-success@example.com", parameters["email"].ToString());
+    Assert.Equal("google-success-web@example.com", parameters["email"].ToString());
     Assert.Equal("User", parameters["roles"].ToString());
+    Assert.Equal("true", parameters["requiresProfileCompletion"].ToString());
     Assert.False(string.IsNullOrWhiteSpace(parameters["token"].ToString()));
     Assert.False(string.IsNullOrWhiteSpace(parameters["refreshToken"].ToString()));
   }
@@ -199,7 +212,7 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
       AllowAutoRedirect = false
     });
 
-    var response = await client.GetAsync("/api/auth/google/callback?code=google-success&state=mobile");
+    var response = await client.GetAsync("/api/auth/google/callback?code=google-success-mobile&state=mobile");
 
     Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
     Assert.NotNull(response.Headers.Location);
@@ -209,8 +222,43 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
 
     var parameters = QueryHelpers.ParseQuery(response.Headers.Location.Query);
     Assert.Equal("success", parameters["oauth"].ToString());
-    Assert.Equal("google-success@example.com", parameters["email"].ToString());
+    Assert.Equal("google-success-mobile@example.com", parameters["email"].ToString());
     Assert.Equal("User", parameters["roles"].ToString());
+    Assert.Equal("true", parameters["requiresProfileCompletion"].ToString());
+  }
+
+  [Fact]
+  public async Task POST_CompleteProfile_Should_Update_Google_User_And_Return_Profile_As_Completed()
+  {
+    var client = _factory.CreateClient(new WebApplicationFactoryClientOptions
+    {
+      AllowAutoRedirect = false
+    });
+
+    var callbackResponse = await client.GetAsync("/api/auth/google/callback?code=google-success-complete");
+
+    Assert.Equal(HttpStatusCode.Redirect, callbackResponse.StatusCode);
+    Assert.NotNull(callbackResponse.Headers.Location);
+
+    var parameters = QueryHelpers.ParseQuery("?" + callbackResponse.Headers.Location.Fragment.TrimStart('#'));
+    var token = parameters["token"].ToString();
+
+    client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+    var response = await client.PostAsJsonAsync("/api/auth/complete-profile", new
+    {
+      name = "Mariela",
+      lastName = "Suarez",
+      identificationNumber = "001-9999999-9",
+      phone = "8095550108"
+    });
+
+    response.EnsureSuccessStatusCode();
+
+    var payload = await response.Content.ReadFromJsonAsync<AuthResponseDto>();
+    Assert.NotNull(payload);
+    Assert.False(payload!.RequiresProfileCompletion);
+    Assert.Equal("google-success-complete@example.com", payload.Email);
   }
 
   [Fact]
@@ -248,6 +296,10 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
 
     await client.PostAsJsonAsync("/api/auth/register", new
     {
+      name = "Jose",
+      lastName = "Santos",
+      identificationNumber = "001-4455667-8",
+      phone = "8095550104",
       email,
       password = "Pass123!",
       confirmPassword = "Pass123!"
@@ -297,6 +349,10 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
 
     await client.PostAsJsonAsync("/api/auth/register", new
     {
+      name = "Elena",
+      lastName = "Ruiz",
+      identificationNumber = "001-5566778-9",
+      phone = "8095550105",
       email,
       password = "Pass123!",
       confirmPassword = "Pass123!"
@@ -334,6 +390,7 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
     public Guid UserId { get; set; }
     public string Email { get; set; } = string.Empty;
     public string[] Roles { get; set; } = [];
+    public bool RequiresProfileCompletion { get; set; }
   }
 
   private sealed class ProblemDetailsDto

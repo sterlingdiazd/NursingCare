@@ -66,6 +66,24 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
             "google-success@example.com",
             "Google Success",
             true)),
+        "google-success-web" => Task.FromResult(
+          new GoogleOAuthUserInfo(
+            "google-subject-success-web",
+            "google-success-web@example.com",
+            "Google Success Web",
+            true)),
+        "google-success-mobile" => Task.FromResult(
+          new GoogleOAuthUserInfo(
+            "google-subject-success-mobile",
+            "google-success-mobile@example.com",
+            "Google Success Mobile",
+            true)),
+        "google-success-complete" => Task.FromResult(
+          new GoogleOAuthUserInfo(
+            "google-subject-success-complete",
+            "google-success-complete@example.com",
+            "Google Success Complete",
+            true)),
         "google-unverified" => Task.FromResult(
           new GoogleOAuthUserInfo(
             "google-subject-unverified",

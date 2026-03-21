@@ -50,6 +50,48 @@ public sealed class AuthController : ControllerBase
         return Ok(response);
     }
 
+    [HttpPost("complete-profile")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> CompleteProfile(
+        [FromBody] CompleteProfileRequest request,
+        CancellationToken cancellationToken)
+    {
+        var userId = ResolveAuthenticatedUserId();
+        if (userId is null)
+        {
+            return Unauthorized(new ProblemDetails
+            {
+                Status = StatusCodes.Status401Unauthorized,
+                Title = "Profile completion failed",
+                Detail = "Authenticated user identifier is missing from the access token.",
+                Instance = HttpContext.Request.Path
+            });
+        }
+
+        try
+        {
+            var response = await _authenticationService.CompleteProfileAsync(
+                userId.Value,
+                request,
+                cancellationToken);
+
+            return Ok(response);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Title = "Profile completion failed",
+                Detail = ex.Message,
+                Instance = HttpContext.Request.Path
+            });
+        }
+    }
+
     /// <summary>
     /// Login with email and password
     /// </summary>
@@ -309,7 +351,8 @@ public sealed class AuthController : ControllerBase
             ["expiresAtUtc"] = response.ExpiresAtUtc?.ToString("O"),
             ["userId"] = response.UserId.ToString(),
             ["email"] = response.Email,
-            ["roles"] = string.Join(",", response.Roles)
+            ["roles"] = string.Join(",", response.Roles),
+            ["requiresProfileCompletion"] = response.RequiresProfileCompletion.ToString().ToLowerInvariant()
         }, redirectTarget);
     }
 
@@ -375,4 +418,10 @@ public sealed class AuthController : ControllerBase
 
     private static string NormalizeRedirectTarget(string? target)
         => string.Equals(target, "mobile", StringComparison.OrdinalIgnoreCase) ? "mobile" : "web";
+
+    private Guid? ResolveAuthenticatedUserId()
+    {
+        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        return Guid.TryParse(userIdClaim, out var userId) ? userId : null;
+    }
 }

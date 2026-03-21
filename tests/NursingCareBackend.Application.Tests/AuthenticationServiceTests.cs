@@ -24,6 +24,10 @@ public sealed class AuthenticationServiceTests
       roleRepository: new FakeRoleRepository(nurseRole));
 
     var response = await service.RegisterAsync(new RegisterRequest(
+      Name: "Ana",
+      LastName: "Lopez",
+      IdentificationNumber: "001-1234567-8",
+      Phone: "8095550101",
       Email: "nurse@example.com",
       Password: "Pass123!",
       ConfirmPassword: "Pass123!",
@@ -36,6 +40,10 @@ public sealed class AuthenticationServiceTests
 
     var createdUser = Assert.Single(userRepository.CreatedUsers);
     Assert.False(createdUser.IsActive);
+    Assert.Equal("Ana", createdUser.Name);
+    Assert.Equal("Lopez", createdUser.LastName);
+    Assert.Equal("001-1234567-8", createdUser.IdentificationNumber);
+    Assert.Equal("8095550101", createdUser.Phone);
     Assert.Contains(createdUser.UserRoles, userRole => userRole.Role.Name == "Nurse");
   }
 
@@ -46,6 +54,10 @@ public sealed class AuthenticationServiceTests
 
     var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
       service.RegisterAsync(new RegisterRequest(
+        Name: "Client",
+        LastName: "User",
+        IdentificationNumber: "001-9876543-2",
+        Phone: "8095550102",
         Email: "client@example.com",
         Password: "Pass123!",
         ConfirmPassword: "Pass123!",
@@ -123,7 +135,7 @@ public sealed class AuthenticationServiceTests
   }
 
   [Fact]
-  public async Task LoginWithGoogleAsync_Should_Create_A_New_Active_Client_User()
+  public async Task LoginWithGoogleAsync_Should_Create_A_New_Active_Client_User_Requiring_Profile_Completion()
   {
     var userRole = new Role
     {
@@ -143,11 +155,16 @@ public sealed class AuthenticationServiceTests
     Assert.Equal("jwt-token-1", response.Token);
     Assert.Equal("google-user@example.com", response.Email);
     Assert.Contains("User", response.Roles);
+    Assert.True(response.RequiresProfileCompletion);
 
     var createdUser = Assert.Single(userRepository.CreatedUsers);
-    Assert.True(createdUser.IsActive);
+    Assert.False(createdUser.IsActive);
     Assert.Equal("google-subject-1", createdUser.GoogleSubjectId);
     Assert.Equal("Google User", createdUser.DisplayName);
+    Assert.Null(createdUser.Name);
+    Assert.Null(createdUser.LastName);
+    Assert.Null(createdUser.IdentificationNumber);
+    Assert.Null(createdUser.Phone);
     Assert.Contains(createdUser.UserRoles, userRoleLink => userRoleLink.Role.Name == "User");
   }
 
@@ -171,9 +188,44 @@ public sealed class AuthenticationServiceTests
     var response = await service.LoginWithGoogleAsync("google-auth-code");
 
     Assert.Equal("existing@example.com", response.Email);
+    Assert.False(response.RequiresProfileCompletion);
     Assert.Empty(userRepository.CreatedUsers);
     Assert.Equal("google-subject-2", existingUser.GoogleSubjectId);
     Assert.Equal("Existing User", existingUser.DisplayName);
+  }
+
+  [Fact]
+  public async Task CompleteProfileAsync_Should_Update_Google_User_And_Clear_Profile_Completion_Flag()
+  {
+    var userRole = new Role
+    {
+      Id = Guid.NewGuid(),
+      Name = "User"
+    };
+
+    var existingUser = CreateUser("google-existing@example.com", userRole);
+    existingUser.GoogleSubjectId = "google-subject-9";
+    existingUser.Name = null;
+    existingUser.LastName = null;
+    existingUser.IdentificationNumber = null;
+    existingUser.Phone = null;
+
+    var service = CreateService(userRepository: new FakeUserRepository(existingUser));
+
+    var response = await service.CompleteProfileAsync(
+      existingUser.Id,
+      new CompleteProfileRequest(
+        Name: "Laura",
+        LastName: "Gomez",
+        IdentificationNumber: "001-1111111-1",
+        Phone: "8095550199"));
+
+    Assert.False(response.RequiresProfileCompletion);
+    Assert.True(existingUser.IsActive);
+    Assert.Equal("Laura", existingUser.Name);
+    Assert.Equal("Gomez", existingUser.LastName);
+    Assert.Equal("001-1111111-1", existingUser.IdentificationNumber);
+    Assert.Equal("8095550199", existingUser.Phone);
   }
 
   [Fact]
@@ -223,6 +275,10 @@ public sealed class AuthenticationServiceTests
     var user = new User
     {
       Id = Guid.NewGuid(),
+      Name = "Existing",
+      LastName = "User",
+      IdentificationNumber = "001-7654321-0",
+      Phone = "8095550109",
       Email = email,
       PasswordHash = "hashed-password",
       IsActive = true,

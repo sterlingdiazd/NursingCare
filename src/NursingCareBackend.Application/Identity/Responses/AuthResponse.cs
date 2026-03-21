@@ -6,5 +6,6 @@ public sealed record AuthResponse(
     DateTime? ExpiresAtUtc,
     Guid UserId,
     string Email,
-    IEnumerable<string> Roles
+    IEnumerable<string> Roles,
+    bool RequiresProfileCompletion
 );

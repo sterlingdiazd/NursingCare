@@ -92,6 +92,18 @@ public sealed class NursingCareDbContext : DbContext
                      builder.HasIndex(x => x.Email)
                   .IsUnique();
 
+                     builder.Property(x => x.Name)
+                      .HasMaxLength(150);
+
+                     builder.Property(x => x.LastName)
+                      .HasMaxLength(150);
+
+                     builder.Property(x => x.IdentificationNumber)
+                      .HasMaxLength(50);
+
+                     builder.Property(x => x.Phone)
+                      .HasMaxLength(30);
+
                      builder.Property(x => x.DisplayName)
                       .HasMaxLength(256);
 

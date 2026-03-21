@@ -4,6 +4,10 @@ public sealed class User
 {
   public Guid Id { get; set; }
   public string Email { get; set; } = default!;
+  public string? Name { get; set; }
+  public string? LastName { get; set; }
+  public string? IdentificationNumber { get; set; }
+  public string? Phone { get; set; }
   public string? DisplayName { get; set; }
   public string? GoogleSubjectId { get; set; }
   public string PasswordHash { get; set; } = default!;

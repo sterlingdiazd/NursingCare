@@ -7,6 +7,10 @@ public enum UserProfileType
 }
 
 public sealed record RegisterRequest(
+    string Name,
+    string LastName,
+    string IdentificationNumber,
+    string Phone,
     string Email,
     string Password,
     string ConfirmPassword,

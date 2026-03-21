@@ -35,7 +35,29 @@ public sealed class AuthenticationService : IAuthenticationService
 
     public async Task<AuthResponse> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default)
     {
+        var normalizedEmail = request.Email.Trim();
+
         // Validate input
+        if (string.IsNullOrWhiteSpace(request.Name))
+        {
+            throw new ArgumentException("Name is required.", nameof(request.Name));
+        }
+
+        if (string.IsNullOrWhiteSpace(request.LastName))
+        {
+            throw new ArgumentException("Last name is required.", nameof(request.LastName));
+        }
+
+        if (string.IsNullOrWhiteSpace(request.IdentificationNumber))
+        {
+            throw new ArgumentException("Identification number is required.", nameof(request.IdentificationNumber));
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Phone))
+        {
+            throw new ArgumentException("Phone is required.", nameof(request.Phone));
+        }
+
         if (string.IsNullOrWhiteSpace(request.Email))
         {
             throw new ArgumentException("Email is required.", nameof(request.Email));
@@ -57,7 +79,7 @@ public sealed class AuthenticationService : IAuthenticationService
         }
 
         // Check if user already exists
-        var existingUser = await _userRepository.GetByEmailAsync(request.Email, cancellationToken);
+        var existingUser = await _userRepository.GetByEmailAsync(normalizedEmail, cancellationToken);
         if (existingUser is not null)
         {
             throw new InvalidOperationException("User with this email already exists.");
@@ -71,7 +93,11 @@ public sealed class AuthenticationService : IAuthenticationService
         var user = new User
         {
             Id = Guid.NewGuid(),
-            Email = request.Email,
+            Name = request.Name.Trim(),
+            LastName = request.LastName.Trim(),
+            IdentificationNumber = request.IdentificationNumber.Trim(),
+            Phone = request.Phone.Trim(),
+            Email = normalizedEmail,
             PasswordHash = _passwordHasher.Hash(request.Password),
             IsActive = isActive,
             CreatedAtUtc = DateTime.UtcNow
@@ -99,14 +125,54 @@ public sealed class AuthenticationService : IAuthenticationService
         if (request.ProfileType == UserProfileType.Nurse)
         {
             return new AuthResponse(
-                Token: string.Empty,
-                RefreshToken: string.Empty,
-                ExpiresAtUtc: null,
-                UserId: user.Id,
-                Email: user.Email,
-                Roles: new[] { roleName }
-            );
+            Token: string.Empty,
+            RefreshToken: string.Empty,
+            ExpiresAtUtc: null,
+            UserId: user.Id,
+            Email: user.Email,
+            Roles: new[] { roleName },
+            RequiresProfileCompletion: false
+        );
+    }
+
+    return await CreateAuthResponseAsync(user, cancellationToken);
+    }
+
+    public async Task<AuthResponse> CompleteProfileAsync(
+        Guid userId,
+        CompleteProfileRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (userId == Guid.Empty)
+        {
+            throw new ArgumentException("User ID cannot be empty.", nameof(userId));
         }
+
+        ValidateProfileFields(request.Name, request.LastName, request.IdentificationNumber, request.Phone);
+
+        var user = await _userRepository.GetByIdAsync(userId, cancellationToken);
+        if (user is null)
+        {
+            throw new InvalidOperationException($"User with ID {userId} not found.");
+        }
+
+        if (string.IsNullOrWhiteSpace(user.GoogleSubjectId))
+        {
+            throw new InvalidOperationException("Profile completion is only available for Google-linked users.");
+        }
+
+        user.Name = request.Name.Trim();
+        user.LastName = request.LastName.Trim();
+        user.IdentificationNumber = request.IdentificationNumber.Trim();
+        user.Phone = request.Phone.Trim();
+        user.IsActive = true;
+
+        if (string.IsNullOrWhiteSpace(user.DisplayName))
+        {
+            user.DisplayName = $"{user.Name} {user.LastName}".Trim();
+        }
+
+        await _userRepository.UpdateAsync(user, cancellationToken);
 
         return await CreateAuthResponseAsync(user, cancellationToken);
     }
@@ -176,10 +242,10 @@ public sealed class AuthenticationService : IAuthenticationService
                     throw new InvalidOperationException("Google sign-in is already linked to a different account.");
                 }
 
-                if (!existingUser.IsActive)
-                {
-                    throw new InvalidOperationException("User account is not active.");
-                }
+        if (!existingUser.IsActive && !RequiresProfileCompletion(existingUser))
+        {
+            throw new InvalidOperationException("User account is not active.");
+        }
 
                 existingUser.GoogleSubjectId = googleUser.Subject;
                 if (string.IsNullOrWhiteSpace(existingUser.DisplayName))
@@ -196,7 +262,7 @@ public sealed class AuthenticationService : IAuthenticationService
             }
         }
 
-        if (!user.IsActive)
+        if (!user.IsActive && !RequiresProfileCompletion(user))
         {
             throw new InvalidOperationException("User account is not active.");
         }
@@ -224,7 +290,7 @@ public sealed class AuthenticationService : IAuthenticationService
 
         var user = existingRefreshToken.User;
 
-        if (!user.IsActive)
+        if (!user.IsActive && !RequiresProfileCompletion(user))
         {
             throw new InvalidOperationException("User account is not active.");
         }
@@ -387,7 +453,8 @@ public sealed class AuthenticationService : IAuthenticationService
             ExpiresAtUtc: tokenResult.ExpiresAtUtc,
             UserId: user.Id,
             Email: user.Email,
-            Roles: user.UserRoles.Select(ur => ur.Role.Name)
+            Roles: user.UserRoles.Select(ur => ur.Role.Name),
+            RequiresProfileCompletion: RequiresProfileCompletion(user)
         );
     }
 
@@ -408,7 +475,7 @@ public sealed class AuthenticationService : IAuthenticationService
             DisplayName = googleUser.Name,
             GoogleSubjectId = googleUser.Subject,
             PasswordHash = _passwordHasher.Hash(Convert.ToHexString(RandomNumberGenerator.GetBytes(16))),
-            IsActive = true,
+            IsActive = false,
             CreatedAtUtc = DateTime.UtcNow
         };
 
@@ -421,4 +488,38 @@ public sealed class AuthenticationService : IAuthenticationService
 
         return await _userRepository.CreateAsync(user, cancellationToken);
     }
+
+    private static void ValidateProfileFields(
+        string name,
+        string lastName,
+        string identificationNumber,
+        string phone)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("Name is required.", nameof(name));
+        }
+
+        if (string.IsNullOrWhiteSpace(lastName))
+        {
+            throw new ArgumentException("Last name is required.", nameof(lastName));
+        }
+
+        if (string.IsNullOrWhiteSpace(identificationNumber))
+        {
+            throw new ArgumentException("Identification number is required.", nameof(identificationNumber));
+        }
+
+        if (string.IsNullOrWhiteSpace(phone))
+        {
+            throw new ArgumentException("Phone is required.", nameof(phone));
+        }
+    }
+
+    private static bool RequiresProfileCompletion(User user)
+        => !string.IsNullOrWhiteSpace(user.GoogleSubjectId)
+            && (string.IsNullOrWhiteSpace(user.Name)
+                || string.IsNullOrWhiteSpace(user.LastName)
+                || string.IsNullOrWhiteSpace(user.IdentificationNumber)
+                || string.IsNullOrWhiteSpace(user.Phone));
 }
