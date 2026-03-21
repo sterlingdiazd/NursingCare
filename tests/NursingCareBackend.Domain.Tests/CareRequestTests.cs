@@ -56,7 +56,8 @@ public class CareRequestTests
     [Fact]
     public void Approve_Should_Transition_Request_To_Approved()
     {
-        var careRequest = CreateForTest(Guid.NewGuid(), "Needs approval");
+        var nurseUserId = Guid.NewGuid();
+        var careRequest = CreateForTest(Guid.NewGuid(), "Needs approval", assignedNurse: nurseUserId);
         var approvedAtUtc = new DateTime(2026, 3, 18, 12, 0, 0, DateTimeKind.Utc);
 
         careRequest.Approve(approvedAtUtc);
@@ -82,12 +83,13 @@ public class CareRequestTests
     [Fact]
     public void Complete_Should_Transition_Approved_Request_To_Completed()
     {
-        var careRequest = CreateForTest(Guid.NewGuid(), "Needs completion");
+        var nurseUserId = Guid.NewGuid();
+        var careRequest = CreateForTest(Guid.NewGuid(), "Needs completion", assignedNurse: nurseUserId);
         var approvedAtUtc = new DateTime(2026, 3, 18, 12, 0, 0, DateTimeKind.Utc);
         var completedAtUtc = new DateTime(2026, 3, 18, 12, 15, 0, DateTimeKind.Utc);
 
         careRequest.Approve(approvedAtUtc);
-        careRequest.Complete(completedAtUtc);
+        careRequest.Complete(completedAtUtc, nurseUserId);
 
         Assert.Equal(CareRequestStatus.Completed, careRequest.Status);
         Assert.Equal(completedAtUtc, careRequest.CompletedAtUtc);
@@ -97,9 +99,10 @@ public class CareRequestTests
     [Fact]
     public void Complete_Before_Approval_Should_Throw()
     {
-        var careRequest = CreateForTest(Guid.NewGuid(), "Needs completion");
+        var nurseUserId = Guid.NewGuid();
+        var careRequest = CreateForTest(Guid.NewGuid(), "Needs completion", assignedNurse: nurseUserId);
 
-        var act = () => careRequest.Complete(DateTime.UtcNow);
+        var act = () => careRequest.Complete(DateTime.UtcNow, nurseUserId);
 
         Assert.Throws<InvalidOperationException>(act);
     }
@@ -107,7 +110,7 @@ public class CareRequestTests
     [Fact]
     public void Reject_After_Approval_Should_Throw()
     {
-        var careRequest = CreateForTest(Guid.NewGuid(), "Already approved");
+        var careRequest = CreateForTest(Guid.NewGuid(), "Already approved", assignedNurse: Guid.NewGuid());
         careRequest.Approve(DateTime.UtcNow);
 
         var act = () => careRequest.Reject(DateTime.UtcNow.AddMinutes(5));
@@ -115,16 +118,15 @@ public class CareRequestTests
         Assert.Throws<InvalidOperationException>(act);
     }
 
-    private static CareRequest CreateForTest(Guid userID, string description)
+    private static CareRequest CreateForTest(Guid userID, string description, Guid? assignedNurse = null)
     {
         return CareRequest.Create(
             userID: userID,
             description: description,
             careRequestReason: null,
             careRequestType: "domicilio_24h",
-            nurseId: null,
             suggestedNurse: null,
-            assignedNurse: null,
+            assignedNurse: assignedNurse,
             unit: 1,
             price: null,
             clientBasePrice: null,
