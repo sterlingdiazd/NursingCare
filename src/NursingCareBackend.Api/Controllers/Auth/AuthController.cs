@@ -306,7 +306,7 @@ public sealed class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// Activate a user account (Admin only) - Required for nurses before they can login
+    /// Compatibility endpoint that activates a user account after the admin completion step.
     /// </summary>
     /// <param name="request">User ID to activate</param>
     /// <param name="cancellationToken">Cancellation token</param>
