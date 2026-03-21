@@ -134,11 +134,29 @@ public sealed class TransitionCareRequestHandlerTests
       return Task.CompletedTask;
     }
 
-    public Task<IReadOnlyList<CareRequest>> GetAllAsync(CancellationToken cancellationToken)
-      => Task.FromResult<IReadOnlyList<CareRequest>>(_items.Values.ToList());
+    public Task<IReadOnlyList<CareRequest>> GetAllAsync(Guid? userId, CancellationToken cancellationToken)
+    {
+      var items = _items.Values
+        .Where(careRequest => userId is null || careRequest.UserID == userId.Value)
+        .ToList();
 
-    public Task<CareRequest?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
-      => Task.FromResult(_items.TryGetValue(id, out var careRequest) ? careRequest : null);
+      return Task.FromResult<IReadOnlyList<CareRequest>>(items);
+    }
+
+    public Task<CareRequest?> GetByIdAsync(Guid id, Guid? userId, CancellationToken cancellationToken)
+    {
+      if (!_items.TryGetValue(id, out var careRequest))
+      {
+        return Task.FromResult<CareRequest?>(null);
+      }
+
+      if (userId is not null && careRequest.UserID != userId.Value)
+      {
+        return Task.FromResult<CareRequest?>(null);
+      }
+
+      return Task.FromResult<CareRequest?>(careRequest);
+    }
 
     public Task UpdateAsync(CareRequest careRequest, CancellationToken cancellationToken)
     {
