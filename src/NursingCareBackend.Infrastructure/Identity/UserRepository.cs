@@ -17,6 +17,8 @@ public sealed class UserRepository : IUserRepository
     public async Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
         return await _dbContext.Users
+            .Include(u => u.NurseProfile)
+            .Include(u => u.ClientProfile)
             .Include(u => u.UserRoles)
             .ThenInclude(ur => ur.Role)
             .FirstOrDefaultAsync(u => u.Email == email, cancellationToken);
@@ -27,6 +29,8 @@ public sealed class UserRepository : IUserRepository
         CancellationToken cancellationToken = default)
     {
         return await _dbContext.Users
+            .Include(u => u.NurseProfile)
+            .Include(u => u.ClientProfile)
             .Include(u => u.UserRoles)
             .ThenInclude(ur => ur.Role)
             .FirstOrDefaultAsync(u => u.GoogleSubjectId == googleSubjectId, cancellationToken);
@@ -35,6 +39,8 @@ public sealed class UserRepository : IUserRepository
     public async Task<User?> GetByIdAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         return await _dbContext.Users
+            .Include(u => u.NurseProfile)
+            .Include(u => u.ClientProfile)
             .Include(u => u.UserRoles)
             .ThenInclude(ur => ur.Role)
             .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);

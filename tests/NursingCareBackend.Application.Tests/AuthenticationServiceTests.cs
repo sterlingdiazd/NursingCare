@@ -40,15 +40,19 @@ public sealed class AuthenticationServiceTests
 
     var createdUser = Assert.Single(userRepository.CreatedUsers);
     Assert.False(createdUser.IsActive);
+    Assert.Equal(UserProfileType.Nurse, createdUser.ProfileType);
     Assert.Equal("Ana", createdUser.Name);
     Assert.Equal("Lopez", createdUser.LastName);
     Assert.Equal("001-1234567-8", createdUser.IdentificationNumber);
     Assert.Equal("8095550101", createdUser.Phone);
+    Assert.NotNull(createdUser.NurseProfile);
+    Assert.Equal(createdUser.Id, createdUser.NurseProfile!.UserId);
+    Assert.Null(createdUser.ClientProfile);
     Assert.Contains(createdUser.UserRoles, userRole => userRole.Role.Name == "Nurse");
   }
 
   [Fact]
-  public async Task RegisterAsync_Should_Reject_When_Default_User_Role_Is_Missing()
+  public async Task RegisterAsync_Should_Reject_When_Default_Client_Role_Is_Missing()
   {
     var service = CreateService(roleRepository: new FakeRoleRepository());
 
@@ -63,7 +67,7 @@ public sealed class AuthenticationServiceTests
         ConfirmPassword: "Pass123!",
         ProfileType: UserProfileType.Client)));
 
-    Assert.Equal("User role not found in the system.", exception.Message);
+    Assert.Equal("Client role not found in the system.", exception.Message);
   }
 
   [Fact]
@@ -108,7 +112,7 @@ public sealed class AuthenticationServiceTests
     var role = new Role
     {
       Id = Guid.NewGuid(),
-      Name = "User"
+      Name = "Client"
     };
 
     var user = CreateUser("client@example.com", role);
@@ -140,7 +144,7 @@ public sealed class AuthenticationServiceTests
     var userRole = new Role
     {
       Id = Guid.NewGuid(),
-      Name = "User"
+      Name = "Client"
     };
 
     var userRepository = new FakeUserRepository();
@@ -154,18 +158,21 @@ public sealed class AuthenticationServiceTests
 
     Assert.Equal("jwt-token-1", response.Token);
     Assert.Equal("google-user@example.com", response.Email);
-    Assert.Contains("User", response.Roles);
+    Assert.Contains("Client", response.Roles);
     Assert.True(response.RequiresProfileCompletion);
 
     var createdUser = Assert.Single(userRepository.CreatedUsers);
     Assert.False(createdUser.IsActive);
+    Assert.Equal(UserProfileType.Client, createdUser.ProfileType);
     Assert.Equal("google-subject-1", createdUser.GoogleSubjectId);
     Assert.Equal("Google User", createdUser.DisplayName);
     Assert.Null(createdUser.Name);
     Assert.Null(createdUser.LastName);
     Assert.Null(createdUser.IdentificationNumber);
     Assert.Null(createdUser.Phone);
-    Assert.Contains(createdUser.UserRoles, userRoleLink => userRoleLink.Role.Name == "User");
+    Assert.NotNull(createdUser.ClientProfile);
+    Assert.Equal(createdUser.Id, createdUser.ClientProfile!.UserId);
+    Assert.Contains(createdUser.UserRoles, userRoleLink => userRoleLink.Role.Name == "Client");
   }
 
   [Fact]
@@ -174,7 +181,7 @@ public sealed class AuthenticationServiceTests
     var userRole = new Role
     {
       Id = Guid.NewGuid(),
-      Name = "User"
+      Name = "Client"
     };
 
     var existingUser = CreateUser("existing@example.com", userRole);
@@ -200,7 +207,7 @@ public sealed class AuthenticationServiceTests
     var userRole = new Role
     {
       Id = Guid.NewGuid(),
-      Name = "User"
+      Name = "Client"
     };
 
     var existingUser = CreateUser("google-existing@example.com", userRole);
@@ -275,6 +282,7 @@ public sealed class AuthenticationServiceTests
     var user = new User
     {
       Id = Guid.NewGuid(),
+      ProfileType = role.Name == "Nurse" ? UserProfileType.Nurse : UserProfileType.Client,
       Name = "Existing",
       LastName = "User",
       IdentificationNumber = "001-7654321-0",
@@ -282,8 +290,21 @@ public sealed class AuthenticationServiceTests
       Email = email,
       PasswordHash = "hashed-password",
       IsActive = true,
-      CreatedAtUtc = DateTime.UtcNow
+      CreatedAtUtc = DateTime.UtcNow,
+      ClientProfile = role.Name == "Nurse" ? null : new Client()
     };
+
+    if (role.Name == "Nurse")
+    {
+      user.NurseProfile = new Nurse
+      {
+        UserId = user.Id
+      };
+    }
+    else
+    {
+      user.ClientProfile!.UserId = user.Id;
+    }
 
     user.UserRoles.Add(new UserRole
     {

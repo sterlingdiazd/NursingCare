@@ -4,6 +4,7 @@ public sealed class User
 {
   public Guid Id { get; set; }
   public string Email { get; set; } = default!;
+  public UserProfileType ProfileType { get; init; }
   public string? Name { get; set; }
   public string? LastName { get; set; }
   public string? IdentificationNumber { get; set; }
@@ -16,4 +17,6 @@ public sealed class User
 
   public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
   public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
+  public Nurse? NurseProfile { get; set; }
+  public Client? ClientProfile { get; set; }
 }

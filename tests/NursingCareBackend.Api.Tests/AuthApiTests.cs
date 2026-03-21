@@ -16,7 +16,7 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
   }
 
   [Fact]
-  public async Task POST_Register_Should_Return_Token_And_Default_User_Role()
+  public async Task POST_Register_Should_Return_Token_And_Default_Client_Role()
   {
     var client = _factory.CreateClient();
     var email = $"register-{Guid.NewGuid():N}@nursingcare.local";
@@ -41,7 +41,7 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
     Assert.False(string.IsNullOrWhiteSpace(payload.RefreshToken));
     Assert.NotNull(payload.ExpiresAtUtc);
     Assert.Equal(email, payload.Email);
-    Assert.Contains("User", payload.Roles);
+    Assert.Contains("Client", payload.Roles);
   }
 
   [Fact]
@@ -178,7 +178,7 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
     var parameters = QueryHelpers.ParseQuery("?" + response.Headers.Location.Fragment.TrimStart('#'));
     Assert.Equal("success", parameters["oauth"].ToString());
     Assert.Equal("google-success-web@example.com", parameters["email"].ToString());
-    Assert.Equal("User", parameters["roles"].ToString());
+    Assert.Equal("Client", parameters["roles"].ToString());
     Assert.Equal("true", parameters["requiresProfileCompletion"].ToString());
     Assert.False(string.IsNullOrWhiteSpace(parameters["token"].ToString()));
     Assert.False(string.IsNullOrWhiteSpace(parameters["refreshToken"].ToString()));
@@ -223,7 +223,7 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
     var parameters = QueryHelpers.ParseQuery(response.Headers.Location.Query);
     Assert.Equal("success", parameters["oauth"].ToString());
     Assert.Equal("google-success-mobile@example.com", parameters["email"].ToString());
-    Assert.Equal("User", parameters["roles"].ToString());
+    Assert.Equal("Client", parameters["roles"].ToString());
     Assert.Equal("true", parameters["requiresProfileCompletion"].ToString());
   }
 

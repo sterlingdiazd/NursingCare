@@ -13,6 +13,8 @@ public sealed class NursingCareDbContext : DbContext
 
        public DbSet<CareRequest> CareRequests => Set<CareRequest>();
        public DbSet<User> Users => Set<User>();
+       public DbSet<Nurse> Nurses => Set<Nurse>();
+       public DbSet<Client> Clients => Set<Client>();
        public DbSet<Role> Roles => Set<Role>();
        public DbSet<UserRole> UserRoles => Set<UserRole>();
        public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
@@ -89,6 +91,11 @@ public sealed class NursingCareDbContext : DbContext
                       .IsRequired()
                       .HasMaxLength(256);
 
+                     builder.Property(x => x.ProfileType)
+                      .HasConversion<string>()
+                      .IsRequired()
+                      .HasMaxLength(20);
+
                      builder.HasIndex(x => x.Email)
                   .IsUnique();
 
@@ -122,6 +129,48 @@ public sealed class NursingCareDbContext : DbContext
 
                      builder.Property(x => x.CreatedAtUtc)
                       .IsRequired();
+
+                     builder.HasOne(x => x.NurseProfile)
+                      .WithOne(x => x.User)
+                      .HasForeignKey<Nurse>(x => x.UserId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                     builder.HasOne(x => x.ClientProfile)
+                      .WithOne(x => x.User)
+                      .HasForeignKey<Client>(x => x.UserId)
+                      .OnDelete(DeleteBehavior.Cascade);
+              });
+
+              modelBuilder.Entity<Nurse>(builder =>
+              {
+                     builder.ToTable("Nurses");
+
+                     builder.HasKey(x => x.UserId);
+
+                     builder.Property(x => x.HireDate)
+                      .HasColumnType("date");
+
+                     builder.Property(x => x.Specialty)
+                      .HasMaxLength(150);
+
+                     builder.Property(x => x.LicenseId)
+                      .HasMaxLength(100);
+
+                     builder.Property(x => x.BankName)
+                      .HasMaxLength(150);
+
+                     builder.Property(x => x.AccountNumber)
+                      .HasMaxLength(50);
+
+                     builder.Property(x => x.Category)
+                      .HasMaxLength(100);
+              });
+
+              modelBuilder.Entity<Client>(builder =>
+              {
+                     builder.ToTable("Clients");
+
+                     builder.HasKey(x => x.UserId);
               });
 
               modelBuilder.Entity<Role>(builder =>

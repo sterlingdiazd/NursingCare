@@ -98,13 +98,14 @@ public sealed class AuthenticationService : IAuthenticationService
             IdentificationNumber = request.IdentificationNumber.Trim(),
             Phone = request.Phone.Trim(),
             Email = normalizedEmail,
+            ProfileType = request.ProfileType,
             PasswordHash = _passwordHasher.Hash(request.Password),
             IsActive = isActive,
             CreatedAtUtc = DateTime.UtcNow
         };
 
         // Add appropriate role based on profile type
-        string roleName = request.ProfileType == UserProfileType.Nurse ? SystemRoles.Nurse : SystemRoles.User;
+        string roleName = request.ProfileType == UserProfileType.Nurse ? SystemRoles.Nurse : SystemRoles.Client;
         var role = await _roleRepository.GetByNameAsync(roleName, cancellationToken);
         if (role is null)
         {
@@ -117,6 +118,21 @@ public sealed class AuthenticationService : IAuthenticationService
             RoleId = role.Id,
             Role = role
         });
+
+        if (request.ProfileType == UserProfileType.Nurse)
+        {
+            user.NurseProfile = new Nurse
+            {
+                UserId = user.Id
+            };
+        }
+        else
+        {
+            user.ClientProfile = new Client
+            {
+                UserId = user.Id
+            };
+        }
 
         // Save user
         await _userRepository.CreateAsync(user, cancellationToken);
@@ -383,10 +399,14 @@ public sealed class AuthenticationService : IAuthenticationService
         {
             Id = Guid.NewGuid(),
             Email = request.AdminEmail,
+            ProfileType = UserProfileType.Client,
             PasswordHash = _passwordHasher.Hash(request.AdminPassword),
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = DateTime.UtcNow,
+            ClientProfile = new Client()
         };
+
+        user.ClientProfile.UserId = user.Id;
 
         user.UserRoles.Add(new UserRole
         {
@@ -462,22 +482,26 @@ public sealed class AuthenticationService : IAuthenticationService
         GoogleOAuthUserInfo googleUser,
         CancellationToken cancellationToken)
     {
-        var userRole = await _roleRepository.GetByNameAsync(SystemRoles.User, cancellationToken);
+        var userRole = await _roleRepository.GetByNameAsync(SystemRoles.Client, cancellationToken);
         if (userRole is null)
         {
-            throw new InvalidOperationException("User role not found in the system.");
+            throw new InvalidOperationException("Client role not found in the system.");
         }
 
         var user = new User
         {
             Id = Guid.NewGuid(),
             Email = googleUser.Email,
+            ProfileType = UserProfileType.Client,
             DisplayName = googleUser.Name,
             GoogleSubjectId = googleUser.Subject,
             PasswordHash = _passwordHasher.Hash(Convert.ToHexString(RandomNumberGenerator.GetBytes(16))),
             IsActive = false,
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = DateTime.UtcNow,
+            ClientProfile = new Client()
         };
+
+        user.ClientProfile.UserId = user.Id;
 
         user.UserRoles.Add(new UserRole
         {

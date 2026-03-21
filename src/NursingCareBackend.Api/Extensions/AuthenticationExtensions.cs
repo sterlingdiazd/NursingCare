@@ -46,10 +46,10 @@ public static class AuthenticationExtensions
     services.AddAuthorization(options =>
     {
       options.AddPolicy("CareRequestReader", policy =>
-        policy.RequireRole("User", "Nurse", "Admin"));
+        policy.RequireRole("Client", "Nurse", "Admin"));
 
       options.AddPolicy("CareRequestCreator", policy =>
-        policy.RequireRole("User", "Nurse", "Admin"));
+        policy.RequireRole("Client", "Nurse", "Admin"));
 
       options.AddPolicy("CareRequestApprover", policy =>
         policy.RequireRole("Admin"));
