@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using NursingCareBackend.Api.Middleware;
@@ -16,6 +17,31 @@ public static class ApplicationBuilderExtensions
   public static IApplicationBuilder UseExceptionHandling(this IApplicationBuilder app)
   {
     return app.UseMiddleware<ExceptionHandlingMiddleware>();
+  }
+
+  public static WebApplication UseApiMiddleware(this WebApplication app)
+  {
+    app.UseForwardedHeadersForProxy();
+    app.UseCorrelationId();
+    app.UseStructuredRequestLogging();
+    app.UseExceptionHandling();
+
+    app.UseCors("AllowAllDev");
+
+    app.UseAuthentication();
+    app.UseAuthorization();
+
+    app.UseSwagger();
+    app.UseSwaggerUI(options =>
+    {
+      options.SwaggerEndpoint("/swagger/v1/swagger.json", "Nursing Care API v1");
+      options.DocumentTitle = "Nursing Care API";
+      options.DisplayRequestDuration();
+    });
+
+    app.MapControllers();
+
+    return app;
   }
 
   public static string GetCorrelationId(this HttpContext context)
@@ -39,5 +65,20 @@ public static class ApplicationBuilderExtensions
     logger.LogInformation(
       "Database connection ready. HasUnresolvedPlaceholder={HasPlaceholder}",
       hasPlaceholder);
+  }
+
+  private static IApplicationBuilder UseForwardedHeadersForProxy(this IApplicationBuilder app)
+  {
+    var forwardedHeadersOptions = new ForwardedHeadersOptions
+    {
+      ForwardedHeaders = ForwardedHeaders.XForwardedFor
+        | ForwardedHeaders.XForwardedHost
+        | ForwardedHeaders.XForwardedProto
+    };
+
+    forwardedHeadersOptions.KnownIPNetworks.Clear();
+    forwardedHeadersOptions.KnownProxies.Clear();
+
+    return app.UseForwardedHeaders(forwardedHeadersOptions);
   }
 }
