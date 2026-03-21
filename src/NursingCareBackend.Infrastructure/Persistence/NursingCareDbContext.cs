@@ -82,7 +82,21 @@ public sealed class NursingCareDbContext : DbContext
 
               modelBuilder.Entity<User>(builder =>
               {
-                     builder.ToTable("Users");
+                     builder.ToTable("Users", table =>
+                     {
+                            table.HasCheckConstraint(
+                             "CK_Users_Name_TextOnly",
+                             "[Name] IS NULL OR (LEN(LTRIM(RTRIM([Name]))) > 0 AND [Name] NOT LIKE '%[^A-Za-zÁÉÍÓÚáéíóúÑñÜü ]%')");
+                            table.HasCheckConstraint(
+                             "CK_Users_LastName_TextOnly",
+                             "[LastName] IS NULL OR (LEN(LTRIM(RTRIM([LastName]))) > 0 AND [LastName] NOT LIKE '%[^A-Za-zÁÉÍÓÚáéíóúÑñÜü ]%')");
+                            table.HasCheckConstraint(
+                             "CK_Users_IdentificationNumber_ExactDigits",
+                             "[IdentificationNumber] IS NULL OR (LEN([IdentificationNumber]) = 11 AND [IdentificationNumber] NOT LIKE '%[^0-9]%')");
+                            table.HasCheckConstraint(
+                             "CK_Users_Phone_ExactDigits",
+                             "[Phone] IS NULL OR (LEN([Phone]) = 10 AND [Phone] NOT LIKE '%[^0-9]%')");
+                     });
 
                      builder.HasKey(x => x.Id);
 
@@ -142,7 +156,18 @@ public sealed class NursingCareDbContext : DbContext
 
               modelBuilder.Entity<Nurse>(builder =>
               {
-                     builder.ToTable("Nurses");
+                     builder.ToTable("Nurses", table =>
+                     {
+                            table.HasCheckConstraint(
+                             "CK_Nurses_LicenseId_DigitsOnly",
+                             "[LicenseId] IS NULL OR (LEN([LicenseId]) > 0 AND [LicenseId] NOT LIKE '%[^0-9]%')");
+                            table.HasCheckConstraint(
+                             "CK_Nurses_BankName_TextOnly",
+                             "[BankName] IS NULL OR (LEN(LTRIM(RTRIM([BankName]))) > 0 AND [BankName] NOT LIKE '%[^A-Za-zÁÉÍÓÚáéíóúÑñÜü ]%')");
+                            table.HasCheckConstraint(
+                             "CK_Nurses_AccountNumber_DigitsOnly",
+                             "[AccountNumber] IS NULL OR (LEN([AccountNumber]) > 0 AND [AccountNumber] NOT LIKE '%[^0-9]%')");
+                     });
 
                      builder.HasKey(x => x.UserId);
 

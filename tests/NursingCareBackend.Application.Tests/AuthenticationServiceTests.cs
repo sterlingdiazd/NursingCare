@@ -26,7 +26,7 @@ public sealed class AuthenticationServiceTests
     var response = await service.RegisterAsync(new RegisterRequest(
       Name: "Ana",
       LastName: "Lopez",
-      IdentificationNumber: "001-1234567-8",
+      IdentificationNumber: "00112345678",
       Phone: "8095550101",
       Email: "nurse@example.com",
       Password: "Pass123!",
@@ -47,7 +47,7 @@ public sealed class AuthenticationServiceTests
     Assert.Equal(UserProfileType.Nurse, createdUser.ProfileType);
     Assert.Equal("Ana", createdUser.Name);
     Assert.Equal("Lopez", createdUser.LastName);
-    Assert.Equal("001-1234567-8", createdUser.IdentificationNumber);
+    Assert.Equal("00112345678", createdUser.IdentificationNumber);
     Assert.Equal("8095550101", createdUser.Phone);
     Assert.NotNull(createdUser.NurseProfile);
     Assert.Equal(createdUser.Id, createdUser.NurseProfile!.UserId);
@@ -74,7 +74,7 @@ public sealed class AuthenticationServiceTests
       service.RegisterAsync(new RegisterRequest(
         Name: "Ana",
         LastName: "Lopez",
-        IdentificationNumber: "001-1234567-8",
+        IdentificationNumber: "00112345678",
         Phone: "8095550101",
         Email: "nurse@example.com",
         Password: "Pass123!",
@@ -93,7 +93,7 @@ public sealed class AuthenticationServiceTests
       service.RegisterAsync(new RegisterRequest(
         Name: "Client",
         LastName: "User",
-        IdentificationNumber: "001-9876543-2",
+        IdentificationNumber: "00198765432",
         Phone: "8095550102",
         Email: "client@example.com",
         Password: "Pass123!",
@@ -257,14 +257,14 @@ public sealed class AuthenticationServiceTests
       new CompleteProfileRequest(
         Name: "Laura",
         LastName: "Gomez",
-        IdentificationNumber: "001-1111111-1",
+        IdentificationNumber: "00111111111",
         Phone: "8095550199"));
 
     Assert.False(response.RequiresProfileCompletion);
     Assert.True(existingUser.IsActive);
     Assert.Equal("Laura", existingUser.Name);
     Assert.Equal("Gomez", existingUser.LastName);
-    Assert.Equal("001-1111111-1", existingUser.IdentificationNumber);
+    Assert.Equal("00111111111", existingUser.IdentificationNumber);
     Assert.Equal("8095550199", existingUser.Phone);
   }
 
@@ -318,7 +318,7 @@ public sealed class AuthenticationServiceTests
       ProfileType = role.Name == "Nurse" ? UserProfileType.Nurse : UserProfileType.Client,
       Name = "Existing",
       LastName = "User",
-      IdentificationNumber = "001-7654321-0",
+      IdentificationNumber = "00176543210",
       Phone = "8095550109",
       Email = email,
       PasswordHash = "hashed-password",

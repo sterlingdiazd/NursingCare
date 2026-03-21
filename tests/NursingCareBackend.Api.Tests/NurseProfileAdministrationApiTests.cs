@@ -67,12 +67,12 @@ public sealed class NurseProfileAdministrationApiTests : IClassFixture<CustomWeb
       {
         name = "Laura",
         lastName = "Gomez",
-        identificationNumber = "001-1111111-1",
+        identificationNumber = "00111111111",
         phone = "8095550199",
         email = registration.Email,
         hireDate = "2026-03-21",
         specialty = "Critical Care",
-        licenseId = "LIC-55",
+        licenseId = "55",
         bankName = "Banco Central",
         accountNumber = "123456",
         category = "Senior"
@@ -87,6 +87,32 @@ public sealed class NurseProfileAdministrationApiTests : IClassFixture<CustomWeb
 
     var unlockedResponse = await nurseClient.GetAsync("/api/care-requests");
     Assert.Equal(HttpStatusCode.OK, unlockedResponse.StatusCode);
+  }
+
+  [Fact]
+  public async Task PUT_Complete_Should_Return_BadRequest_For_Invalid_Field_Formats()
+  {
+    var registration = await RegisterPendingNurseAsync("invalid-complete");
+    var adminClient = CreateAdminClient();
+
+    var response = await adminClient.PutAsJsonAsync(
+      $"/api/admin/nurse-profiles/{registration.UserId}/complete",
+      new
+      {
+        name = "Laura2",
+        lastName = "Gomez",
+        identificationNumber = "0011111111",
+        phone = "809555019A",
+        email = registration.Email,
+        hireDate = "2026-03-21",
+        specialty = "Critical Care",
+        licenseId = "55A",
+        bankName = "Banco 123",
+        accountNumber = "123-456",
+        category = "Senior"
+      });
+
+    Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
   }
 
   private HttpClient CreateAdminClient()
@@ -107,7 +133,7 @@ public sealed class NurseProfileAdministrationApiTests : IClassFixture<CustomWeb
     {
       name = "Luisa",
       lastName = "Martinez",
-      identificationNumber = "001-3344556-7",
+      identificationNumber = "00133445567",
       phone = "8095550103",
       email,
       password = "Pass123!",

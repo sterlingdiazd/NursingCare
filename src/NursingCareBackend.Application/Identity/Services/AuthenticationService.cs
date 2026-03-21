@@ -3,6 +3,7 @@ using NursingCareBackend.Application.Identity.OAuth;
 using NursingCareBackend.Application.Identity.Commands;
 using NursingCareBackend.Application.Identity.Repositories;
 using NursingCareBackend.Application.Identity.Responses;
+using NursingCareBackend.Application.Identity.Validation;
 using NursingCareBackend.Domain.Identity;
 using System.Security.Cryptography;
 
@@ -67,6 +68,11 @@ public sealed class AuthenticationService : IAuthenticationService
         {
             throw new ArgumentException("Password is required.", nameof(request.Password));
         }
+
+        IdentityInputRules.EnsureTextOnlyRequired(request.Name, nameof(request.Name), "Name");
+        IdentityInputRules.EnsureTextOnlyRequired(request.LastName, nameof(request.LastName), "Last name");
+        IdentityInputRules.EnsureIdentificationNumber(request.IdentificationNumber, nameof(request.IdentificationNumber));
+        IdentityInputRules.EnsurePhone(request.Phone, nameof(request.Phone));
 
         if (request.Password != request.ConfirmPassword)
         {
@@ -513,25 +519,10 @@ public sealed class AuthenticationService : IAuthenticationService
         string identificationNumber,
         string phone)
     {
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            throw new ArgumentException("Name is required.", nameof(name));
-        }
-
-        if (string.IsNullOrWhiteSpace(lastName))
-        {
-            throw new ArgumentException("Last name is required.", nameof(lastName));
-        }
-
-        if (string.IsNullOrWhiteSpace(identificationNumber))
-        {
-            throw new ArgumentException("Identification number is required.", nameof(identificationNumber));
-        }
-
-        if (string.IsNullOrWhiteSpace(phone))
-        {
-            throw new ArgumentException("Phone is required.", nameof(phone));
-        }
+        IdentityInputRules.EnsureTextOnlyRequired(name, nameof(name), "Name");
+        IdentityInputRules.EnsureTextOnlyRequired(lastName, nameof(lastName), "Last name");
+        IdentityInputRules.EnsureIdentificationNumber(identificationNumber, nameof(identificationNumber));
+        IdentityInputRules.EnsurePhone(phone, nameof(phone));
     }
 
     private static bool RequiresProfileCompletion(User user)
@@ -560,6 +551,10 @@ public sealed class AuthenticationService : IAuthenticationService
         {
             throw new ArgumentException("Bank name is required for nurse registration.", nameof(request.BankName));
         }
+
+        IdentityInputRules.EnsureTextOnlyRequired(request.BankName, nameof(request.BankName), "Bank name");
+        IdentityInputRules.EnsureNumericOnlyOptional(request.LicenseId, nameof(request.LicenseId), "License ID");
+        IdentityInputRules.EnsureNumericOnlyOptional(request.AccountNumber, nameof(request.AccountNumber), "Account number");
     }
 
     private static string? TrimOptional(string? value)

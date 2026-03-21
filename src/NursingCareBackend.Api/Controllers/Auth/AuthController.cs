@@ -47,8 +47,31 @@ public sealed class AuthController : ControllerBase
         [FromBody] RegisterRequest request,
         CancellationToken cancellationToken)
     {
-        var response = await _authenticationService.RegisterAsync(request, cancellationToken);
-        return Ok(response);
+        try
+        {
+            var response = await _authenticationService.RegisterAsync(request, cancellationToken);
+            return Ok(response);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Title = "Registration failed",
+                Detail = ex.Message,
+                Instance = HttpContext.Request.Path
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Title = "Registration failed",
+                Detail = ex.Message,
+                Instance = HttpContext.Request.Path
+            });
+        }
     }
 
     [HttpPost("complete-profile")]
@@ -82,6 +105,16 @@ public sealed class AuthController : ControllerBase
             return Ok(response);
         }
         catch (InvalidOperationException ex)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Title = "Profile completion failed",
+                Detail = ex.Message,
+                Instance = HttpContext.Request.Path
+            });
+        }
+        catch (ArgumentException ex)
         {
             return BadRequest(new ProblemDetails
             {

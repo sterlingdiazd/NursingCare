@@ -1,6 +1,7 @@
 using NursingCareBackend.Application.Identity.Commands;
 using NursingCareBackend.Application.Identity.Repositories;
 using NursingCareBackend.Application.Identity.Responses;
+using NursingCareBackend.Application.Identity.Validation;
 using NursingCareBackend.Domain.Identity;
 
 namespace NursingCareBackend.Application.Identity.Services;
@@ -114,25 +115,10 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
 
     private static void ValidateCompletionRequest(AdminCompleteNurseProfileRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.Name))
-        {
-            throw new ArgumentException("Name is required.", nameof(request.Name));
-        }
-
-        if (string.IsNullOrWhiteSpace(request.LastName))
-        {
-            throw new ArgumentException("Last name is required.", nameof(request.LastName));
-        }
-
-        if (string.IsNullOrWhiteSpace(request.IdentificationNumber))
-        {
-            throw new ArgumentException("Identification number is required.", nameof(request.IdentificationNumber));
-        }
-
-        if (string.IsNullOrWhiteSpace(request.Phone))
-        {
-            throw new ArgumentException("Phone is required.", nameof(request.Phone));
-        }
+        IdentityInputRules.EnsureTextOnlyRequired(request.Name, nameof(request.Name), "Name");
+        IdentityInputRules.EnsureTextOnlyRequired(request.LastName, nameof(request.LastName), "Last name");
+        IdentityInputRules.EnsureIdentificationNumber(request.IdentificationNumber, nameof(request.IdentificationNumber));
+        IdentityInputRules.EnsurePhone(request.Phone, nameof(request.Phone));
 
         if (string.IsNullOrWhiteSpace(request.Email))
         {
@@ -148,6 +134,10 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
         {
             throw new ArgumentException("Bank name is required.", nameof(request.BankName));
         }
+
+        IdentityInputRules.EnsureTextOnlyRequired(request.BankName, nameof(request.BankName), "Bank name");
+        IdentityInputRules.EnsureNumericOnlyOptional(request.LicenseId, nameof(request.LicenseId), "License ID");
+        IdentityInputRules.EnsureNumericOnlyOptional(request.AccountNumber, nameof(request.AccountNumber), "Account number");
 
         if (string.IsNullOrWhiteSpace(request.Category))
         {

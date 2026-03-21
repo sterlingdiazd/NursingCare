@@ -25,7 +25,7 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
     {
       name = "Maria",
       lastName = "Perez",
-      identificationNumber = "001-1234567-8",
+      identificationNumber = "00112345678",
       phone = "8095550101",
       email,
       password = "Pass123!",
@@ -55,7 +55,7 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
     {
       name = "Luisa",
       lastName = "Martinez",
-      identificationNumber = "001-2233445-6",
+      identificationNumber = "00122334456",
       phone = "8095550102",
       email,
       password = "Pass123!",
@@ -89,7 +89,7 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
     {
       name = "Carlos",
       lastName = "Diaz",
-      identificationNumber = "001-2233445-6",
+      identificationNumber = "00122334456",
       phone = "8095550102",
       email,
       password = "Pass123!",
@@ -123,7 +123,7 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
     {
       name = "Luisa",
       lastName = "Martinez",
-      identificationNumber = "001-3344556-7",
+      identificationNumber = "00133445567",
       phone = "8095550103",
       email,
       password = "Pass123!",
@@ -160,7 +160,7 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
     {
       name = "Luisa",
       lastName = "Martinez",
-      identificationNumber = "001-3344556-7",
+      identificationNumber = "00133445567",
       phone = "8095550103",
       email,
       password = "Pass123!",
@@ -205,6 +205,26 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
     var problem = await response.Content.ReadFromJsonAsync<ProblemDetailsDto>();
     Assert.NotNull(problem);
     Assert.Equal("Invalid email or password.", problem!.Detail);
+  }
+
+  [Fact]
+  public async Task POST_Register_Should_Return_BadRequest_For_Invalid_Identity_Field_Formats()
+  {
+    var client = _factory.CreateClient();
+    var email = $"invalid-register-{Guid.NewGuid():N}@nursingcare.local";
+
+    var response = await client.PostAsJsonAsync("/api/auth/register", new
+    {
+      name = "Maria1",
+      lastName = "Perez",
+      identificationNumber = "001-1234567-8",
+      phone = "809-555-0101",
+      email,
+      password = "Pass123!",
+      confirmPassword = "Pass123!"
+    });
+
+    Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
   }
 
   [Fact]
@@ -356,7 +376,7 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
     {
       name = "Mariela",
       lastName = "Suarez",
-      identificationNumber = "001-9999999-9",
+      identificationNumber = "00199999999",
       phone = "8095550108"
     });
 
@@ -405,7 +425,7 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
     {
       name = "Jose",
       lastName = "Santos",
-      identificationNumber = "001-4455667-8",
+      identificationNumber = "00144556678",
       phone = "8095550104",
       email,
       password = "Pass123!",
@@ -458,7 +478,7 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
     {
       name = "Elena",
       lastName = "Ruiz",
-      identificationNumber = "001-5566778-9",
+      identificationNumber = "00155667789",
       phone = "8095550105",
       email,
       password = "Pass123!",

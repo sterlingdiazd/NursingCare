@@ -16,7 +16,7 @@ internal static class CareRequestApiAuthHelper
     {
       name = "Carla",
       lastName = "Jimenez",
-      identificationNumber = "001-2233445-6",
+      identificationNumber = "00122334456",
       phone = "8095550101",
       email,
       password = "Pass123!",
@@ -58,7 +58,7 @@ internal static class CareRequestApiAuthHelper
     {
       name = "Luisa",
       lastName = "Martinez",
-      identificationNumber = "001-3344556-7",
+      identificationNumber = "00133445567",
       phone = "8095550103",
       email,
       password = "Pass123!",
@@ -86,12 +86,12 @@ internal static class CareRequestApiAuthHelper
       {
         name = "Luisa",
         lastName = "Martinez",
-        identificationNumber = "001-3344556-7",
+        identificationNumber = "00133445567",
         phone = "8095550103",
         email,
         hireDate = "2026-03-21",
         specialty = "Home Care",
-        licenseId = "LIC-01",
+        licenseId = "01",
         bankName = "Banco Central",
         accountNumber = "12345",
         category = "Senior"
