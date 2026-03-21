@@ -74,7 +74,7 @@ public sealed class CareRequestsController : ControllerBase
     public async Task<ActionResult<IReadOnlyList<CareRequestResponse>>> GetAll(
         CancellationToken cancellationToken)
     {
-        var careRequests = await _getAllHandler.Handle(cancellationToken);
+        var careRequests = await _getAllHandler.Handle(ResolveScopedUserId(), cancellationToken);
         var response = careRequests
             .Select(CareRequestResponse.FromDomain)
             .ToList()
@@ -89,7 +89,7 @@ public sealed class CareRequestsController : ControllerBase
         Guid id,
         CancellationToken cancellationToken)
     {
-        var careRequest = await _getByIdHandler.Handle(id, cancellationToken);
+        var careRequest = await _getByIdHandler.Handle(id, ResolveScopedUserId(), cancellationToken);
 
         if (careRequest is null)
         {
@@ -141,5 +141,16 @@ public sealed class CareRequestsController : ControllerBase
                 Instance = HttpContext.Request.Path
             });
         }
+    }
+
+    private Guid? ResolveScopedUserId()
+    {
+        if (User.IsInRole("Admin") || User.IsInRole("Nurse"))
+        {
+            return null;
+        }
+
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        return Guid.TryParse(userIdClaim, out var userId) ? userId : null;
     }
 }

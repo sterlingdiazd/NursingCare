@@ -26,17 +26,30 @@ public sealed class CareRequestRepository : ICareRequestRepository
     await _dbContext.SaveChangesAsync(cancellationToken);
   }
 
-  public async Task<IReadOnlyList<CareRequest>> GetAllAsync(CancellationToken cancellationToken)
+  public async Task<IReadOnlyList<CareRequest>> GetAllAsync(Guid? userId, CancellationToken cancellationToken)
   {
-    return await _dbContext.CareRequests
+    var query = _dbContext.CareRequests.AsQueryable();
+
+    if (userId.HasValue)
+    {
+      query = query.Where(x => x.UserID == userId.Value);
+    }
+
+    return await query
       .OrderByDescending(x => x.CreatedAtUtc)
       .ToListAsync(cancellationToken);
   }
 
-  public Task<CareRequest?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
+  public Task<CareRequest?> GetByIdAsync(Guid id, Guid? userId, CancellationToken cancellationToken)
   {
-    return _dbContext.CareRequests
-      .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+    var query = _dbContext.CareRequests.Where(x => x.Id == id);
+
+    if (userId.HasValue)
+    {
+      query = query.Where(x => x.UserID == userId.Value);
+    }
+
+    return query.FirstOrDefaultAsync(cancellationToken);
   }
 
   public Task<int> CountByUserAndUnitTypeAsync(
