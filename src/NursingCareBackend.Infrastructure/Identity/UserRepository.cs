@@ -46,6 +46,20 @@ public sealed class UserRepository : IUserRepository
             .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<User>> GetPendingNurseProfilesAsync(CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Users
+            .Include(u => u.NurseProfile)
+            .Include(u => u.UserRoles)
+            .ThenInclude(ur => ur.Role)
+            .Where(u =>
+                u.ProfileType == UserProfileType.Nurse &&
+                u.NurseProfile != null &&
+                !u.NurseProfile.IsActive)
+            .OrderBy(u => u.CreatedAtUtc)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<User> CreateAsync(User user, CancellationToken cancellationToken = default)
     {
         _dbContext.Users.Add(user);

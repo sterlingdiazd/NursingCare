@@ -394,6 +394,13 @@ public sealed class AuthenticationServiceTests
     public Task<User?> GetByIdAsync(Guid userId, CancellationToken cancellationToken = default)
       => Task.FromResult(_usersById.TryGetValue(userId, out var user) ? user : null);
 
+    public Task<IReadOnlyList<User>> GetPendingNurseProfilesAsync(CancellationToken cancellationToken = default)
+      => Task.FromResult<IReadOnlyList<User>>(
+        _usersById.Values
+          .Where(user => user.ProfileType == UserProfileType.Nurse && user.NurseProfile?.IsActive == false)
+          .OrderBy(user => user.CreatedAtUtc)
+          .ToArray());
+
     public Task UpdateAsync(User user, CancellationToken cancellationToken = default)
     {
       _usersById[user.Id] = user;

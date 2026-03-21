@@ -64,6 +64,7 @@ public static class DependencyInjection
                 new HttpClient(),
                 serviceProvider.GetRequiredService<IOptions<GoogleOAuthOptions>>()));
         services.AddScoped<IAuthenticationService, AuthenticationService>();
+        services.AddScoped<INurseProfileAdministrationService, NurseProfileAdministrationService>();
 
         return services;
     }

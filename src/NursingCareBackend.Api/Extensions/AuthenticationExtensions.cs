@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
+using NursingCareBackend.Api.Authorization;
 using NursingCareBackend.Domain.Identity;
 
 namespace NursingCareBackend.Api.Extensions;
@@ -50,12 +51,12 @@ public static class AuthenticationExtensions
       options.AddPolicy("CareRequestReader", policy =>
         policy
           .RequireRole("Client", "Nurse", "Admin")
-          .RequireAssertion(HasOperationalAccess));
+          .AddRequirements(new OperationalAccessRequirement()));
 
       options.AddPolicy("CareRequestCreator", policy =>
         policy
           .RequireRole("Client", "Nurse", "Admin")
-          .RequireAssertion(HasOperationalAccess));
+          .AddRequirements(new OperationalAccessRequirement()));
 
       options.AddPolicy("CareRequestApprover", policy =>
         policy.RequireRole("Admin"));
@@ -63,20 +64,11 @@ public static class AuthenticationExtensions
       options.AddPolicy("CareRequestCompleter", policy =>
         policy
           .RequireRole("Nurse", "Admin")
-          .RequireAssertion(HasOperationalAccess));
+          .AddRequirements(new OperationalAccessRequirement()));
     });
 
+    services.AddScoped<IAuthorizationHandler, OperationalAccessHandler>();
+
     return services;
-  }
-
-  private static bool HasOperationalAccess(AuthorizationHandlerContext context)
-  {
-    if (!context.User.IsInRole(SystemRoles.Nurse))
-    {
-      return true;
-    }
-
-    var claimValue = context.User.FindFirst(AuthClaimTypes.NurseProfileActive)?.Value;
-    return string.Equals(claimValue, "true", StringComparison.OrdinalIgnoreCase);
   }
 }

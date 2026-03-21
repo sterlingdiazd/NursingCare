@@ -19,7 +19,7 @@ public sealed class GetCareRequestsApiTests : IClassFixture<CustomWebApplication
     // Arrange
     var client = _factory.CreateClient();
     client.DefaultRequestHeaders.Authorization =
-      new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", JwtTestTokens.CreateWriterToken(_factory.Services));
+      new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", JwtTestTokens.CreateAdminToken(_factory.Services));
 
     var createPayload = new
     {
@@ -49,7 +49,7 @@ public sealed class GetCareRequestsApiTests : IClassFixture<CustomWebApplication
     // Arrange
     var client = _factory.CreateClient();
     client.DefaultRequestHeaders.Authorization =
-      new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", JwtTestTokens.CreateWriterToken(_factory.Services));
+      new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", JwtTestTokens.CreateAdminToken(_factory.Services));
 
     var createPayload = new
     {
@@ -84,7 +84,7 @@ public sealed class GetCareRequestsApiTests : IClassFixture<CustomWebApplication
     // Arrange
     var client = _factory.CreateClient();
     client.DefaultRequestHeaders.Authorization =
-      new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", JwtTestTokens.CreateWriterToken(_factory.Services));
+      new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", JwtTestTokens.CreateAdminToken(_factory.Services));
     var id = Guid.NewGuid();
 
     // Act
