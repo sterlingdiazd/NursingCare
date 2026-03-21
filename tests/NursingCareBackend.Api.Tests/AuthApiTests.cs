@@ -284,6 +284,8 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
 
     var parameters = QueryHelpers.ParseQuery("?" + response.Headers.Location.Fragment.TrimStart('#'));
     Assert.Equal("error", parameters["oauth"].ToString());
+    Assert.Equal("Error al iniciar sesión con Google. Por favor intenta de nuevo.", parameters["message"].ToString());
+    Assert.False(string.IsNullOrWhiteSpace(parameters["correlationId"].ToString()));
   }
 
   [Fact]
@@ -308,6 +310,28 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
     Assert.Equal("Client", parameters["roles"].ToString());
     Assert.Equal("true", parameters["requiresProfileCompletion"].ToString());
     Assert.Equal("false", parameters["requiresAdminReview"].ToString());
+  }
+
+  [Fact]
+  public async Task GET_GoogleCallback_Should_Redirect_Back_To_Login_With_Specific_Error_For_Unverified_Google_Email()
+  {
+    var client = _factory.CreateClient(new WebApplicationFactoryClientOptions
+    {
+      AllowAutoRedirect = false
+    });
+
+    var response = await client.GetAsync("/api/auth/google/callback?code=google-unverified");
+
+    Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+    Assert.NotNull(response.Headers.Location);
+
+    var location = response.Headers.Location!.ToString();
+    Assert.StartsWith("http://localhost:3000/login#", location, StringComparison.Ordinal);
+
+    var parameters = QueryHelpers.ParseQuery("?" + response.Headers.Location.Fragment.TrimStart('#'));
+    Assert.Equal("error", parameters["oauth"].ToString());
+    Assert.Equal("Tu cuenta de Google no tiene el correo verificado.", parameters["message"].ToString());
+    Assert.False(string.IsNullOrWhiteSpace(parameters["correlationId"].ToString()));
   }
 
   [Fact]

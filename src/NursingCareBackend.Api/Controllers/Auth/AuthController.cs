@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
+using NursingCareBackend.Api.Extensions;
 using NursingCareBackend.Application.Identity.Commands;
 using NursingCareBackend.Application.Identity.OAuth;
 using NursingCareBackend.Application.Identity.Services;
@@ -172,21 +173,29 @@ public sealed class AuthController : ControllerBase
         CancellationToken cancellationToken)
     {
         var redirectTarget = NormalizeRedirectTarget(state);
+        var correlationId = HttpContext.GetCorrelationId();
 
         if (!string.IsNullOrWhiteSpace(error))
         {
-            _logger.LogWarning("Google OAuth returned an error: {OAuthError}", error);
+            _logger.LogWarning(
+                "Google OAuth returned an error: {OAuthError}. CorrelationId={CorrelationId}",
+                error,
+                correlationId);
             return Redirect(BuildFailureRedirect(
                 "Error al iniciar sesión con Google. Por favor intenta de nuevo.",
-                redirectTarget));
+                redirectTarget,
+                correlationId));
         }
 
         if (string.IsNullOrWhiteSpace(code))
         {
-            _logger.LogWarning("Google OAuth callback arrived without an authorization code.");
+            _logger.LogWarning(
+                "Google OAuth callback arrived without an authorization code. CorrelationId={CorrelationId}",
+                correlationId);
             return Redirect(BuildFailureRedirect(
                 "Error al iniciar sesión con Google. Por favor intenta de nuevo.",
-                redirectTarget));
+                redirectTarget,
+                correlationId));
         }
 
         try
@@ -194,12 +203,27 @@ public sealed class AuthController : ControllerBase
             var response = await _authenticationService.LoginWithGoogleAsync(code, cancellationToken);
             return Redirect(BuildSuccessRedirect(response, redirectTarget));
         }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Google OAuth validation failed. CorrelationId={CorrelationId}",
+                correlationId);
+            return Redirect(BuildFailureRedirect(
+                MapGoogleSignInErrorMessage(ex),
+                redirectTarget,
+                correlationId));
+        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "OAuth error: {OAuthError}", ex.Message);
+            _logger.LogError(
+                ex,
+                "Google OAuth callback failed unexpectedly. CorrelationId={CorrelationId}",
+                correlationId);
             return Redirect(BuildFailureRedirect(
                 "Error al iniciar sesión con Google. Por favor intenta de nuevo.",
-                redirectTarget));
+                redirectTarget,
+                correlationId));
         }
     }
 
@@ -357,12 +381,13 @@ public sealed class AuthController : ControllerBase
         }, redirectTarget);
     }
 
-    private string BuildFailureRedirect(string message, string redirectTarget)
+    private string BuildFailureRedirect(string message, string redirectTarget, string correlationId)
     {
         return BuildRedirect(new Dictionary<string, string?>
         {
             ["oauth"] = "error",
-            ["message"] = message
+            ["message"] = message,
+            ["correlationId"] = correlationId
         }, redirectTarget);
     }
 
@@ -419,6 +444,24 @@ public sealed class AuthController : ControllerBase
 
     private static string NormalizeRedirectTarget(string? target)
         => string.Equals(target, "mobile", StringComparison.OrdinalIgnoreCase) ? "mobile" : "web";
+
+    private static string MapGoogleSignInErrorMessage(InvalidOperationException ex)
+    {
+        return ex.Message switch
+        {
+            "Google account email is not verified."
+                => "Tu cuenta de Google no tiene el correo verificado.",
+            "Google sign-in is already linked to a different account."
+                => "Este correo ya esta vinculado a otra cuenta.",
+            "User account is not active."
+                => "Tu cuenta existe, pero aun no esta activa.",
+            _ when ex.Message.StartsWith("Google token exchange failed:", StringComparison.Ordinal)
+                => "No se pudo validar la sesion con Google. Por favor intenta de nuevo.",
+            _ when ex.Message.StartsWith("Google user info request failed:", StringComparison.Ordinal)
+                => "No se pudo obtener tu perfil desde Google. Por favor intenta de nuevo.",
+            _ => "Error al iniciar sesion con Google. Por favor intenta de nuevo."
+        };
+    }
 
     private Guid? ResolveAuthenticatedUserId()
     {
