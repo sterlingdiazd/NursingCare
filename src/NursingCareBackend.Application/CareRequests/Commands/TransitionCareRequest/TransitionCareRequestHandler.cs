@@ -16,7 +16,7 @@ public sealed class TransitionCareRequestHandler
     TransitionCareRequestCommand command,
     CancellationToken cancellationToken)
   {
-    var careRequest = await _repository.GetByIdAsync(command.CareRequestId, cancellationToken);
+    var careRequest = await _repository.GetByIdAsync(command.CareRequestId, null, cancellationToken);
 
     if (careRequest is null)
     {
