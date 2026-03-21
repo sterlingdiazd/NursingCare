@@ -4,6 +4,7 @@ using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
+using NursingCareBackend.Domain.Identity;
 
 namespace NursingCareBackend.Api.Tests;
 
@@ -32,7 +33,10 @@ internal static class JwtTestTokens
     var claims = new[]
     {
       new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
-      new Claim(ClaimTypes.Email, "test.user@nursingcare.local")
+      new Claim(ClaimTypes.Email, "test.user@nursingcare.local"),
+      new Claim(
+        AuthClaimTypes.NurseProfileActive,
+        roles.Contains("Nurse", StringComparer.OrdinalIgnoreCase) ? "true" : "false")
     }
     .Concat(roles.Select(role => new Claim(ClaimTypes.Role, role)));
 

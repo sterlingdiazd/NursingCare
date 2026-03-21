@@ -147,6 +147,9 @@ public sealed class NursingCareDbContext : DbContext
 
                      builder.HasKey(x => x.UserId);
 
+                     builder.Property(x => x.IsActive)
+                      .IsRequired();
+
                      builder.Property(x => x.HireDate)
                       .HasColumnType("date");
 

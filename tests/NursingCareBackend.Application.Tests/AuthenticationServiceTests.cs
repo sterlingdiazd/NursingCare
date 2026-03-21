@@ -10,7 +10,7 @@ namespace NursingCareBackend.Application.Tests;
 public sealed class AuthenticationServiceTests
 {
   [Fact]
-  public async Task RegisterAsync_Should_Create_Inactive_Nurse_Without_Tokens()
+  public async Task RegisterAsync_Should_Create_Nurse_With_Immediate_Access_And_Admin_Review_State()
   {
     var nurseRole = new Role
     {
@@ -31,15 +31,19 @@ public sealed class AuthenticationServiceTests
       Email: "nurse@example.com",
       Password: "Pass123!",
       ConfirmPassword: "Pass123!",
+      HireDate: new DateOnly(2026, 3, 21),
+      Specialty: "Home Care",
+      BankName: "Banco Central",
       ProfileType: UserProfileType.Nurse));
 
-    Assert.Equal(string.Empty, response.Token);
-    Assert.Equal(string.Empty, response.RefreshToken);
-    Assert.Null(response.ExpiresAtUtc);
+    Assert.False(string.IsNullOrWhiteSpace(response.Token));
+    Assert.False(string.IsNullOrWhiteSpace(response.RefreshToken));
+    Assert.NotNull(response.ExpiresAtUtc);
     Assert.Contains("Nurse", response.Roles);
+    Assert.True(response.RequiresAdminReview);
 
     var createdUser = Assert.Single(userRepository.CreatedUsers);
-    Assert.False(createdUser.IsActive);
+    Assert.True(createdUser.IsActive);
     Assert.Equal(UserProfileType.Nurse, createdUser.ProfileType);
     Assert.Equal("Ana", createdUser.Name);
     Assert.Equal("Lopez", createdUser.LastName);
@@ -47,8 +51,37 @@ public sealed class AuthenticationServiceTests
     Assert.Equal("8095550101", createdUser.Phone);
     Assert.NotNull(createdUser.NurseProfile);
     Assert.Equal(createdUser.Id, createdUser.NurseProfile!.UserId);
+    Assert.False(createdUser.NurseProfile.IsActive);
+    Assert.Equal(new DateOnly(2026, 3, 21), createdUser.NurseProfile.HireDate);
+    Assert.Equal("Home Care", createdUser.NurseProfile.Specialty);
+    Assert.Equal("Banco Central", createdUser.NurseProfile.BankName);
     Assert.Null(createdUser.ClientProfile);
     Assert.Contains(createdUser.UserRoles, userRole => userRole.Role.Name == "Nurse");
+  }
+
+  [Fact]
+  public async Task RegisterAsync_Should_Reject_Nurse_When_Required_Nurse_Fields_Are_Missing()
+  {
+    var nurseRole = new Role
+    {
+      Id = Guid.NewGuid(),
+      Name = "Nurse"
+    };
+
+    var service = CreateService(roleRepository: new FakeRoleRepository(nurseRole));
+
+    var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+      service.RegisterAsync(new RegisterRequest(
+        Name: "Ana",
+        LastName: "Lopez",
+        IdentificationNumber: "001-1234567-8",
+        Phone: "8095550101",
+        Email: "nurse@example.com",
+        Password: "Pass123!",
+        ConfirmPassword: "Pass123!",
+        ProfileType: UserProfileType.Nurse)));
+
+    Assert.Equal("Hire date is required for nurse registration. (Parameter 'HireDate')", exception.Message);
   }
 
   [Fact]
@@ -298,7 +331,8 @@ public sealed class AuthenticationServiceTests
     {
       user.NurseProfile = new Nurse
       {
-        UserId = user.Id
+        UserId = user.Id,
+        IsActive = true
       };
     }
     else

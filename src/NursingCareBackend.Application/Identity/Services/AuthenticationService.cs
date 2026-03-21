@@ -85,10 +85,6 @@ public sealed class AuthenticationService : IAuthenticationService
             throw new InvalidOperationException("User with this email already exists.");
         }
 
-        // Determine if user should be active based on profile type
-        // Clients are immediately active, Nurses require admin approval
-        bool isActive = request.ProfileType == UserProfileType.Client;
-
         // Create new user
         var user = new User
         {
@@ -100,7 +96,7 @@ public sealed class AuthenticationService : IAuthenticationService
             Email = normalizedEmail,
             ProfileType = request.ProfileType,
             PasswordHash = _passwordHasher.Hash(request.Password),
-            IsActive = isActive,
+            IsActive = true,
             CreatedAtUtc = DateTime.UtcNow
         };
 
@@ -121,9 +117,16 @@ public sealed class AuthenticationService : IAuthenticationService
 
         if (request.ProfileType == UserProfileType.Nurse)
         {
+            ValidateNurseRegistrationFields(request);
             user.NurseProfile = new Nurse
             {
-                UserId = user.Id
+                UserId = user.Id,
+                IsActive = false,
+                HireDate = request.HireDate,
+                Specialty = request.Specialty?.Trim(),
+                LicenseId = TrimOptional(request.LicenseId),
+                BankName = request.BankName?.Trim(),
+                AccountNumber = TrimOptional(request.AccountNumber)
             };
         }
         else
@@ -137,21 +140,7 @@ public sealed class AuthenticationService : IAuthenticationService
         // Save user
         await _userRepository.CreateAsync(user, cancellationToken);
 
-        // For Nurses, return response without token (account inactive)
-        if (request.ProfileType == UserProfileType.Nurse)
-        {
-            return new AuthResponse(
-            Token: string.Empty,
-            RefreshToken: string.Empty,
-            ExpiresAtUtc: null,
-            UserId: user.Id,
-            Email: user.Email,
-            Roles: new[] { roleName },
-            RequiresProfileCompletion: false
-        );
-    }
-
-    return await CreateAuthResponseAsync(user, cancellationToken);
+        return await CreateAuthResponseAsync(user, cancellationToken);
     }
 
     public async Task<AuthResponse> CompleteProfileAsync(
@@ -437,13 +426,17 @@ public sealed class AuthenticationService : IAuthenticationService
         }
 
         // Check if already active
-        if (user.IsActive)
+        if (user.IsActive && (user.ProfileType != UserProfileType.Nurse || user.NurseProfile?.IsActive == true))
         {
             throw new InvalidOperationException("User account is already active.");
         }
 
         // Activate user
         user.IsActive = true;
+        if (user.ProfileType == UserProfileType.Nurse && user.NurseProfile is not null)
+        {
+            user.NurseProfile.IsActive = true;
+        }
 
         // Save changes
         await _userRepository.UpdateAsync(user, cancellationToken);
@@ -474,7 +467,8 @@ public sealed class AuthenticationService : IAuthenticationService
             UserId: user.Id,
             Email: user.Email,
             Roles: user.UserRoles.Select(ur => ur.Role.Name),
-            RequiresProfileCompletion: RequiresProfileCompletion(user)
+            RequiresProfileCompletion: RequiresProfileCompletion(user),
+            RequiresAdminReview: RequiresAdminReview(user)
         );
     }
 
@@ -546,4 +540,28 @@ public sealed class AuthenticationService : IAuthenticationService
                 || string.IsNullOrWhiteSpace(user.LastName)
                 || string.IsNullOrWhiteSpace(user.IdentificationNumber)
                 || string.IsNullOrWhiteSpace(user.Phone));
+
+    private static bool RequiresAdminReview(User user)
+        => user.ProfileType == UserProfileType.Nurse && user.NurseProfile?.IsActive != true;
+
+    private static void ValidateNurseRegistrationFields(RegisterRequest request)
+    {
+        if (request.HireDate is null)
+        {
+            throw new ArgumentException("Hire date is required for nurse registration.", nameof(request.HireDate));
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Specialty))
+        {
+            throw new ArgumentException("Specialty is required for nurse registration.", nameof(request.Specialty));
+        }
+
+        if (string.IsNullOrWhiteSpace(request.BankName))
+        {
+            throw new ArgumentException("Bank name is required for nurse registration.", nameof(request.BankName));
+        }
+    }
+
+    private static string? TrimOptional(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

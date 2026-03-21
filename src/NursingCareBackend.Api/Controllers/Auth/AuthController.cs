@@ -352,7 +352,8 @@ public sealed class AuthController : ControllerBase
             ["userId"] = response.UserId.ToString(),
             ["email"] = response.Email,
             ["roles"] = string.Join(",", response.Roles),
-            ["requiresProfileCompletion"] = response.RequiresProfileCompletion.ToString().ToLowerInvariant()
+            ["requiresProfileCompletion"] = response.RequiresProfileCompletion.ToString().ToLowerInvariant(),
+            ["requiresAdminReview"] = response.RequiresAdminReview.ToString().ToLowerInvariant()
         }, redirectTarget);
     }
 

@@ -7,5 +7,6 @@ public sealed record AuthResponse(
     Guid UserId,
     string Email,
     IEnumerable<string> Roles,
-    bool RequiresProfileCompletion
+    bool RequiresProfileCompletion,
+    bool RequiresAdminReview
 );

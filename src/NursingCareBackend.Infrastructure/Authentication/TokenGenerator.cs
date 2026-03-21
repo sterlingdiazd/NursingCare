@@ -50,6 +50,10 @@ public sealed class TokenGenerator : ITokenGenerator
             new Claim(ClaimTypes.Email, user.Email),
         };
 
+        claims.Add(new Claim(
+            AuthClaimTypes.NurseProfileActive,
+            IsNurseProfileActive(user).ToString().ToLowerInvariant()));
+
         // Add roles as claims
         foreach (var userRole in user.UserRoles)
         {
@@ -68,4 +72,7 @@ public sealed class TokenGenerator : ITokenGenerator
             new JwtSecurityTokenHandler().WriteToken(token),
             expiresAtUtc);
     }
+
+    private static bool IsNurseProfileActive(User user)
+        => user.ProfileType != UserProfileType.Nurse || user.NurseProfile?.IsActive == true;
 }

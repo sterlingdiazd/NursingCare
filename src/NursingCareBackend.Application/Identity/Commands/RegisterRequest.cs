@@ -10,5 +10,10 @@ public sealed record RegisterRequest(
     string Email,
     string Password,
     string ConfirmPassword,
+    DateOnly? HireDate = null,
+    string? Specialty = null,
+    string? LicenseId = null,
+    string? BankName = null,
+    string? AccountNumber = null,
     UserProfileType ProfileType = UserProfileType.Client
 );

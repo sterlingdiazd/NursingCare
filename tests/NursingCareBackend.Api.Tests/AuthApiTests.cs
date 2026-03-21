@@ -42,6 +42,41 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
     Assert.NotNull(payload.ExpiresAtUtc);
     Assert.Equal(email, payload.Email);
     Assert.Contains("Client", payload.Roles);
+    Assert.False(payload.RequiresAdminReview);
+  }
+
+  [Fact]
+  public async Task POST_Register_Should_Return_Token_And_Admin_Review_Flag_For_Nurse()
+  {
+    var client = _factory.CreateClient();
+    var email = $"nurse-register-{Guid.NewGuid():N}@nursingcare.local";
+
+    var response = await client.PostAsJsonAsync("/api/auth/register", new
+    {
+      name = "Luisa",
+      lastName = "Martinez",
+      identificationNumber = "001-2233445-6",
+      phone = "8095550102",
+      email,
+      password = "Pass123!",
+      confirmPassword = "Pass123!",
+      hireDate = "2026-03-21",
+      specialty = "Home Care",
+      bankName = "Banco Central",
+      profileType = 1
+    });
+
+    response.EnsureSuccessStatusCode();
+
+    var payload = await response.Content.ReadFromJsonAsync<AuthResponseDto>();
+
+    Assert.NotNull(payload);
+    Assert.False(string.IsNullOrWhiteSpace(payload!.Token));
+    Assert.False(string.IsNullOrWhiteSpace(payload.RefreshToken));
+    Assert.NotNull(payload.ExpiresAtUtc);
+    Assert.Equal(email, payload.Email);
+    Assert.Contains("Nurse", payload.Roles);
+    Assert.True(payload.RequiresAdminReview);
   }
 
   [Fact]
@@ -79,7 +114,7 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
   }
 
   [Fact]
-  public async Task POST_Login_Should_Return_BadRequest_For_Inactive_Nurse()
+  public async Task POST_Login_Should_Return_Token_For_Nurse_Under_Admin_Review()
   {
     var client = _factory.CreateClient();
     var email = $"pending-nurse-{Guid.NewGuid():N}@nursingcare.local";
@@ -93,6 +128,9 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
       email,
       password = "Pass123!",
       confirmPassword = "Pass123!",
+      hireDate = "2026-03-21",
+      specialty = "Home Care",
+      bankName = "Banco Central",
       profileType = 1
     });
 
@@ -104,7 +142,50 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
       password = "Pass123!"
     });
 
-    Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    response.EnsureSuccessStatusCode();
+
+    var payload = await response.Content.ReadFromJsonAsync<AuthResponseDto>();
+    Assert.NotNull(payload);
+    Assert.False(string.IsNullOrWhiteSpace(payload!.Token));
+    Assert.True(payload.RequiresAdminReview);
+  }
+
+  [Fact]
+  public async Task GET_CareRequests_Should_Return_Forbidden_For_Nurse_Under_Admin_Review()
+  {
+    var client = _factory.CreateClient();
+    var email = $"review-nurse-{Guid.NewGuid():N}@nursingcare.local";
+
+    await client.PostAsJsonAsync("/api/auth/register", new
+    {
+      name = "Luisa",
+      lastName = "Martinez",
+      identificationNumber = "001-3344556-7",
+      phone = "8095550103",
+      email,
+      password = "Pass123!",
+      confirmPassword = "Pass123!",
+      hireDate = "2026-03-21",
+      specialty = "Home Care",
+      bankName = "Banco Central",
+      profileType = 1
+    });
+
+    var loginResponse = await client.PostAsJsonAsync("/api/auth/login", new
+    {
+      email,
+      password = "Pass123!"
+    });
+
+    loginResponse.EnsureSuccessStatusCode();
+    var loginPayload = await loginResponse.Content.ReadFromJsonAsync<AuthResponseDto>();
+
+    client.DefaultRequestHeaders.Authorization =
+      new AuthenticationHeaderValue("Bearer", loginPayload!.Token);
+
+    var response = await client.GetAsync("/api/care-requests");
+
+    Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
   }
 
   [Fact]
@@ -180,6 +261,7 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
     Assert.Equal("google-success-web@example.com", parameters["email"].ToString());
     Assert.Equal("Client", parameters["roles"].ToString());
     Assert.Equal("true", parameters["requiresProfileCompletion"].ToString());
+    Assert.Equal("false", parameters["requiresAdminReview"].ToString());
     Assert.False(string.IsNullOrWhiteSpace(parameters["token"].ToString()));
     Assert.False(string.IsNullOrWhiteSpace(parameters["refreshToken"].ToString()));
   }
@@ -225,6 +307,7 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
     Assert.Equal("google-success-mobile@example.com", parameters["email"].ToString());
     Assert.Equal("Client", parameters["roles"].ToString());
     Assert.Equal("true", parameters["requiresProfileCompletion"].ToString());
+    Assert.Equal("false", parameters["requiresAdminReview"].ToString());
   }
 
   [Fact]
@@ -391,6 +474,7 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
     public string Email { get; set; } = string.Empty;
     public string[] Roles { get; set; } = [];
     public bool RequiresProfileCompletion { get; set; }
+    public bool RequiresAdminReview { get; set; }
   }
 
   private sealed class ProblemDetailsDto
