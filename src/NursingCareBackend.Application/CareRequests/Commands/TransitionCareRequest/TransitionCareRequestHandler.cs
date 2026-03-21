@@ -1,4 +1,5 @@
 using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
+using NursingCareBackend.Application.CareRequests;
 using NursingCareBackend.Domain.CareRequests;
 
 namespace NursingCareBackend.Application.CareRequests.Commands.TransitionCareRequest;
@@ -16,7 +17,10 @@ public sealed class TransitionCareRequestHandler
     TransitionCareRequestCommand command,
     CancellationToken cancellationToken)
   {
-    var careRequest = await _repository.GetByIdAsync(command.CareRequestId, null, cancellationToken);
+    var careRequest = await _repository.GetByIdAsync(
+      command.CareRequestId,
+      CareRequestAccessScope.Admin,
+      cancellationToken);
 
     if (careRequest is null)
     {
@@ -34,7 +38,12 @@ public sealed class TransitionCareRequestHandler
         careRequest.Reject(transitionedAtUtc);
         break;
       case CareRequestTransitionAction.Complete:
-        careRequest.Complete(transitionedAtUtc);
+        if (!command.ActingUserId.HasValue || command.ActingUserId == Guid.Empty)
+        {
+          throw new InvalidOperationException("A valid nurse user identifier is required to complete a care request.");
+        }
+
+        careRequest.Complete(transitionedAtUtc, command.ActingUserId.Value);
         break;
       default:
         throw new ArgumentOutOfRangeException(nameof(command.Action), command.Action, "Unsupported care request transition.");

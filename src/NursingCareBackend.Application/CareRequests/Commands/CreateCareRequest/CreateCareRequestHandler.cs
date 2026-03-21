@@ -24,7 +24,6 @@ public sealed class CreateCareRequestHandler
             description: command.Description,
             careRequestReason: command.CareRequestReason,
             careRequestType: command.CareRequestType,
-            nurseId: command.NurseId,
             suggestedNurse: command.SuggestedNurse,
             assignedNurse: command.AssignedNurse,
             unit: command.Unit,

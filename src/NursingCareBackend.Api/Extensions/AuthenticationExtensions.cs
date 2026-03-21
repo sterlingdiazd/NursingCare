@@ -50,20 +50,20 @@ public static class AuthenticationExtensions
     {
       options.AddPolicy("CareRequestReader", policy =>
         policy
-          .RequireRole("Client", "Nurse", "Admin")
+          .RequireRole(SystemRoles.Client, SystemRoles.Nurse, SystemRoles.Admin)
           .AddRequirements(new OperationalAccessRequirement()));
 
       options.AddPolicy("CareRequestCreator", policy =>
         policy
-          .RequireRole("Client", "Nurse", "Admin")
+          .RequireRole(SystemRoles.Client, SystemRoles.Admin)
           .AddRequirements(new OperationalAccessRequirement()));
 
       options.AddPolicy("CareRequestApprover", policy =>
-        policy.RequireRole("Admin"));
+        policy.RequireRole(SystemRoles.Admin));
 
       options.AddPolicy("CareRequestCompleter", policy =>
         policy
-          .RequireRole("Nurse", "Admin")
+          .RequireRole(SystemRoles.Nurse)
           .AddRequirements(new OperationalAccessRequirement()));
     });
 

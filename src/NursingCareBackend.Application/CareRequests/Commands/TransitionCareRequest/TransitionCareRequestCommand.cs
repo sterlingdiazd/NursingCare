@@ -2,7 +2,8 @@ namespace NursingCareBackend.Application.CareRequests.Commands.TransitionCareReq
 
 public sealed record TransitionCareRequestCommand(
   Guid CareRequestId,
-  CareRequestTransitionAction Action
+  CareRequestTransitionAction Action,
+  Guid? ActingUserId = null
 );
 
 public enum CareRequestTransitionAction

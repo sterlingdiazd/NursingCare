@@ -25,9 +25,8 @@ public sealed class CareRequest
     public DateOnly? CareRequestDate { get; private set; }
 
     // Not used by the pricing algorithm, but included for completeness of UC003.
-    public Guid? NurseId { get; private set; }
     public string? SuggestedNurse { get; private set; }
-    public string? AssignedNurse { get; private set; }
+    public Guid? AssignedNurse { get; private set; }
 
     public CareRequestStatus Status { get; private set; }
     public DateTime CreatedAtUtc { get; private set; }
@@ -100,9 +99,8 @@ public sealed class CareRequest
         string description,
         string? careRequestReason,
         string careRequestType,
-        Guid? nurseId,
         string? suggestedNurse,
-        string? assignedNurse,
+        Guid? assignedNurse,
         int unit,
         decimal? price,
         decimal? clientBasePrice,
@@ -142,7 +140,6 @@ public sealed class CareRequest
         Description = description;
         CareRequestReason = careRequestReason;
 
-        NurseId = nurseId;
         SuggestedNurse = suggestedNurse;
         AssignedNurse = assignedNurse;
 
@@ -280,9 +277,8 @@ public sealed class CareRequest
         string description,
         string? careRequestReason,
         string careRequestType,
-        Guid? nurseId,
         string? suggestedNurse,
-        string? assignedNurse,
+        Guid? assignedNurse,
         int unit,
         decimal? price,
         decimal? clientBasePrice,
@@ -297,7 +293,6 @@ public sealed class CareRequest
             description: description,
             careRequestReason: careRequestReason,
             careRequestType: careRequestType,
-            nurseId: nurseId,
             suggestedNurse: suggestedNurse,
             assignedNurse: assignedNurse,
             unit: unit,
@@ -315,6 +310,11 @@ public sealed class CareRequest
     {
         EnsurePending(nameof(Approve));
 
+        if (!AssignedNurse.HasValue)
+        {
+            throw new InvalidOperationException("Care request must have an assigned nurse before approval.");
+        }
+
         Status = CareRequestStatus.Approved;
         ApprovedAtUtc = transitionedAtUtc;
         UpdatedAtUtc = transitionedAtUtc;
@@ -329,7 +329,7 @@ public sealed class CareRequest
         UpdatedAtUtc = transitionedAtUtc;
     }
 
-    public void Complete(DateTime transitionedAtUtc)
+    public void Complete(DateTime transitionedAtUtc, Guid nurseUserId)
     {
         if (Status != CareRequestStatus.Approved)
         {
@@ -337,9 +337,36 @@ public sealed class CareRequest
                 $"Care request can only be completed from Approved status. Current status is {Status}.");
         }
 
+        if (!AssignedNurse.HasValue)
+        {
+            throw new InvalidOperationException("Care request must have an assigned nurse before completion.");
+        }
+
+        if (AssignedNurse.Value != nurseUserId)
+        {
+            throw new InvalidOperationException("Only the assigned nurse can complete this care request.");
+        }
+
+        var completionDate = DateOnly.FromDateTime(transitionedAtUtc);
+        if (CareRequestDate.HasValue && CareRequestDate.Value > completionDate)
+        {
+            throw new InvalidOperationException("Care request cannot be completed before its scheduled care-request date.");
+        }
+
         Status = CareRequestStatus.Completed;
         CompletedAtUtc = transitionedAtUtc;
         UpdatedAtUtc = transitionedAtUtc;
+    }
+
+    public void AssignNurse(Guid nurseUserId, DateTime assignedAtUtc)
+    {
+        if (nurseUserId == Guid.Empty)
+        {
+            throw new ArgumentException("Assigned nurse cannot be empty.", nameof(nurseUserId));
+        }
+
+        AssignedNurse = nurseUserId;
+        UpdatedAtUtc = assignedAtUtc;
     }
 
     private void EnsurePending(string actionName)

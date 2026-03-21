@@ -11,9 +11,7 @@ public sealed class CreateCareRequestRequest
     [Required]
     public string CareRequestType { get; set; } = default!;
 
-    public Guid? NurseId { get; set; }
     public string? SuggestedNurse { get; set; }
-    public string? AssignedNurse { get; set; }
 
     public int Unit { get; set; } = 1;
     public decimal? Price { get; set; }

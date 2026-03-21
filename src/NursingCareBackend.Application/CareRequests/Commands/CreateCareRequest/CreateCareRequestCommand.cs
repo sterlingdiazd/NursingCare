@@ -7,9 +7,8 @@ public class CreateCareRequestCommand
 
   public string? CareRequestReason { get; init; }
   public string CareRequestType { get; init; } = default!;
-  public Guid? NurseId { get; init; }
   public string? SuggestedNurse { get; init; }
-  public string? AssignedNurse { get; init; }
+  public Guid? AssignedNurse { get; init; }
 
   // Quantity / units
   public int Unit { get; init; } = 1;

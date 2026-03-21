@@ -31,6 +31,22 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
             .ToArray();
     }
 
+    public async Task<IReadOnlyList<ActiveNurseProfileSummaryResponse>> GetActiveNurseProfilesAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var users = await _userRepository.GetActiveNurseProfilesAsync(cancellationToken);
+
+        return users
+            .Select(user => new ActiveNurseProfileSummaryResponse(
+                user.Id,
+                user.Email,
+                user.Name,
+                user.LastName,
+                user.NurseProfile?.Specialty,
+                user.NurseProfile?.Category))
+            .ToArray();
+    }
+
     public async Task<NurseProfileAdminResponse> GetNurseProfileAsync(
         Guid userId,
         CancellationToken cancellationToken = default)

@@ -27,6 +27,16 @@ public sealed class NurseProfilesController : ControllerBase
         return Ok(response);
     }
 
+    [HttpGet("active")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetActive(CancellationToken cancellationToken)
+    {
+        var response = await _nurseProfileAdministrationService.GetActiveNurseProfilesAsync(cancellationToken);
+        return Ok(response);
+    }
+
     [HttpGet("{userId:guid}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

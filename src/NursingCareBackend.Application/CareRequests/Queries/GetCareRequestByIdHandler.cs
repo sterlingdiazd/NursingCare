@@ -12,8 +12,8 @@ public sealed class GetCareRequestByIdHandler
     _repository = repository;
   }
 
-  public Task<CareRequest?> Handle(Guid id, Guid? userId, CancellationToken cancellationToken)
+  public Task<CareRequest?> Handle(Guid id, CareRequestAccessScope scope, CancellationToken cancellationToken)
   {
-    return _repository.GetByIdAsync(id, userId, cancellationToken);
+    return _repository.GetByIdAsync(id, scope, cancellationToken);
   }
 }

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using NursingCareBackend.Application.CareRequests;
 using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
 using NursingCareBackend.Domain.CareRequests;
 using NursingCareBackend.Infrastructure.Persistence;
@@ -26,13 +27,19 @@ public sealed class CareRequestRepository : ICareRequestRepository
     await _dbContext.SaveChangesAsync(cancellationToken);
   }
 
-  public async Task<IReadOnlyList<CareRequest>> GetAllAsync(Guid? userId, CancellationToken cancellationToken)
+  public async Task<IReadOnlyList<CareRequest>> GetAllAsync(
+    CareRequestAccessScope scope,
+    CancellationToken cancellationToken)
   {
     var query = _dbContext.CareRequests.AsQueryable();
 
-    if (userId.HasValue)
+    if (scope.CreatedByUserId.HasValue)
     {
-      query = query.Where(x => x.UserID == userId.Value);
+      query = query.Where(x => x.UserID == scope.CreatedByUserId.Value);
+    }
+    else if (scope.AssignedNurseUserId.HasValue)
+    {
+      query = query.Where(x => x.AssignedNurse == scope.AssignedNurseUserId.Value);
     }
 
     return await query
@@ -40,13 +47,20 @@ public sealed class CareRequestRepository : ICareRequestRepository
       .ToListAsync(cancellationToken);
   }
 
-  public Task<CareRequest?> GetByIdAsync(Guid id, Guid? userId, CancellationToken cancellationToken)
+  public Task<CareRequest?> GetByIdAsync(
+    Guid id,
+    CareRequestAccessScope scope,
+    CancellationToken cancellationToken)
   {
     var query = _dbContext.CareRequests.Where(x => x.Id == id);
 
-    if (userId.HasValue)
+    if (scope.CreatedByUserId.HasValue)
     {
-      query = query.Where(x => x.UserID == userId.Value);
+      query = query.Where(x => x.UserID == scope.CreatedByUserId.Value);
+    }
+    else if (scope.AssignedNurseUserId.HasValue)
+    {
+      query = query.Where(x => x.AssignedNurse == scope.AssignedNurseUserId.Value);
     }
 
     return query.FirstOrDefaultAsync(cancellationToken);

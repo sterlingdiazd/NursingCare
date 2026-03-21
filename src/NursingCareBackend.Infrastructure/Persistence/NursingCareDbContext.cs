@@ -76,7 +76,6 @@ public sealed class NursingCareDbContext : DbContext
 
                      builder.Property(x => x.CareRequestDate); // column: "CareRequestDate"
 
-                     builder.Property(x => x.NurseId);
                      builder.Property(x => x.SuggestedNurse);
                      builder.Property(x => x.AssignedNurse);
               });

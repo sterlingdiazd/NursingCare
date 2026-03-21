@@ -60,6 +60,22 @@ public sealed class UserRepository : IUserRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<User>> GetActiveNurseProfilesAsync(CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Users
+            .Include(u => u.NurseProfile)
+            .Include(u => u.UserRoles)
+            .ThenInclude(ur => ur.Role)
+            .Where(u =>
+                u.ProfileType == UserProfileType.Nurse &&
+                u.IsActive &&
+                u.NurseProfile != null &&
+                u.NurseProfile.IsActive)
+            .OrderBy(u => u.Name)
+            .ThenBy(u => u.LastName)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<User> CreateAsync(User user, CancellationToken cancellationToken = default)
     {
         _dbContext.Users.Add(user);
