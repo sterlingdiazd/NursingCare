@@ -58,5 +58,6 @@ public sealed class CreateCareRequestHandlerTests
     Assert.Equal("domicilio_24h", saved.CareRequestType);
     Assert.Equal("dia_completo", saved.UnitType);
     Assert.Equal(1, saved.Unit);
+    Assert.Null(saved.AssignedNurse);
   }
 }

@@ -185,6 +185,13 @@ public sealed class NurseProfileAdministrationServiceTests
           .OrderBy(user => user.CreatedAtUtc)
           .ToArray());
 
+    public Task<IReadOnlyList<User>> GetActiveNurseProfilesAsync(CancellationToken cancellationToken = default)
+      => Task.FromResult<IReadOnlyList<User>>(
+        _usersById.Values
+          .Where(user => user.ProfileType == UserProfileType.Nurse && user.IsActive && user.NurseProfile?.IsActive == true)
+          .OrderBy(user => user.CreatedAtUtc)
+          .ToArray());
+
     public Task<User> CreateAsync(User user, CancellationToken cancellationToken = default)
     {
       _usersById[user.Id] = user;
