@@ -18,6 +18,7 @@ public sealed class AuthenticationService : IAuthenticationService
     private readonly IPasswordHasher _passwordHasher;
     private readonly ITokenGenerator _tokenGenerator;
     private readonly IGoogleOAuthClient _googleOAuthClient;
+    private readonly IAdminBootstrapPolicy _adminBootstrapPolicy;
 
     public AuthenticationService(
         IUserRepository userRepository,
@@ -25,7 +26,8 @@ public sealed class AuthenticationService : IAuthenticationService
         IRefreshTokenRepository refreshTokenRepository,
         IPasswordHasher passwordHasher,
         ITokenGenerator tokenGenerator,
-        IGoogleOAuthClient googleOAuthClient)
+        IGoogleOAuthClient googleOAuthClient,
+        IAdminBootstrapPolicy adminBootstrapPolicy)
     {
         _userRepository = userRepository;
         _roleRepository = roleRepository;
@@ -33,6 +35,7 @@ public sealed class AuthenticationService : IAuthenticationService
         _passwordHasher = passwordHasher;
         _tokenGenerator = tokenGenerator;
         _googleOAuthClient = googleOAuthClient;
+        _adminBootstrapPolicy = adminBootstrapPolicy;
     }
 
     public async Task<AuthResponse> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default)
@@ -326,6 +329,11 @@ public sealed class AuthenticationService : IAuthenticationService
             throw new ArgumentException("Role name is required.", nameof(roleName));
         }
 
+        if (string.Equals(roleName.Trim(), SystemRoles.Admin, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("The Admin role can only be assigned through the Admin Portal.");
+        }
+
         // Get user
         var user = await _userRepository.GetByIdAsync(userId, cancellationToken);
         if (user is null)
@@ -360,6 +368,8 @@ public sealed class AuthenticationService : IAuthenticationService
 
     public async Task<AuthResponse> CreateAdminAsync(AdminSetupRequest request, CancellationToken cancellationToken = default)
     {
+        await _adminBootstrapPolicy.EnsureSetupAdminAllowedAsync(cancellationToken);
+
         // Validate input
         if (string.IsNullOrWhiteSpace(request.AdminEmail))
         {
@@ -376,11 +386,13 @@ public sealed class AuthenticationService : IAuthenticationService
             throw new ArgumentException("Password must be at least 6 characters long.", nameof(request.AdminPassword));
         }
 
+        var normalizedEmail = request.AdminEmail.Trim();
+
         // Check if user already exists (regardless of role)
-        var existingUser = await _userRepository.GetByEmailAsync(request.AdminEmail, cancellationToken);
+        var existingUser = await _userRepository.GetByEmailAsync(normalizedEmail, cancellationToken);
         if (existingUser is not null)
         {
-            throw new InvalidOperationException($"User with email '{request.AdminEmail}' already exists. Use login instead.");
+            throw new InvalidOperationException($"User with email '{normalizedEmail}' already exists. Use login instead.");
         }
 
         // Get Admin role
@@ -394,7 +406,7 @@ public sealed class AuthenticationService : IAuthenticationService
         var user = new User
         {
             Id = Guid.NewGuid(),
-            Email = request.AdminEmail,
+            Email = normalizedEmail,
             ProfileType = UserProfileType.Client,
             PasswordHash = _passwordHasher.Hash(request.AdminPassword),
             IsActive = true,

@@ -24,6 +24,7 @@ public static class DependencyInjection
     services.AddScoped<GetAdminCareRequestClientOptionsHandler>();
     services.AddScoped<GetAdminUsersHandler>();
     services.AddScoped<GetAdminUserDetailHandler>();
+    services.AddScoped<IAdminAccountProvisioningService, AdminAccountProvisioningService>();
     services.AddScoped<IAdminUserManagementService, AdminUserManagementService>();
 
     return services;

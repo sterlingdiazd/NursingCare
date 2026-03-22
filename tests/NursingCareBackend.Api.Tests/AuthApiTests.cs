@@ -420,6 +420,29 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
   }
 
   [Fact]
+  public async Task POST_AssignRole_Should_Reject_Admin_Role_Assignment_Outside_Admin_Portal()
+  {
+    var client = _factory.CreateClient();
+    client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+      "Bearer",
+      JwtTestTokens.CreateAdminToken(_factory.Services));
+
+    var response = await client.PostAsJsonAsync("/api/auth/assign-role", new
+    {
+      userId = Guid.NewGuid().ToString(),
+      roleName = "Admin"
+    });
+
+    Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+    var payload = await response.Content.ReadFromJsonAsync<ProblemDetailsDto>();
+    Assert.NotNull(payload);
+    Assert.Equal(
+      "El rol de administracion solo puede asignarse desde el portal administrativo.",
+      payload!.Detail);
+  }
+
+  [Fact]
   public async Task POST_Refresh_Should_Return_New_Tokens_For_Valid_RefreshToken()
   {
     var client = _factory.CreateClient();

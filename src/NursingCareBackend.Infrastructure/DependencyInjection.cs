@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using NursingCareBackend.Application.AdminPortal.Auditing;
 using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
 using NursingCareBackend.Application.AdminPortal.Queries;
 using NursingCareBackend.Application.AdminPortal.Users;
@@ -51,12 +52,22 @@ public static class DependencyInjection
                 ?? string.Empty;
         });
 
+        services.Configure<AdminBootstrapOptions>(options =>
+        {
+            var section = configuration.GetSection(AdminBootstrapOptions.SectionName);
+            if (bool.TryParse(section["AllowInProduction"], out var allowInProduction))
+            {
+                options.AllowInProduction = allowInProduction;
+            }
+        });
+
         // Care Request Repository
         services.AddScoped<ICareRequestRepository, CareRequestRepository>();
         services.AddScoped<IAdminDashboardRepository, AdminDashboardRepository>();
         services.AddScoped<IAdminActionQueueRepository, AdminActionQueueRepository>();
         services.AddScoped<IAdminCareRequestRepository, AdminCareRequestRepository>();
         services.AddScoped<IAdminUserManagementRepository, AdminUserManagementRepository>();
+        services.AddScoped<IAdminAuditService, AdminAuditService>();
 
         // Identity Repositories
         services.AddScoped<IUserRepository, UserRepository>();
@@ -71,6 +82,7 @@ public static class DependencyInjection
                 new HttpClient(),
                 serviceProvider.GetRequiredService<IOptions<GoogleOAuthOptions>>()));
         services.AddScoped<IAuthenticationService, AuthenticationService>();
+        services.AddScoped<IAdminBootstrapPolicy, AdminBootstrapPolicy>();
         services.AddScoped<INurseProfileAdministrationService, NurseProfileAdministrationService>();
 
         return services;

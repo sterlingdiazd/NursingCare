@@ -178,6 +178,11 @@ public sealed class NurseProfileAdministrationServiceTests
     public Task<User?> GetByIdAsync(Guid userId, CancellationToken cancellationToken = default)
       => Task.FromResult(_usersById.TryGetValue(userId, out var user) ? user : null);
 
+    public Task<bool> AnyAdminExistsAsync(CancellationToken cancellationToken = default)
+      => Task.FromResult(
+        _usersById.Values.Any(user =>
+          user.UserRoles.Any(userRole => string.Equals(userRole.Role.Name, SystemRoles.Admin, StringComparison.OrdinalIgnoreCase))));
+
     public Task<IReadOnlyList<User>> GetPendingNurseProfilesAsync(CancellationToken cancellationToken = default)
       => Task.FromResult<IReadOnlyList<User>>(
         _usersById.Values

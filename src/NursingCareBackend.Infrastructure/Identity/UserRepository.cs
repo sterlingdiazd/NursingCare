@@ -46,6 +46,15 @@ public sealed class UserRepository : IUserRepository
             .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
     }
 
+    public Task<bool> AnyAdminExistsAsync(CancellationToken cancellationToken = default)
+    {
+        return _dbContext.Users
+            .AsNoTracking()
+            .AnyAsync(
+                user => user.UserRoles.Any(userRole => userRole.Role.Name == SystemRoles.Admin),
+                cancellationToken);
+    }
+
     public async Task<IReadOnlyList<User>> GetPendingNurseProfilesAsync(CancellationToken cancellationToken = default)
     {
         return await _dbContext.Users

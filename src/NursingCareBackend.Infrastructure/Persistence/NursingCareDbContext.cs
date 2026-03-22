@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using NursingCareBackend.Domain.Admin;
 using NursingCareBackend.Domain.CareRequests;
 using NursingCareBackend.Domain.Identity;
 
@@ -18,6 +19,7 @@ public sealed class NursingCareDbContext : DbContext
        public DbSet<Role> Roles => Set<Role>();
        public DbSet<UserRole> UserRoles => Set<UserRole>();
        public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+       public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
        protected override void OnModelCreating(ModelBuilder modelBuilder)
        {
@@ -254,6 +256,37 @@ public sealed class NursingCareDbContext : DbContext
                   .WithMany(user => user.RefreshTokens)
                   .HasForeignKey(x => x.UserId)
                   .OnDelete(DeleteBehavior.Cascade);
+              });
+
+              modelBuilder.Entity<AuditLog>(builder =>
+              {
+                     builder.ToTable("AuditLogs");
+
+                     builder.HasKey(x => x.Id);
+
+                     builder.Property(x => x.ActorRole)
+                  .IsRequired()
+                  .HasMaxLength(100);
+
+                     builder.Property(x => x.Action)
+                  .IsRequired()
+                  .HasMaxLength(150);
+
+                     builder.Property(x => x.EntityType)
+                  .IsRequired()
+                  .HasMaxLength(100);
+
+                     builder.Property(x => x.EntityId)
+                  .IsRequired()
+                  .HasMaxLength(150);
+
+                     builder.Property(x => x.Notes)
+                  .HasMaxLength(1000);
+
+                     builder.Property(x => x.MetadataJson);
+
+                     builder.Property(x => x.CreatedAtUtc)
+                  .IsRequired();
               });
        }
 }

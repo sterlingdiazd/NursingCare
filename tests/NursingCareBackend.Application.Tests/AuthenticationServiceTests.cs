@@ -298,7 +298,8 @@ public sealed class AuthenticationServiceTests
     IRefreshTokenRepository? refreshTokenRepository = null,
     IPasswordHasher? passwordHasher = null,
     ITokenGenerator? tokenGenerator = null,
-    IGoogleOAuthClient? googleOAuthClient = null)
+    IGoogleOAuthClient? googleOAuthClient = null,
+    IAdminBootstrapPolicy? adminBootstrapPolicy = null)
   {
     return new AuthenticationService(
       userRepository ?? new FakeUserRepository(),
@@ -307,7 +308,8 @@ public sealed class AuthenticationServiceTests
       passwordHasher ?? new FakePasswordHasher(),
       tokenGenerator ?? new FakeTokenGenerator(),
       googleOAuthClient ?? new FakeGoogleOAuthClient(
-        new GoogleOAuthUserInfo("default-google-subject", "default@example.com", "Default User", true)));
+        new GoogleOAuthUserInfo("default-google-subject", "default@example.com", "Default User", true)),
+      adminBootstrapPolicy ?? new FakeAdminBootstrapPolicy());
   }
 
   private static User CreateUser(string email, Role role)
@@ -394,6 +396,11 @@ public sealed class AuthenticationServiceTests
     public Task<User?> GetByIdAsync(Guid userId, CancellationToken cancellationToken = default)
       => Task.FromResult(_usersById.TryGetValue(userId, out var user) ? user : null);
 
+    public Task<bool> AnyAdminExistsAsync(CancellationToken cancellationToken = default)
+      => Task.FromResult(
+        _usersById.Values.Any(user =>
+          user.UserRoles.Any(userRole => string.Equals(userRole.Role.Name, SystemRoles.Admin, StringComparison.OrdinalIgnoreCase))));
+
     public Task<IReadOnlyList<User>> GetPendingNurseProfilesAsync(CancellationToken cancellationToken = default)
       => Task.FromResult<IReadOnlyList<User>>(
         _usersById.Values
@@ -470,16 +477,18 @@ public sealed class AuthenticationServiceTests
     public Task<RefreshToken?> GetByTokenAsync(string token, CancellationToken cancellationToken = default)
       => Task.FromResult(_tokens.TryGetValue(token, out var refreshToken) ? refreshToken : null);
 
-    public Task RevokeActiveTokensForUserAsync(Guid userId, CancellationToken cancellationToken = default)
+    public Task<int> RevokeActiveTokensForUserAsync(Guid userId, CancellationToken cancellationToken = default)
     {
       var now = DateTime.UtcNow;
+      var revokedCount = 0;
 
       foreach (var refreshToken in _tokens.Values.Where(token => token.UserId == userId && token.RevokedAtUtc is null))
       {
         refreshToken.RevokedAtUtc = now;
+        revokedCount++;
       }
 
-      return Task.CompletedTask;
+      return Task.FromResult(revokedCount);
     }
 
     public Task UpdateAsync(RefreshToken refreshToken, CancellationToken cancellationToken = default)
@@ -524,5 +533,11 @@ public sealed class AuthenticationServiceTests
       string authorizationCode,
       CancellationToken cancellationToken = default)
       => Task.FromResult(_userInfo);
+  }
+
+  private sealed class FakeAdminBootstrapPolicy : IAdminBootstrapPolicy
+  {
+    public Task EnsureSetupAdminAllowedAsync(CancellationToken cancellationToken = default)
+      => Task.CompletedTask;
   }
 }

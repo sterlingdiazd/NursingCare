@@ -28,6 +28,8 @@ public static class UserFacingMessageTranslator
             ["Refresh token is required."] = "El token de actualizacion es obligatorio.",
             ["Refresh token is invalid or expired."] = "El token de actualizacion no es valido o ya vencio.",
             ["Role name is required."] = "El nombre del rol es obligatorio.",
+            ["The Admin role can only be assigned through the Admin Portal."] =
+                "El rol de administracion solo puede asignarse desde el portal administrativo.",
             ["At least one role is required."] = "Debes conservar al menos un rol asignado.",
             ["The selected role is not supported."] = "El rol seleccionado no es compatible con la politica actual.",
             ["The Nurse role can only be assigned to nurse profiles."] =
@@ -39,6 +41,12 @@ public static class UserFacingMessageTranslator
             ["You cannot deactivate your own account."] = "No puedes desactivar tu propia cuenta.",
             ["User account is already active."] = "La cuenta ya esta activa.",
             ["User ID cannot be empty."] = "El identificador del usuario es obligatorio.",
+            ["A valid admin user identifier is required to create an admin account."] =
+                "La sesion actual no incluye un identificador administrativo valido.",
+            ["Bootstrap admin setup is no longer available because an admin account already exists."] =
+                "La configuracion publica del primer administrador ya no esta disponible porque ya existe una cuenta administrativa.",
+            ["Bootstrap admin setup is disabled in production. Use the Admin Portal after the initial installation flow."] =
+                "La configuracion publica del primer administrador esta deshabilitada en produccion. Usa el portal administrativo despues de la instalacion inicial.",
             ["Hire date is required for nurse registration."] =
                 "La fecha de contratacion es obligatoria para el registro de enfermeria.",
             ["Specialty is required for nurse registration."] =

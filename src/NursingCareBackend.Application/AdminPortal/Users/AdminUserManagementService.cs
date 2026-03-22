@@ -1,3 +1,5 @@
+using System.Text.Json;
+using NursingCareBackend.Application.AdminPortal.Auditing;
 using NursingCareBackend.Application.Identity.Repositories;
 using NursingCareBackend.Application.Identity.Users;
 using NursingCareBackend.Application.Identity.Validation;
@@ -15,17 +17,20 @@ public sealed class AdminUserManagementService : IAdminUserManagementService
   private readonly IRoleRepository _roleRepository;
   private readonly IRefreshTokenRepository _refreshTokenRepository;
   private readonly IAdminUserManagementRepository _adminUserManagementRepository;
+  private readonly IAdminAuditService _adminAuditService;
 
   public AdminUserManagementService(
     IUserRepository userRepository,
     IRoleRepository roleRepository,
     IRefreshTokenRepository refreshTokenRepository,
-    IAdminUserManagementRepository adminUserManagementRepository)
+    IAdminUserManagementRepository adminUserManagementRepository,
+    IAdminAuditService adminAuditService)
   {
     _userRepository = userRepository;
     _roleRepository = roleRepository;
     _refreshTokenRepository = refreshTokenRepository;
     _adminUserManagementRepository = adminUserManagementRepository;
+    _adminAuditService = adminAuditService;
   }
 
   public async Task<AdminUserDetail> UpdateIdentityAsync(
@@ -67,6 +72,10 @@ public sealed class AdminUserManagementService : IAdminUserManagementService
   {
     var user = await GetRequiredUserAsync(userId, cancellationToken);
     var normalizedRoleNames = NormalizeRoleNames(roleNames);
+    var hadAdminRole = user.UserRoles.Any(userRole => string.Equals(
+      userRole.Role.Name,
+      SystemRoles.Admin,
+      StringComparison.OrdinalIgnoreCase));
 
     if (normalizedRoleNames.Count == 0)
     {
@@ -120,6 +129,26 @@ public sealed class AdminUserManagementService : IAdminUserManagementService
     }
 
     await _userRepository.UpdateAsync(user, cancellationToken);
+
+    if (!hadAdminRole && normalizedRoleNames.Contains(SystemRoles.Admin))
+    {
+      await _adminAuditService.WriteAsync(
+        new AdminAuditRecord(
+          ActorUserId: actorUserId,
+          ActorRole: SystemRoles.Admin,
+          Action: AdminAuditActions.AdminRoleGranted,
+          EntityType: "User",
+          EntityId: user.Id.ToString(),
+          Notes: $"Admin role granted to {user.Email}.",
+          MetadataJson: JsonSerializer.Serialize(new
+          {
+            email = user.Email,
+            roleNames = normalizedRoleNames
+              .OrderBy(roleName => roleName, StringComparer.OrdinalIgnoreCase)
+              .ToArray()
+          })),
+        cancellationToken);
+    }
 
     return await GetRequiredDetailAsync(userId, cancellationToken);
   }
