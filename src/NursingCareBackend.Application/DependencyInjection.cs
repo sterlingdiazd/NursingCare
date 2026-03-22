@@ -18,6 +18,9 @@ public static class DependencyInjection
     services.AddScoped<GetCareRequestByIdHandler>();
     services.AddScoped<GetAdminDashboardHandler>();
     services.AddScoped<GetAdminActionQueueHandler>();
+    services.AddScoped<GetAdminCareRequestsHandler>();
+    services.AddScoped<GetAdminCareRequestDetailHandler>();
+    services.AddScoped<GetAdminCareRequestClientOptionsHandler>();
 
     return services;
   }
