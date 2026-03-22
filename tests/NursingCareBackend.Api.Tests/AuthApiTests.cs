@@ -527,6 +527,7 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
 
   private sealed class ProblemDetailsDto
   {
+    public string? Title { get; set; }
     public string? Detail { get; set; }
   }
 }
