@@ -6,6 +6,7 @@ using NursingCareBackend.Application.CareRequests.Commands.AssignCareRequestNurs
 using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
 using NursingCareBackend.Application.CareRequests.Commands.TransitionCareRequest;
 using NursingCareBackend.Application.CareRequests.Queries;
+using NursingCareBackend.Api.Extensions;
 using NursingCareBackend.Domain.Identity;
 
 namespace NursingCareBackend.Api.Controllers.CareRequests;
@@ -43,13 +44,10 @@ public sealed class CareRequestsController : ControllerBase
         var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (!Guid.TryParse(userIdClaim, out var userId))
         {
-            return Unauthorized(new ProblemDetails
-            {
-                Status = StatusCodes.Status401Unauthorized,
-                Title = "Authenticated user identifier is missing",
-                Detail = "The current session does not include a valid user identifier.",
-                Instance = HttpContext.Request.Path
-            });
+            return this.ProblemResponse(
+                StatusCodes.Status401Unauthorized,
+                "No autorizado",
+                "La sesion actual no incluye un identificador de usuario valido.");
         }
 
         var command = new CreateCareRequestCommand
@@ -79,7 +77,15 @@ public sealed class CareRequestsController : ControllerBase
     public async Task<ActionResult<IReadOnlyList<CareRequestResponse>>> GetAll(
         CancellationToken cancellationToken)
     {
-        var careRequests = await _getAllHandler.Handle(ResolveAccessScope(), cancellationToken);
+        if (!TryResolveAccessScope(out var accessScope))
+        {
+            return this.ProblemResponse(
+                StatusCodes.Status401Unauthorized,
+                "No autorizado",
+                "La sesion actual no incluye un identificador de usuario valido.");
+        }
+
+        var careRequests = await _getAllHandler.Handle(accessScope, cancellationToken);
         var response = careRequests
             .Select(CareRequestResponse.FromDomain)
             .ToList()
@@ -94,11 +100,22 @@ public sealed class CareRequestsController : ControllerBase
         Guid id,
         CancellationToken cancellationToken)
     {
-        var careRequest = await _getByIdHandler.Handle(id, ResolveAccessScope(), cancellationToken);
+        if (!TryResolveAccessScope(out var accessScope))
+        {
+            return this.ProblemResponse(
+                StatusCodes.Status401Unauthorized,
+                "No autorizado",
+                "La sesion actual no incluye un identificador de usuario valido.");
+        }
+
+        var careRequest = await _getByIdHandler.Handle(id, accessScope, cancellationToken);
 
         if (careRequest is null)
         {
-            return NotFound();
+            return this.ProblemResponse(
+                StatusCodes.Status404NotFound,
+                "Solicitud no encontrada",
+                "No se encontro la solicitud.");
         }
 
         return Ok(CareRequestResponse.FromDomain(careRequest));
@@ -126,38 +143,11 @@ public sealed class CareRequestsController : ControllerBase
         [FromBody] AssignCareRequestNurseRequest request,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            var updated = await _assignNurseHandler.Handle(
-                new AssignCareRequestNurseCommand(id, request.AssignedNurse),
-                cancellationToken);
+        var updated = await _assignNurseHandler.Handle(
+            new AssignCareRequestNurseCommand(id, request.AssignedNurse),
+            cancellationToken);
 
-            return Ok(CareRequestResponse.FromDomain(updated));
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound();
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new ProblemDetails
-            {
-                Status = StatusCodes.Status400BadRequest,
-                Title = "Care request assignment failed",
-                Detail = ex.Message,
-                Instance = HttpContext.Request.Path
-            });
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new ProblemDetails
-            {
-                Status = StatusCodes.Status400BadRequest,
-                Title = "Care request assignment failed",
-                Detail = ex.Message,
-                Instance = HttpContext.Request.Path
-            });
-        }
+        return Ok(CareRequestResponse.FromDomain(updated));
     }
 
     private async Task<ActionResult<CareRequestResponse>> Transition(
@@ -165,28 +155,11 @@ public sealed class CareRequestsController : ControllerBase
         CareRequestTransitionAction action,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            var updated = await _transitionHandler.Handle(
-                new TransitionCareRequestCommand(id, action, ResolveCurrentUserId()),
-                cancellationToken);
+        var updated = await _transitionHandler.Handle(
+            new TransitionCareRequestCommand(id, action, ResolveCurrentUserId()),
+            cancellationToken);
 
-            return Ok(CareRequestResponse.FromDomain(updated));
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound();
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new ProblemDetails
-            {
-                Status = StatusCodes.Status400BadRequest,
-                Title = "Care request transition failed",
-                Detail = ex.Message,
-                Instance = HttpContext.Request.Path
-            });
-        }
+        return Ok(CareRequestResponse.FromDomain(updated));
     }
 
     private Guid? ResolveCurrentUserId()
@@ -195,24 +168,28 @@ public sealed class CareRequestsController : ControllerBase
         return Guid.TryParse(userIdClaim, out var userId) ? userId : null;
     }
 
-    private CareRequestAccessScope ResolveAccessScope()
+    private bool TryResolveAccessScope(out CareRequestAccessScope accessScope)
     {
         if (User.IsInRole(SystemRoles.Admin))
         {
-            return CareRequestAccessScope.Admin;
+            accessScope = CareRequestAccessScope.Admin;
+            return true;
         }
 
         var userId = ResolveCurrentUserId();
         if (!userId.HasValue)
         {
-            return CareRequestAccessScope.Admin;
+            accessScope = CareRequestAccessScope.Admin;
+            return false;
         }
 
         if (User.IsInRole(SystemRoles.Nurse))
         {
-            return CareRequestAccessScope.ForNurse(userId.Value);
+            accessScope = CareRequestAccessScope.ForNurse(userId.Value);
+            return true;
         }
 
-        return CareRequestAccessScope.ForClient(userId.Value);
+        accessScope = CareRequestAccessScope.ForClient(userId.Value);
+        return true;
     }
 }

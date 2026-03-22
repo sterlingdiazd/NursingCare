@@ -119,6 +119,22 @@ public sealed class GetCareRequestsApiTests : IClassFixture<CustomWebApplication
     Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
   }
 
+  [Fact]
+  public async Task GET_CareRequests_Should_Return_Unauthorized_When_Non_Admin_Token_Misses_User_Id_Claim()
+  {
+    var (clientToken, _) = await CareRequestApiAuthHelper.CreateClientTokenAsync(_factory, "missing-user-id");
+    await CreateCareRequestAsClientAsync(clientToken, "missing-user-id-request");
+
+    var client = _factory.CreateClient();
+    client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+      "Bearer",
+      JwtTestTokens.CreateTokenWithoutUserId(_factory.Services, "Client"));
+
+    var response = await client.GetAsync("/api/care-requests");
+
+    Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+  }
+
   private async Task<Guid> CreateCareRequestAsClientAsync(string clientToken, string description)
   {
     var client = _factory.CreateClient();

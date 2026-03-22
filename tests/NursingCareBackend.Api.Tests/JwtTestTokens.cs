@@ -16,7 +16,13 @@ internal static class JwtTestTokens
   public static string CreateAdminToken(IServiceProvider services)
     => CreateToken(services, "Admin");
 
+  public static string CreateTokenWithoutUserId(IServiceProvider services, params string[] roles)
+    => CreateToken(services, includeUserId: false, roles);
+
   public static string CreateToken(IServiceProvider services, params string[] roles)
+    => CreateToken(services, includeUserId: true, roles);
+
+  private static string CreateToken(IServiceProvider services, bool includeUserId, params string[] roles)
   {
     var configuration = services.GetRequiredService<IConfiguration>();
     var jwtSection = configuration.GetSection("Jwt");
@@ -30,15 +36,20 @@ internal static class JwtTestTokens
     var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));
     var credentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);
 
-    var claims = new[]
+    var claims = new List<Claim>
     {
-      new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
-      new Claim(ClaimTypes.Email, "test.user@nursingcare.local"),
-      new Claim(
+      new(ClaimTypes.Email, "test.user@nursingcare.local"),
+      new(
         AuthClaimTypes.NurseProfileActive,
         roles.Contains("Nurse", StringComparer.OrdinalIgnoreCase) ? "true" : "false")
+    };
+
+    if (includeUserId)
+    {
+      claims.Add(new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()));
     }
-    .Concat(roles.Select(role => new Claim(ClaimTypes.Role, role)));
+
+    claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
 
     var token = new JwtSecurityToken(
       issuer: issuer,
