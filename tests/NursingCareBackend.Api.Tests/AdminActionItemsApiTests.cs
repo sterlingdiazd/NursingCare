@@ -65,7 +65,7 @@ public sealed class AdminActionItemsApiTests : IClassFixture<CustomWebApplicatio
     Assert.Contains(payload!, item =>
       item.EntityType == "UserAccount"
       && item.EntityIdentifier == inconsistentUserId.ToString()
-      && item.DeepLinkPath == $"/admin/users?focus={inconsistentUserId}");
+      && item.DeepLinkPath == $"/admin/users/{inconsistentUserId}");
     Assert.Contains(payload!, item =>
       item.EntityType == "SystemIssue"
       && item.EntityIdentifier == "overdue-backlog"
