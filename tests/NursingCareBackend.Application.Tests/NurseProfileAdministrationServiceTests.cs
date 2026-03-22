@@ -41,7 +41,7 @@ public sealed class NurseProfileAdministrationServiceTests
         Phone: "8095550199",
         Email: "laura.gomez@example.com",
         HireDate: new DateOnly(2026, 3, 21),
-        Specialty: "Critical Care",
+        Specialty: "Cuidados intensivos",
         LicenseId: "55",
         BankName: "Banco Central",
         AccountNumber: "123456",
@@ -51,7 +51,7 @@ public sealed class NurseProfileAdministrationServiceTests
     Assert.True(nurse.IsActive);
     Assert.True(nurse.NurseProfile!.IsActive);
     Assert.Equal("laura.gomez@example.com", nurse.Email);
-    Assert.Equal("Critical Care", nurse.NurseProfile.Specialty);
+    Assert.Equal("Cuidados intensivos", nurse.NurseProfile.Specialty);
     Assert.Equal("Senior", nurse.NurseProfile.Category);
     Assert.Equal("laura.gomez@example.com", response.Email);
     Assert.True(response.NurseProfileIsActive);
@@ -76,7 +76,7 @@ public sealed class NurseProfileAdministrationServiceTests
           Phone: "8095550199",
           Email: "used@example.com",
           HireDate: new DateOnly(2026, 3, 21),
-          Specialty: "Critical Care",
+          Specialty: "Cuidados intensivos",
           LicenseId: null,
           BankName: "Banco Central",
           AccountNumber: null,

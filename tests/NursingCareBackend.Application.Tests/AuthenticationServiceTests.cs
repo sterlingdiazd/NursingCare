@@ -32,7 +32,7 @@ public sealed class AuthenticationServiceTests
       Password: "Pass123!",
       ConfirmPassword: "Pass123!",
       HireDate: new DateOnly(2026, 3, 21),
-      Specialty: "Home Care",
+      Specialty: "Atencion domiciliaria",
       BankName: "Banco Central",
       ProfileType: UserProfileType.Nurse));
 
@@ -53,7 +53,7 @@ public sealed class AuthenticationServiceTests
     Assert.Equal(createdUser.Id, createdUser.NurseProfile!.UserId);
     Assert.False(createdUser.NurseProfile.IsActive);
     Assert.Equal(new DateOnly(2026, 3, 21), createdUser.NurseProfile.HireDate);
-    Assert.Equal("Home Care", createdUser.NurseProfile.Specialty);
+    Assert.Equal("Atencion domiciliaria", createdUser.NurseProfile.Specialty);
     Assert.Equal("Banco Central", createdUser.NurseProfile.BankName);
     Assert.Null(createdUser.ClientProfile);
     Assert.Contains(createdUser.UserRoles, userRole => userRole.Role.Name == "Nurse");

@@ -45,7 +45,7 @@ public sealed class NurseProfileAdministrationApiTests : IClassFixture<CustomWeb
     var payload = await response.Content.ReadFromJsonAsync<NurseProfileAdminDto>();
     Assert.NotNull(payload);
     Assert.Equal(registration.UserId, payload!.UserId);
-    Assert.Equal("Home Care", payload.Specialty);
+    Assert.Equal("Atencion domiciliaria", payload.Specialty);
     Assert.False(payload.NurseProfileIsActive);
   }
 
@@ -71,7 +71,7 @@ public sealed class NurseProfileAdministrationApiTests : IClassFixture<CustomWeb
         phone = "8095550199",
         email = registration.Email,
         hireDate = "2026-03-21",
-        specialty = "Critical Care",
+        specialty = "Cuidados intensivos",
         licenseId = "55",
         bankName = "Banco Central",
         accountNumber = "123456",
@@ -105,7 +105,7 @@ public sealed class NurseProfileAdministrationApiTests : IClassFixture<CustomWeb
         phone = "809555019A",
         email = registration.Email,
         hireDate = "2026-03-21",
-        specialty = "Critical Care",
+        specialty = "Cuidados intensivos",
         licenseId = "55A",
         bankName = "Banco 123",
         accountNumber = "123-456",
@@ -139,7 +139,7 @@ public sealed class NurseProfileAdministrationApiTests : IClassFixture<CustomWeb
       password = "Pass123!",
       confirmPassword = "Pass123!",
       hireDate = "2026-03-21",
-      specialty = "Home Care",
+      specialty = "Atencion domiciliaria",
       bankName = "Banco Central",
       profileType = 1
     });

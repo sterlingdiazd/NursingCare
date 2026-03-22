@@ -129,7 +129,7 @@ public sealed class AuthenticationService : IAuthenticationService
                 UserId = user.Id,
                 IsActive = false,
                 HireDate = request.HireDate,
-                Specialty = request.Specialty?.Trim(),
+                Specialty = NurseProfileCatalog.NormalizeRequiredSpecialty(request.Specialty, nameof(request.Specialty)),
                 LicenseId = TrimOptional(request.LicenseId),
                 BankName = request.BankName?.Trim(),
                 AccountNumber = TrimOptional(request.AccountNumber)
@@ -542,16 +542,12 @@ public sealed class AuthenticationService : IAuthenticationService
             throw new ArgumentException("Hire date is required for nurse registration.", nameof(request.HireDate));
         }
 
-        if (string.IsNullOrWhiteSpace(request.Specialty))
-        {
-            throw new ArgumentException("Specialty is required for nurse registration.", nameof(request.Specialty));
-        }
-
         if (string.IsNullOrWhiteSpace(request.BankName))
         {
             throw new ArgumentException("Bank name is required for nurse registration.", nameof(request.BankName));
         }
 
+        NurseProfileCatalog.NormalizeRequiredSpecialty(request.Specialty, nameof(request.Specialty));
         IdentityInputRules.EnsureTextOnlyRequired(request.BankName, nameof(request.BankName), "Bank name");
         IdentityInputRules.EnsureNumericOnlyOptional(request.LicenseId, nameof(request.LicenseId), "License ID");
         IdentityInputRules.EnsureNumericOnlyOptional(request.AccountNumber, nameof(request.AccountNumber), "Account number");

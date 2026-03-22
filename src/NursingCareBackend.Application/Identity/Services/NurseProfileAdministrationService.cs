@@ -43,8 +43,8 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
                 user.Email,
                 user.Name,
                 user.LastName,
-                user.NurseProfile?.Specialty,
-                user.NurseProfile?.Category))
+                NurseProfileCatalog.NormalizeSpecialty(user.NurseProfile?.Specialty),
+                NurseProfileCatalog.NormalizeCategory(user.NurseProfile?.Category)))
             .ToArray();
     }
 
@@ -80,11 +80,11 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
         user.IsActive = true;
 
         nurse.HireDate = request.HireDate;
-        nurse.Specialty = request.Specialty.Trim();
+        nurse.Specialty = NurseProfileCatalog.NormalizeRequiredSpecialty(request.Specialty, nameof(request.Specialty));
         nurse.LicenseId = TrimOptional(request.LicenseId);
         nurse.BankName = request.BankName.Trim();
         nurse.AccountNumber = TrimOptional(request.AccountNumber);
-        nurse.Category = request.Category.Trim();
+        nurse.Category = NurseProfileCatalog.NormalizeRequiredCategory(request.Category, nameof(request.Category));
         nurse.IsActive = true;
 
         await _userRepository.UpdateAsync(user, cancellationToken);
@@ -125,24 +125,16 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
             throw new ArgumentException("Email is required.", nameof(request.Email));
         }
 
-        if (string.IsNullOrWhiteSpace(request.Specialty))
-        {
-            throw new ArgumentException("Specialty is required.", nameof(request.Specialty));
-        }
-
         if (string.IsNullOrWhiteSpace(request.BankName))
         {
             throw new ArgumentException("Bank name is required.", nameof(request.BankName));
         }
 
+        NurseProfileCatalog.NormalizeRequiredSpecialty(request.Specialty, nameof(request.Specialty));
         IdentityInputRules.EnsureTextOnlyRequired(request.BankName, nameof(request.BankName), "Bank name");
         IdentityInputRules.EnsureNumericOnlyOptional(request.LicenseId, nameof(request.LicenseId), "License ID");
         IdentityInputRules.EnsureNumericOnlyOptional(request.AccountNumber, nameof(request.AccountNumber), "Account number");
-
-        if (string.IsNullOrWhiteSpace(request.Category))
-        {
-            throw new ArgumentException("Category is required.", nameof(request.Category));
-        }
+        NurseProfileCatalog.NormalizeRequiredCategory(request.Category, nameof(request.Category));
     }
 
     private static NurseProfileAdminResponse MapResponse(User user)
@@ -161,11 +153,11 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
             nurse.IsActive,
             user.CreatedAtUtc,
             nurse.HireDate,
-            nurse.Specialty,
+            NurseProfileCatalog.NormalizeSpecialty(nurse.Specialty),
             nurse.LicenseId,
             nurse.BankName,
             nurse.AccountNumber,
-            nurse.Category);
+            NurseProfileCatalog.NormalizeCategory(nurse.Category));
     }
 
     private static string? TrimOptional(string? value)

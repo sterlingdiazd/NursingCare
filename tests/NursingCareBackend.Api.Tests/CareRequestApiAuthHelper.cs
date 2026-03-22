@@ -64,7 +64,7 @@ internal static class CareRequestApiAuthHelper
       password = "Pass123!",
       confirmPassword = "Pass123!",
       hireDate = "2026-03-21",
-      specialty = "Home Care",
+      specialty = "Atencion domiciliaria",
       bankName = "Banco Central",
       profileType = 1
     });
@@ -90,7 +90,7 @@ internal static class CareRequestApiAuthHelper
         phone = "8095550103",
         email,
         hireDate = "2026-03-21",
-        specialty = "Home Care",
+        specialty = "Atencion domiciliaria",
         licenseId = "01",
         bankName = "Banco Central",
         accountNumber = "12345",
