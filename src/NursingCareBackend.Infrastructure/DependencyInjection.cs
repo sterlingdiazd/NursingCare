@@ -3,10 +3,12 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
+using NursingCareBackend.Application.AdminPortal.Queries;
 using NursingCareBackend.Application.Identity.Authentication;
 using NursingCareBackend.Application.Identity.OAuth;
 using NursingCareBackend.Application.Identity.Repositories;
 using NursingCareBackend.Application.Identity.Services;
+using NursingCareBackend.Infrastructure.AdminPortal;
 using NursingCareBackend.Infrastructure.Authentication;
 using NursingCareBackend.Infrastructure.CareRequests;
 using NursingCareBackend.Infrastructure.Identity;
@@ -50,6 +52,7 @@ public static class DependencyInjection
 
         // Care Request Repository
         services.AddScoped<ICareRequestRepository, CareRequestRepository>();
+        services.AddScoped<IAdminDashboardRepository, AdminDashboardRepository>();
 
         // Identity Repositories
         services.AddScoped<IUserRepository, UserRepository>();
