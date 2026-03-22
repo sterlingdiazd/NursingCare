@@ -172,7 +172,7 @@ public sealed class AdminActionQueueRepository : IAdminActionQueueRepository
       summary: $"La cuenta de {ResolveDisplayName(user.Name, user.LastName, user.Email)} requiere intervencion manual.",
       requiredAction: ResolveManualInterventionAction(user.MissingRoles, user.MissingNurseProfile, user.MissingClientProfile),
       assignedOwner: null,
-      deepLinkPath: $"/admin/users?focus={user.Id}",
+      deepLinkPath: $"/admin/users/{user.Id}",
       detectedAtUtc: user.CreatedAtUtc)));
 
     var overdueOrStaleCount = await _dbContext.CareRequests

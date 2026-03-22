@@ -30,7 +30,7 @@ public sealed class RefreshTokenRepository : IRefreshTokenRepository
       .FirstOrDefaultAsync(rt => rt.Token == token, cancellationToken);
   }
 
-  public async Task RevokeActiveTokensForUserAsync(Guid userId, CancellationToken cancellationToken = default)
+  public async Task<int> RevokeActiveTokensForUserAsync(Guid userId, CancellationToken cancellationToken = default)
   {
     var activeTokens = await _dbContext.RefreshTokens
       .Where(rt => rt.UserId == userId && rt.RevokedAtUtc == null && rt.ExpiresAtUtc > DateTime.UtcNow)
@@ -38,7 +38,7 @@ public sealed class RefreshTokenRepository : IRefreshTokenRepository
 
     if (activeTokens.Count == 0)
     {
-      return;
+      return 0;
     }
 
     var revokedAtUtc = DateTime.UtcNow;
@@ -49,6 +49,7 @@ public sealed class RefreshTokenRepository : IRefreshTokenRepository
     }
 
     await _dbContext.SaveChangesAsync(cancellationToken);
+    return activeTokens.Count;
   }
 
   public async Task UpdateAsync(RefreshToken refreshToken, CancellationToken cancellationToken = default)

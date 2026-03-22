@@ -6,7 +6,9 @@ public static class UserFacingMessageTranslator
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["Name is required."] = "El nombre es obligatorio.",
+            ["Name must contain letters and spaces only."] = "El nombre solo acepta letras y espacios.",
             ["Last name is required."] = "El apellido es obligatorio.",
+            ["Last name must contain letters and spaces only."] = "El apellido solo acepta letras y espacios.",
             ["Identification number is required."] = "La cedula es obligatoria.",
             ["Identification number must contain exactly 11 digits."] = "La cedula debe tener exactamente 11 digitos.",
             ["Phone is required."] = "El telefono es obligatorio.",
@@ -26,6 +28,16 @@ public static class UserFacingMessageTranslator
             ["Refresh token is required."] = "El token de actualizacion es obligatorio.",
             ["Refresh token is invalid or expired."] = "El token de actualizacion no es valido o ya vencio.",
             ["Role name is required."] = "El nombre del rol es obligatorio.",
+            ["At least one role is required."] = "Debes conservar al menos un rol asignado.",
+            ["The selected role is not supported."] = "El rol seleccionado no es compatible con la politica actual.",
+            ["The Nurse role can only be assigned to nurse profiles."] =
+                "El rol de enfermeria solo puede asignarse a perfiles de enfermeria.",
+            ["The Client role can only be assigned to client profiles."] =
+                "El rol de cliente solo puede asignarse a perfiles de cliente.",
+            ["The Admin role cannot be removed from your own account."] =
+                "No puedes quitar el rol administrativo de tu propia cuenta.",
+            ["You cannot deactivate your own account."] = "No puedes desactivar tu propia cuenta.",
+            ["User account is already active."] = "La cuenta ya esta activa.",
             ["User ID cannot be empty."] = "El identificador del usuario es obligatorio.",
             ["Hire date is required for nurse registration."] =
                 "La fecha de contratacion es obligatoria para el registro de enfermeria.",
@@ -36,6 +48,9 @@ public static class UserFacingMessageTranslator
             ["Specialty is required."] = "La especialidad es obligatoria.",
             ["Specialty is not valid."] = "La especialidad seleccionada no es valida.",
             ["Bank name is required."] = "El banco es obligatorio.",
+            ["Bank name must contain letters and spaces only."] = "El banco solo acepta letras y espacios.",
+            ["License ID must contain digits only."] = "La licencia solo acepta numeros.",
+            ["Account number must contain digits only."] = "El numero de cuenta solo acepta numeros.",
             ["Category is required."] = "La categoria es obligatoria.",
             ["Category is not valid."] = "La categoria seleccionada no es valida.",
             ["The requested user does not have a nurse profile."] = "El usuario solicitado no tiene un perfil de enfermeria.",

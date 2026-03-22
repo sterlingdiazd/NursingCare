@@ -3,6 +3,7 @@ using NursingCareBackend.Application.Identity.OAuth;
 using NursingCareBackend.Application.Identity.Commands;
 using NursingCareBackend.Application.Identity.Repositories;
 using NursingCareBackend.Application.Identity.Responses;
+using NursingCareBackend.Application.Identity.Users;
 using NursingCareBackend.Application.Identity.Validation;
 using NursingCareBackend.Domain.Identity;
 using System.Security.Cryptography;
@@ -253,7 +254,7 @@ public sealed class AuthenticationService : IAuthenticationService
                     throw new InvalidOperationException("Google sign-in is already linked to a different account.");
                 }
 
-        if (!existingUser.IsActive && !RequiresProfileCompletion(existingUser))
+        if (!existingUser.IsActive && !UserAccountStateEvaluator.RequiresProfileCompletion(existingUser))
         {
             throw new InvalidOperationException("User account is not active.");
         }
@@ -273,7 +274,7 @@ public sealed class AuthenticationService : IAuthenticationService
             }
         }
 
-        if (!user.IsActive && !RequiresProfileCompletion(user))
+        if (!user.IsActive && !UserAccountStateEvaluator.RequiresProfileCompletion(user))
         {
             throw new InvalidOperationException("User account is not active.");
         }
@@ -301,7 +302,7 @@ public sealed class AuthenticationService : IAuthenticationService
 
         var user = existingRefreshToken.User;
 
-        if (!user.IsActive && !RequiresProfileCompletion(user))
+        if (!user.IsActive && !UserAccountStateEvaluator.RequiresProfileCompletion(user))
         {
             throw new InvalidOperationException("User account is not active.");
         }
@@ -473,8 +474,8 @@ public sealed class AuthenticationService : IAuthenticationService
             UserId: user.Id,
             Email: user.Email,
             Roles: user.UserRoles.Select(ur => ur.Role.Name),
-            RequiresProfileCompletion: RequiresProfileCompletion(user),
-            RequiresAdminReview: RequiresAdminReview(user)
+            RequiresProfileCompletion: UserAccountStateEvaluator.RequiresProfileCompletion(user),
+            RequiresAdminReview: UserAccountStateEvaluator.RequiresAdminReview(user)
         );
     }
 
@@ -524,16 +525,6 @@ public sealed class AuthenticationService : IAuthenticationService
         IdentityInputRules.EnsureIdentificationNumber(identificationNumber, nameof(identificationNumber));
         IdentityInputRules.EnsurePhone(phone, nameof(phone));
     }
-
-    private static bool RequiresProfileCompletion(User user)
-        => !string.IsNullOrWhiteSpace(user.GoogleSubjectId)
-            && (string.IsNullOrWhiteSpace(user.Name)
-                || string.IsNullOrWhiteSpace(user.LastName)
-                || string.IsNullOrWhiteSpace(user.IdentificationNumber)
-                || string.IsNullOrWhiteSpace(user.Phone));
-
-    private static bool RequiresAdminReview(User user)
-        => user.ProfileType == UserProfileType.Nurse && user.NurseProfile?.IsActive != true;
 
     private static void ValidateNurseRegistrationFields(RegisterRequest request)
     {
