@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using NursingCareBackend.Api.ErrorHandling;
 using NursingCareBackend.Api.Extensions;
 
 namespace NursingCareBackend.Api.Middleware;
@@ -33,11 +34,36 @@ public sealed class ExceptionHandlingMiddleware
 
   private async Task HandleExceptionAsync(HttpContext context, Exception exception)
   {
-    var (statusCode, title) = exception switch
+    var (statusCode, title, detail) = exception switch
     {
-      ArgumentNullException => (StatusCodes.Status400BadRequest, "Invalid request"),
-      ArgumentException => (StatusCodes.Status400BadRequest, "Invalid request"),
-      _ => (StatusCodes.Status500InternalServerError, "An unexpected error occurred")
+      ArgumentNullException => (
+        StatusCodes.Status400BadRequest,
+        "Solicitud invalida",
+        UserFacingMessageTranslator.Translate(exception.Message)),
+      ArgumentOutOfRangeException => (
+        StatusCodes.Status400BadRequest,
+        "Solicitud invalida",
+        UserFacingMessageTranslator.Translate(exception.Message)),
+      ArgumentException => (
+        StatusCodes.Status400BadRequest,
+        "Solicitud invalida",
+        UserFacingMessageTranslator.Translate(exception.Message)),
+      InvalidOperationException => (
+        StatusCodes.Status400BadRequest,
+        "No fue posible completar la operacion",
+        UserFacingMessageTranslator.Translate(exception.Message)),
+      KeyNotFoundException => (
+        StatusCodes.Status404NotFound,
+        "Recurso no encontrado",
+        UserFacingMessageTranslator.Translate(exception.Message)),
+      UnauthorizedAccessException => (
+        StatusCodes.Status401Unauthorized,
+        "No autorizado",
+        UserFacingMessageTranslator.Translate(exception.Message)),
+      _ => (
+        StatusCodes.Status500InternalServerError,
+        "Ocurrio un error inesperado",
+        _environment.IsDevelopment() ? exception.Message : null)
     };
     var correlationId = context.GetCorrelationId();
 
@@ -53,7 +79,7 @@ public sealed class ExceptionHandlingMiddleware
     {
       Status = statusCode,
       Title = title,
-      Detail = _environment.IsDevelopment() ? exception.Message : null,
+      Detail = detail,
       Instance = context.Request.Path
     };
 

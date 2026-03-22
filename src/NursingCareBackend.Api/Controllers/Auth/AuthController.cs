@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
+using NursingCareBackend.Api.ErrorHandling;
 using NursingCareBackend.Api.Extensions;
 using NursingCareBackend.Application.Identity.Commands;
 using NursingCareBackend.Application.Identity.OAuth;
@@ -47,31 +48,8 @@ public sealed class AuthController : ControllerBase
         [FromBody] RegisterRequest request,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            var response = await _authenticationService.RegisterAsync(request, cancellationToken);
-            return Ok(response);
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new ProblemDetails
-            {
-                Status = StatusCodes.Status400BadRequest,
-                Title = "Registration failed",
-                Detail = ex.Message,
-                Instance = HttpContext.Request.Path
-            });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new ProblemDetails
-            {
-                Status = StatusCodes.Status400BadRequest,
-                Title = "Registration failed",
-                Detail = ex.Message,
-                Instance = HttpContext.Request.Path
-            });
-        }
+        var response = await _authenticationService.RegisterAsync(request, cancellationToken);
+        return Ok(response);
     }
 
     [HttpPost("complete-profile")]
@@ -86,44 +64,18 @@ public sealed class AuthController : ControllerBase
         var userId = ResolveAuthenticatedUserId();
         if (userId is null)
         {
-            return Unauthorized(new ProblemDetails
-            {
-                Status = StatusCodes.Status401Unauthorized,
-                Title = "Profile completion failed",
-                Detail = "Authenticated user identifier is missing from the access token.",
-                Instance = HttpContext.Request.Path
-            });
+            return this.ProblemResponse(
+                StatusCodes.Status401Unauthorized,
+                "No autorizado",
+                "La sesion actual no incluye un identificador de usuario valido.");
         }
 
-        try
-        {
-            var response = await _authenticationService.CompleteProfileAsync(
-                userId.Value,
-                request,
-                cancellationToken);
+        var response = await _authenticationService.CompleteProfileAsync(
+            userId.Value,
+            request,
+            cancellationToken);
 
-            return Ok(response);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new ProblemDetails
-            {
-                Status = StatusCodes.Status400BadRequest,
-                Title = "Profile completion failed",
-                Detail = ex.Message,
-                Instance = HttpContext.Request.Path
-            });
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new ProblemDetails
-            {
-                Status = StatusCodes.Status400BadRequest,
-                Title = "Profile completion failed",
-                Detail = ex.Message,
-                Instance = HttpContext.Request.Path
-            });
-        }
+        return Ok(response);
     }
 
     /// <summary>
@@ -149,23 +101,10 @@ public sealed class AuthController : ControllerBase
         }
         catch (InvalidOperationException ex) when (ex.Message == "Invalid email or password.")
         {
-            return Unauthorized(new ProblemDetails
-            {
-                Status = StatusCodes.Status401Unauthorized,
-                Title = "Login failed",
-                Detail = ex.Message,
-                Instance = HttpContext.Request.Path
-            });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new ProblemDetails
-            {
-                Status = StatusCodes.Status400BadRequest,
-                Title = "Login failed",
-                Detail = ex.Message,
-                Instance = HttpContext.Request.Path
-            });
+            return this.ProblemResponse(
+                StatusCodes.Status401Unauthorized,
+                "Inicio de sesion fallido",
+                UserFacingMessageTranslator.Translate(ex.Message));
         }
     }
 
@@ -184,13 +123,10 @@ public sealed class AuthController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            return BadRequest(new ProblemDetails
-            {
-                Status = StatusCodes.Status400BadRequest,
-                Title = "Google OAuth is not configured",
-                Detail = ex.Message,
-                Instance = HttpContext.Request.Path
-            });
+            return this.ProblemResponse(
+                StatusCodes.Status400BadRequest,
+                "Google OAuth no esta configurado",
+                ex.Message);
         }
     }
 
@@ -283,23 +219,10 @@ public sealed class AuthController : ControllerBase
         }
         catch (InvalidOperationException ex) when (ex.Message == "Refresh token is invalid or expired.")
         {
-            return Unauthorized(new ProblemDetails
-            {
-                Status = StatusCodes.Status401Unauthorized,
-                Title = "Refresh failed",
-                Detail = ex.Message,
-                Instance = HttpContext.Request.Path
-            });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new ProblemDetails
-            {
-                Status = StatusCodes.Status400BadRequest,
-                Title = "Refresh failed",
-                Detail = ex.Message,
-                Instance = HttpContext.Request.Path
-            });
+            return this.ProblemResponse(
+                StatusCodes.Status401Unauthorized,
+                "Actualizacion de sesion fallida",
+                UserFacingMessageTranslator.Translate(ex.Message));
         }
     }
 
@@ -325,11 +248,14 @@ public sealed class AuthController : ControllerBase
     {
         if (!Guid.TryParse(request.UserId, out var userId))
         {
-            return BadRequest(new { error = "Invalid user ID format." });
+            return this.ProblemResponse(
+                StatusCodes.Status400BadRequest,
+                "Solicitud invalida",
+                "El identificador del usuario no tiene un formato valido.");
         }
 
         await _authenticationService.AssignRoleAsync(userId, request.RoleName, cancellationToken);
-        return Ok(new { message = $"Role '{request.RoleName}' assigned successfully." });
+        return Ok(new { message = "El rol se asigno correctamente." });
     }
 
     /// <summary>
@@ -347,19 +273,12 @@ public sealed class AuthController : ControllerBase
         [FromBody] AdminSetupRequest request,
         CancellationToken cancellationToken)
     {
-        try
+        var response = await _authenticationService.CreateAdminAsync(request, cancellationToken);
+        return Ok(new
         {
-            var response = await _authenticationService.CreateAdminAsync(request, cancellationToken);
-            return Ok(new
-            {
-                message = "Admin user created successfully. Please save this token and disable the /setup-admin endpoint in production.",
-                data = response
-            });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
+            message = "El usuario administrador se creo correctamente. Guarda el token y deshabilita /setup-admin en produccion.",
+            data = response
+        });
     }
 
     /// <summary>
@@ -384,18 +303,14 @@ public sealed class AuthController : ControllerBase
     {
         if (!Guid.TryParse(request.UserId, out var userId))
         {
-            return BadRequest(new { error = "Invalid user ID format." });
+            return this.ProblemResponse(
+                StatusCodes.Status400BadRequest,
+                "Solicitud invalida",
+                "El identificador del usuario no tiene un formato valido.");
         }
 
-        try
-        {
-            await _authenticationService.ActivateUserAsync(userId, cancellationToken);
-            return Ok(new { message = "User account activated successfully." });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
+        await _authenticationService.ActivateUserAsync(userId, cancellationToken);
+        return Ok(new { message = "La cuenta se activo correctamente." });
     }
 
     private string BuildSuccessRedirect(AuthResponse response, string redirectTarget)

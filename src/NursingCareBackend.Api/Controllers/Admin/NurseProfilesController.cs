@@ -44,25 +44,8 @@ public sealed class NurseProfilesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetById(Guid userId, CancellationToken cancellationToken)
     {
-        try
-        {
-            var response = await _nurseProfileAdministrationService.GetNurseProfileAsync(userId, cancellationToken);
-            return Ok(response);
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound();
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new ProblemDetails
-            {
-                Status = StatusCodes.Status400BadRequest,
-                Title = "Nurse profile retrieval failed",
-                Detail = ex.Message,
-                Instance = HttpContext.Request.Path
-            });
-        }
+        var response = await _nurseProfileAdministrationService.GetNurseProfileAsync(userId, cancellationToken);
+        return Ok(response);
     }
 
     [HttpPut("{userId:guid}/complete")]
@@ -76,38 +59,11 @@ public sealed class NurseProfilesController : ControllerBase
         [FromBody] AdminCompleteNurseProfileRequest request,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            var response = await _nurseProfileAdministrationService.CompleteNurseProfileCreationAsync(
-                userId,
-                request,
-                cancellationToken);
+        var response = await _nurseProfileAdministrationService.CompleteNurseProfileCreationAsync(
+            userId,
+            request,
+            cancellationToken);
 
-            return Ok(response);
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound();
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new ProblemDetails
-            {
-                Status = StatusCodes.Status400BadRequest,
-                Title = "Nurse profile completion failed",
-                Detail = ex.Message,
-                Instance = HttpContext.Request.Path
-            });
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new ProblemDetails
-            {
-                Status = StatusCodes.Status400BadRequest,
-                Title = "Nurse profile completion failed",
-                Detail = ex.Message,
-                Instance = HttpContext.Request.Path
-            });
-        }
+        return Ok(response);
     }
 }

@@ -13,7 +13,7 @@ builder.AddStructuredLogging();
 builder.Services.AddCorsPolicy(builder.Configuration);
 
 // Controllers
-builder.Services.AddControllers();
+builder.Services.AddApiControllers();
 
 
 // Swagger

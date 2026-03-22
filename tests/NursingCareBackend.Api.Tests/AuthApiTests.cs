@@ -61,7 +61,7 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
       password = "Pass123!",
       confirmPassword = "Pass123!",
       hireDate = "2026-03-21",
-      specialty = "Home Care",
+      specialty = "Atencion domiciliaria",
       bankName = "Banco Central",
       profileType = 1
     });
@@ -129,7 +129,7 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
       password = "Pass123!",
       confirmPassword = "Pass123!",
       hireDate = "2026-03-21",
-      specialty = "Home Care",
+      specialty = "Atencion domiciliaria",
       bankName = "Banco Central",
       profileType = 1
     });
@@ -166,7 +166,7 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
       password = "Pass123!",
       confirmPassword = "Pass123!",
       hireDate = "2026-03-21",
-      specialty = "Home Care",
+      specialty = "Atencion domiciliaria",
       bankName = "Banco Central",
       profileType = 1
     });
@@ -204,7 +204,7 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
 
     var problem = await response.Content.ReadFromJsonAsync<ProblemDetailsDto>();
     Assert.NotNull(problem);
-    Assert.Equal("Invalid email or password.", problem!.Detail);
+    Assert.Equal("Correo o contrasena invalidos.", problem!.Detail);
   }
 
   [Fact]
@@ -225,6 +225,10 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
     });
 
     Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    var problem = await response.Content.ReadFromJsonAsync<ProblemDetailsDto>();
+    Assert.NotNull(problem);
+    Assert.Equal("La solicitud contiene datos invalidos.", problem!.Title);
+    Assert.Equal("El nombre solo puede contener letras y espacios.", problem.Detail);
   }
 
   [Fact]
