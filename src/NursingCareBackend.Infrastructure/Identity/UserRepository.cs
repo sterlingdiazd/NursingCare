@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using NursingCareBackend.Application.Identity.Models;
 using NursingCareBackend.Application.Identity.Repositories;
+using NursingCareBackend.Domain.CareRequests;
 using NursingCareBackend.Domain.Identity;
 using NursingCareBackend.Infrastructure.Persistence;
 
@@ -55,6 +57,22 @@ public sealed class UserRepository : IUserRepository
                 cancellationToken);
     }
 
+    public async Task<IReadOnlyList<User>> GetNurseProfilesAsync(CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Users
+            .AsNoTracking()
+            .Include(u => u.NurseProfile)
+            .Include(u => u.UserRoles)
+            .ThenInclude(ur => ur.Role)
+            .Where(u =>
+                u.ProfileType == UserProfileType.Nurse &&
+                u.NurseProfile != null)
+            .OrderBy(u => u.Name)
+            .ThenBy(u => u.LastName)
+            .ThenBy(u => u.CreatedAtUtc)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<User>> GetPendingNurseProfilesAsync(CancellationToken cancellationToken = default)
     {
         return await _dbContext.Users
@@ -83,6 +101,51 @@ public sealed class UserRepository : IUserRepository
             .OrderBy(u => u.Name)
             .ThenBy(u => u.LastName)
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyDictionary<Guid, NurseWorkloadSummary>> GetNurseWorkloadsAsync(
+        IReadOnlyCollection<Guid> nurseUserIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (nurseUserIds.Count == 0)
+        {
+            return new Dictionary<Guid, NurseWorkloadSummary>();
+        }
+
+        var workloadRows = await _dbContext.CareRequests
+            .AsNoTracking()
+            .Where(careRequest =>
+                careRequest.AssignedNurse.HasValue &&
+                nurseUserIds.Contains(careRequest.AssignedNurse.Value))
+            .GroupBy(careRequest => careRequest.AssignedNurse!.Value)
+            .Select(group => new
+            {
+                NurseUserId = group.Key,
+                TotalAssignedCareRequests = group.Count(),
+                PendingAssignedCareRequests = group.Count(careRequest => careRequest.Status == CareRequestStatus.Pending),
+                ApprovedAssignedCareRequests = group.Count(careRequest => careRequest.Status == CareRequestStatus.Approved),
+                RejectedAssignedCareRequests = group.Count(careRequest => careRequest.Status == CareRequestStatus.Rejected),
+                CompletedAssignedCareRequests = group.Count(careRequest => careRequest.Status == CareRequestStatus.Completed),
+                LastCareRequestAtUtc = group.Max(careRequest => (DateTime?)careRequest.UpdatedAtUtc)
+            })
+            .ToListAsync(cancellationToken);
+
+        return workloadRows.ToDictionary(
+            row => row.NurseUserId,
+            row => new NurseWorkloadSummary(
+                row.TotalAssignedCareRequests,
+                row.PendingAssignedCareRequests,
+                row.ApprovedAssignedCareRequests,
+                row.RejectedAssignedCareRequests,
+                row.CompletedAssignedCareRequests,
+                row.LastCareRequestAtUtc));
+    }
+
+    public Task<bool> HasAssignedCareRequestsAsync(Guid nurseUserId, CancellationToken cancellationToken = default)
+    {
+        return _dbContext.CareRequests
+            .AsNoTracking()
+            .AnyAsync(careRequest => careRequest.AssignedNurse == nurseUserId, cancellationToken);
     }
 
     public async Task<User> CreateAsync(User user, CancellationToken cancellationToken = default)

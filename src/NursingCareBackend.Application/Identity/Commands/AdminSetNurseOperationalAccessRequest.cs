@@ -1,0 +1,3 @@
+namespace NursingCareBackend.Application.Identity.Commands;
+
+public sealed record AdminSetNurseOperationalAccessRequest(bool IsOperationallyActive);

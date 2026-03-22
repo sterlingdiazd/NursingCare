@@ -1,5 +1,6 @@
 using NursingCareBackend.Application.Identity.Authentication;
 using NursingCareBackend.Application.Identity.Commands;
+using NursingCareBackend.Application.Identity.Models;
 using NursingCareBackend.Application.Identity.OAuth;
 using NursingCareBackend.Application.Identity.Repositories;
 using NursingCareBackend.Application.Identity.Services;
@@ -401,6 +402,13 @@ public sealed class AuthenticationServiceTests
         _usersById.Values.Any(user =>
           user.UserRoles.Any(userRole => string.Equals(userRole.Role.Name, SystemRoles.Admin, StringComparison.OrdinalIgnoreCase))));
 
+    public Task<IReadOnlyList<User>> GetNurseProfilesAsync(CancellationToken cancellationToken = default)
+      => Task.FromResult<IReadOnlyList<User>>(
+        _usersById.Values
+          .Where(user => user.ProfileType == UserProfileType.Nurse && user.NurseProfile is not null)
+          .OrderBy(user => user.CreatedAtUtc)
+          .ToArray());
+
     public Task<IReadOnlyList<User>> GetPendingNurseProfilesAsync(CancellationToken cancellationToken = default)
       => Task.FromResult<IReadOnlyList<User>>(
         _usersById.Values
@@ -414,6 +422,14 @@ public sealed class AuthenticationServiceTests
           .Where(user => user.ProfileType == UserProfileType.Nurse && user.IsActive && user.NurseProfile?.IsActive == true)
           .OrderBy(user => user.CreatedAtUtc)
           .ToArray());
+
+    public Task<IReadOnlyDictionary<Guid, NurseWorkloadSummary>> GetNurseWorkloadsAsync(
+      IReadOnlyCollection<Guid> nurseUserIds,
+      CancellationToken cancellationToken = default)
+      => Task.FromResult<IReadOnlyDictionary<Guid, NurseWorkloadSummary>>(new Dictionary<Guid, NurseWorkloadSummary>());
+
+    public Task<bool> HasAssignedCareRequestsAsync(Guid nurseUserId, CancellationToken cancellationToken = default)
+      => Task.FromResult(false);
 
     public Task UpdateAsync(User user, CancellationToken cancellationToken = default)
     {

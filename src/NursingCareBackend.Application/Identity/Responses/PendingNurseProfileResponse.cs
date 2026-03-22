@@ -7,5 +7,7 @@ public sealed record PendingNurseProfileResponse(
     string? LastName,
     string? IdentificationNumber,
     string? Phone,
+    DateOnly? HireDate,
+    string? Specialty,
     DateTime CreatedAtUtc
 );

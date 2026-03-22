@@ -43,12 +43,15 @@ public static class UserFacingMessageTranslator
             ["User ID cannot be empty."] = "El identificador del usuario es obligatorio.",
             ["A valid admin user identifier is required to create an admin account."] =
                 "La sesion actual no incluye un identificador administrativo valido.",
+            ["A valid admin user identifier is required to manage nurse profiles."] =
+                "La sesion actual no incluye un identificador administrativo valido.",
             ["Bootstrap admin setup is no longer available because an admin account already exists."] =
                 "La configuracion publica del primer administrador ya no esta disponible porque ya existe una cuenta administrativa.",
             ["Bootstrap admin setup is disabled in production. Use the Admin Portal after the initial installation flow."] =
                 "La configuracion publica del primer administrador esta deshabilitada en produccion. Usa el portal administrativo despues de la instalacion inicial.",
             ["Hire date is required for nurse registration."] =
                 "La fecha de contratacion es obligatoria para el registro de enfermeria.",
+            ["Hire date is required."] = "La fecha de contratacion es obligatoria.",
             ["Specialty is required for nurse registration."] =
                 "La especialidad es obligatoria para el registro de enfermeria.",
             ["Bank name is required for nurse registration."] =
@@ -62,6 +65,10 @@ public static class UserFacingMessageTranslator
             ["Category is required."] = "La categoria es obligatoria.",
             ["Category is not valid."] = "La categoria seleccionada no es valida.",
             ["The requested user does not have a nurse profile."] = "El usuario solicitado no tiene un perfil de enfermeria.",
+            ["Pending nurse profiles must be completed through the review flow."] =
+                "Los perfiles pendientes deben completarse desde el flujo de revision administrativa.",
+            ["Nurse operational access can only be changed after the profile is complete."] =
+                "El acceso operativo solo puede cambiarse despues de completar el perfil de enfermeria.",
             ["Description cannot be empty."] = "La descripcion es obligatoria.",
             ["CareRequestType is required."] = "El tipo de solicitud es obligatorio.",
             ["Unit must be greater than zero."] = "La cantidad debe ser mayor que cero.",
