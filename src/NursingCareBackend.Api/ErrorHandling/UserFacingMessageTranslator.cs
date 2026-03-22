@@ -43,6 +43,8 @@ public static class UserFacingMessageTranslator
             ["User ID cannot be empty."] = "El identificador del usuario es obligatorio.",
             ["A valid admin user identifier is required to create an admin account."] =
                 "La sesion actual no incluye un identificador administrativo valido.",
+            ["A valid admin user identifier is required to manage client profiles."] =
+                "La sesion actual no incluye un identificador administrativo valido.",
             ["A valid admin user identifier is required to manage nurse profiles."] =
                 "La sesion actual no incluye un identificador administrativo valido.",
             ["Bootstrap admin setup is no longer available because an admin account already exists."] =
@@ -65,6 +67,7 @@ public static class UserFacingMessageTranslator
             ["Category is required."] = "La categoria es obligatoria.",
             ["Category is not valid."] = "La categoria seleccionada no es valida.",
             ["The requested user does not have a nurse profile."] = "El usuario solicitado no tiene un perfil de enfermeria.",
+            ["The requested user does not have a client profile."] = "El usuario solicitado no tiene un perfil de cliente.",
             ["Pending nurse profiles must be completed through the review flow."] =
                 "Los perfiles pendientes deben completarse desde el flujo de revision administrativa.",
             ["Nurse operational access can only be changed after the profile is complete."] =

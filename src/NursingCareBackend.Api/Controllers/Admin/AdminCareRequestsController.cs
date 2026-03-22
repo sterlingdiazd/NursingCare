@@ -132,7 +132,11 @@ public sealed class AdminCareRequestsController : ControllerBase
     if (clientUser is null
       || clientUser.ProfileType != UserProfileType.Client
       || !clientUser.IsActive
-      || clientUser.ClientProfile is null)
+      || clientUser.ClientProfile is null
+      || !clientUser.UserRoles.Any(userRole => string.Equals(
+        userRole.Role.Name,
+        SystemRoles.Client,
+        StringComparison.OrdinalIgnoreCase)))
     {
       return this.ProblemResponse(
         StatusCodes.Status400BadRequest,

@@ -98,7 +98,8 @@ public sealed class AdminCareRequestRepository : IAdminCareRequestRepository
       .Where(user =>
         user.ProfileType == UserProfileType.Client
         && user.IsActive
-        && user.ClientProfile != null);
+        && user.ClientProfile != null
+        && user.UserRoles.Any(userRole => userRole.Role.Name == SystemRoles.Client));
 
     if (!string.IsNullOrWhiteSpace(normalizedSearch))
     {

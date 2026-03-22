@@ -86,7 +86,8 @@ public sealed class AdminDashboardRepository : IAdminDashboardRepository
       .Where(user =>
         user.ProfileType == UserProfileType.Client
         && user.IsActive
-        && user.ClientProfile != null)
+        && user.ClientProfile != null
+        && user.UserRoles.Any(userRole => userRole.Role.Name == SystemRoles.Client))
       .CountAsync(cancellationToken);
 
     return new AdminDashboardSnapshot(

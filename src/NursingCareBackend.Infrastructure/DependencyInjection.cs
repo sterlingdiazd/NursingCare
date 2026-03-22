@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using NursingCareBackend.Application.AdminPortal.Auditing;
+using NursingCareBackend.Application.AdminPortal.Clients;
 using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
 using NursingCareBackend.Application.AdminPortal.Queries;
 using NursingCareBackend.Application.AdminPortal.Users;
@@ -66,6 +67,7 @@ public static class DependencyInjection
         services.AddScoped<IAdminDashboardRepository, AdminDashboardRepository>();
         services.AddScoped<IAdminActionQueueRepository, AdminActionQueueRepository>();
         services.AddScoped<IAdminCareRequestRepository, AdminCareRequestRepository>();
+        services.AddScoped<IAdminClientManagementRepository, AdminClientManagementRepository>();
         services.AddScoped<IAdminUserManagementRepository, AdminUserManagementRepository>();
         services.AddScoped<IAdminAuditService, AdminAuditService>();
 

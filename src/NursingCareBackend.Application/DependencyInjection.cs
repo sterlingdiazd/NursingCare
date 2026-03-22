@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using NursingCareBackend.Application.AdminPortal.Clients;
 using NursingCareBackend.Application.AdminPortal.Queries;
 using NursingCareBackend.Application.AdminPortal.Users;
 using NursingCareBackend.Application.CareRequests.Commands.AssignCareRequestNurse;
@@ -22,9 +23,12 @@ public static class DependencyInjection
     services.AddScoped<GetAdminCareRequestsHandler>();
     services.AddScoped<GetAdminCareRequestDetailHandler>();
     services.AddScoped<GetAdminCareRequestClientOptionsHandler>();
+    services.AddScoped<GetAdminClientsHandler>();
+    services.AddScoped<GetAdminClientDetailHandler>();
     services.AddScoped<GetAdminUsersHandler>();
     services.AddScoped<GetAdminUserDetailHandler>();
     services.AddScoped<IAdminAccountProvisioningService, AdminAccountProvisioningService>();
+    services.AddScoped<IAdminClientManagementService, AdminClientManagementService>();
     services.AddScoped<IAdminUserManagementService, AdminUserManagementService>();
 
     return services;

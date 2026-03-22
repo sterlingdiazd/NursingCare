@@ -193,6 +193,47 @@ public sealed class AdminCareRequestsApiTests : IClassFixture<CustomWebApplicati
   }
 
   [Fact]
+  public async Task POST_AdminCareRequests_Should_Reject_Admin_Only_Profiles_And_Hide_Them_From_Client_Options()
+  {
+    var adminClient = CreateAdminClient();
+    var scenario = $"admin-only-profile-{Guid.NewGuid():N}";
+    var (_, clientUserId) = await CareRequestApiAuthHelper.CreateClientTokenAsync(_factory, scenario);
+
+    var createAdminResponse = await adminClient.PostAsJsonAsync("/api/admin/admin-accounts", new
+    {
+      name = "Mariela",
+      lastName = "Rojas",
+      identificationNumber = "00111222333",
+      phone = "8095550199",
+      email = $"{scenario}-admin@nursingcare.local",
+      password = "Pass123!",
+      confirmPassword = "Pass123!"
+    });
+
+    createAdminResponse.EnsureSuccessStatusCode();
+    var createdAdmin = await createAdminResponse.Content.ReadFromJsonAsync<AdminAccountDto>();
+    Assert.NotNull(createdAdmin);
+
+    var optionsResponse = await adminClient.GetAsync($"/api/admin/care-requests/clients?search={Uri.EscapeDataString(scenario)}");
+    optionsResponse.EnsureSuccessStatusCode();
+    var optionsPayload = await optionsResponse.Content.ReadFromJsonAsync<List<AdminCareRequestClientOptionDto>>();
+
+    Assert.NotNull(optionsPayload);
+    Assert.Contains(optionsPayload!, item => item.UserId == clientUserId);
+    Assert.DoesNotContain(optionsPayload!, item => item.UserId == createdAdmin!.Id);
+
+    var createResponse = await adminClient.PostAsJsonAsync("/api/admin/care-requests", new
+    {
+      clientUserId = createdAdmin!.Id,
+      careRequestDescription = "solicitud invalida para perfil administrativo",
+      careRequestType = "domicilio_24h",
+      unit = 1
+    });
+
+    Assert.Equal(HttpStatusCode.BadRequest, createResponse.StatusCode);
+  }
+
+  [Fact]
   public async Task GET_AdminCareRequests_Should_Reject_Non_Admin_Users()
   {
     var (clientToken, _) = await CareRequestApiAuthHelper.CreateClientTokenAsync(_factory, $"admin-forbidden-{Guid.NewGuid():N}");
@@ -285,6 +326,16 @@ public sealed class AdminCareRequestsApiTests : IClassFixture<CustomWebApplicati
   }
 
   private sealed class CreateResponse
+  {
+    public Guid Id { get; set; }
+  }
+
+  private sealed class AdminCareRequestClientOptionDto
+  {
+    public Guid UserId { get; set; }
+  }
+
+  private sealed class AdminAccountDto
   {
     public Guid Id { get; set; }
   }
