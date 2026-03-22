@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using NursingCareBackend.Application.AdminPortal.Users;
+using NursingCareBackend.Application.Catalogs;
 using NursingCareBackend.Application.Identity.Users;
-using NursingCareBackend.Application.Identity.Validation;
 using NursingCareBackend.Domain.Identity;
 using NursingCareBackend.Infrastructure.Persistence;
 
@@ -10,10 +10,12 @@ namespace NursingCareBackend.Infrastructure.AdminPortal;
 public sealed class AdminUserManagementRepository : IAdminUserManagementRepository
 {
   private readonly NursingCareDbContext _dbContext;
+  private readonly INurseCatalogService _nurseCatalog;
 
-  public AdminUserManagementRepository(NursingCareDbContext dbContext)
+  public AdminUserManagementRepository(NursingCareDbContext dbContext, INurseCatalogService nurseCatalog)
   {
     _dbContext = dbContext;
+    _nurseCatalog = nurseCatalog;
   }
 
   public async Task<IReadOnlyList<AdminUserListItem>> GetListAsync(
@@ -69,7 +71,7 @@ public sealed class AdminUserManagementRepository : IAdminUserManagementReposito
       .AsNoTracking()
       .CountAsync(item => item.AssignedNurse == userId, cancellationToken);
 
-    return MapDetail(user, activeRefreshTokenCount, ownedCareRequestsCount, assignedCareRequestsCount);
+    return await MapDetailAsync(user, activeRefreshTokenCount, ownedCareRequestsCount, assignedCareRequestsCount, cancellationToken);
   }
 
   private static AdminUserListItem MapListItem(User user)
@@ -97,16 +99,25 @@ public sealed class AdminUserManagementRepository : IAdminUserManagementReposito
       CreatedAtUtc: user.CreatedAtUtc);
   }
 
-  private static AdminUserDetail MapDetail(
+  private async Task<AdminUserDetail> MapDetailAsync(
     User user,
     int activeRefreshTokenCount,
     int ownedCareRequestsCount,
-    int assignedCareRequestsCount)
+    int assignedCareRequestsCount,
+    CancellationToken cancellationToken)
   {
     var roleNames = ResolveRoleNames(user);
     var requiresProfileCompletion = UserAccountStateEvaluator.RequiresProfileCompletion(user);
     var requiresAdminReview = UserAccountStateEvaluator.RequiresAdminReview(user);
     var requiresManualIntervention = UserAccountStateEvaluator.RequiresManualIntervention(user);
+
+    string? nurseSpecialty = null;
+    string? nurseCategory = null;
+    if (user.NurseProfile is not null)
+    {
+      nurseSpecialty = await _nurseCatalog.NormalizeSpecialtyAsync(user.NurseProfile.Specialty, cancellationToken);
+      nurseCategory = await _nurseCatalog.NormalizeCategoryAsync(user.NurseProfile.Category, cancellationToken);
+    }
 
     return new AdminUserDetail(
       Id: user.Id,
@@ -132,11 +143,11 @@ public sealed class AdminUserManagementRepository : IAdminUserManagementReposito
         : new AdminUserNurseProfile(
           user.NurseProfile.IsActive,
           user.NurseProfile.HireDate,
-          NurseProfileCatalog.NormalizeSpecialty(user.NurseProfile.Specialty),
+          nurseSpecialty,
           user.NurseProfile.LicenseId,
           user.NurseProfile.BankName,
           user.NurseProfile.AccountNumber,
-          NurseProfileCatalog.NormalizeCategory(user.NurseProfile.Category),
+          nurseCategory,
           assignedCareRequestsCount),
       ClientProfile: user.ClientProfile is null
         ? null

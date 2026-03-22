@@ -160,8 +160,8 @@ Default CORS policy configured and applied: `AllowAllDev`.
 
 Default allowed origins:
 
-- Web: `http://localhost:3000`
-- Mobile: `http://localhost:19006`
+- Web: [http://localhost:3000](http://localhost:3000)
+- Mobile: [http://localhost:19006](http://localhost:19006)
 
 ## Local Development
 
@@ -183,13 +183,13 @@ dotnet run --project src/NursingCareBackend.Api/NursingCareBackend.Api.csproj
 
 Direct launch profile URLs are:
 
-- `http://localhost:8080` (http profile)
-- `https://localhost:8443` and `http://localhost:8080` (https profile)
+- [http://localhost:8080](http://localhost:8080) (http profile)
+- [https://localhost:8443](https://localhost:8443) and [http://localhost:8080](http://localhost:8080) (https profile)
 
 Swagger UI:
 
-- `http://localhost:8080/swagger`
-- `https://localhost:8443/swagger`
+- [http://localhost:8080/swagger](http://localhost:8080/swagger)
+- [https://localhost:8443/swagger](https://localhost:8443/swagger)
 
 For shared local development across web and mobile, use the reverse proxy endpoint:
 

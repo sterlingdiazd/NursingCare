@@ -15,7 +15,7 @@ Welcome! This guide will help you get started with the Nursing Care Backend API.
 1. **Quick test?** → See **[QUICK_START.md](QUICK_START.md)** section 4
 2. **Specific scenarios?** → Check **[TESTING_SCENARIOS.md](TESTING_SCENARIOS.md)**
 3. **Postman setup?** → Import **[Postman_Collection.json](Postman_Collection.json)**
-4. **Swagger documentation?** → Open http://localhost:5050/swagger when API is running
+4. **Swagger documentation?** → Open <http://localhost:5050/swagger> when API is running
 
 ---
 
@@ -78,8 +78,8 @@ NursingCareBackend/
 ## System Requirements
 
 ### Development Machine
-- **.NET SDK 10.x** - Download from https://dotnet.microsoft.com/download
-- **Docker Desktop** - Download from https://www.docker.com/products/docker-desktop
+- **.NET SDK 10.x** - Download from <https://dotnet.microsoft.com/download>
+- **Docker Desktop** - Download from <https://www.docker.com/products/docker-desktop>
 - **Postman** (optional) - For API testing
 - **Git** - Version control
 
@@ -134,7 +134,7 @@ export JWT_KEY="dev-secret-key"
 dotnet run --project src/NursingCareBackend.Api
 ```
 
-**API is running at:** http://localhost:5050
+**API is running at:** <http://localhost:5050>
 
 ---
 
@@ -213,7 +213,7 @@ dotnet run --project src/NursingCareBackend.Api
 ### Method 1: Using Swagger UI (Easiest)
 
 1. Run the API: `dotnet run --project src/NursingCareBackend.Api`
-2. Open browser: http://localhost:5050/swagger
+2. Open browser: <http://localhost:5050/swagger>
 3. Click "Try it out" on any endpoint
 4. For protected endpoints: Click **Authorize** and paste token
 
@@ -418,11 +418,11 @@ See [src/RUN_AND_TEST_GUIDE.md](src/RUN_AND_TEST_GUIDE.md#troubleshooting) for c
 
 ### Documentation Links
 
-- **JWT Tokens:** https://jwt.io (paste token to decode)
-- **.NET Documentation:** https://docs.microsoft.com/en-us/dotnet/
-- **Entity Framework:** https://docs.microsoft.com/en-us/ef/core/
-- **Docker:** https://docs.docker.com/
-- **SQL Server:** https://docs.microsoft.com/en-us/sql/
+- **JWT Tokens:** <https://jwt.io> (paste token to decode)
+- **.NET Documentation:** <https://docs.microsoft.com/en-us/dotnet/>
+- **Entity Framework:** <https://docs.microsoft.com/en-us/ef/core/>
+- **Docker:** <https://docs.docker.com/>
+- **SQL Server:** <https://docs.microsoft.com/en-us/sql/>
 
 ---
 

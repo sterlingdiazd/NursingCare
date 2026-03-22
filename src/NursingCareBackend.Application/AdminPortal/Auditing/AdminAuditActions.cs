@@ -11,4 +11,5 @@ public static class AdminAuditActions
   public const string NurseProfileCompleted = "NurseProfileCompleted";
   public const string NurseProfileUpdated = "NurseProfileUpdated";
   public const string NurseOperationalAccessChanged = "NurseOperationalAccessChanged";
+  public const string CatalogEntryUpdated = "CatalogEntryUpdated";
 }

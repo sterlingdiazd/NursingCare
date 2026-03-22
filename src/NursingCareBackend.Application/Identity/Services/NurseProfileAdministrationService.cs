@@ -1,5 +1,6 @@
 using System.Text.Json;
 using NursingCareBackend.Application.AdminPortal.Auditing;
+using NursingCareBackend.Application.Catalogs;
 using NursingCareBackend.Application.Identity.Authentication;
 using NursingCareBackend.Application.Identity.Commands;
 using NursingCareBackend.Application.Identity.Models;
@@ -16,18 +17,21 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
     private readonly IRoleRepository _roleRepository;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IAdminAuditService _adminAuditService;
+    private readonly INurseCatalogService _nurseCatalog;
     private static readonly NurseWorkloadSummary EmptyWorkload = new(0, 0, 0, 0, 0, null);
 
     public NurseProfileAdministrationService(
         IUserRepository userRepository,
         IRoleRepository roleRepository,
         IPasswordHasher passwordHasher,
-        IAdminAuditService adminAuditService)
+        IAdminAuditService adminAuditService,
+        INurseCatalogService nurseCatalog)
     {
         _userRepository = userRepository;
         _roleRepository = roleRepository;
         _passwordHasher = passwordHasher;
         _adminAuditService = adminAuditService;
+        _nurseCatalog = nurseCatalog;
     }
 
     public async Task<IReadOnlyList<PendingNurseProfileResponse>> GetPendingNurseProfilesAsync(
@@ -35,10 +39,16 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
     {
         var users = await _userRepository.GetNurseProfilesAsync(cancellationToken);
 
-        return users
+        var pending = users
             .Where(IsPendingReview)
             .OrderBy(user => user.CreatedAtUtc)
-            .Select(user => new PendingNurseProfileResponse(
+            .ToArray();
+
+        var results = new List<PendingNurseProfileResponse>(pending.Length);
+        foreach (var user in pending)
+        {
+            var specialty = await _nurseCatalog.NormalizeSpecialtyAsync(user.NurseProfile?.Specialty, cancellationToken);
+            results.Add(new PendingNurseProfileResponse(
                 user.Id,
                 user.Email,
                 user.Name,
@@ -46,9 +56,11 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
                 user.IdentificationNumber,
                 user.Phone,
                 user.NurseProfile?.HireDate,
-                NurseProfileCatalog.NormalizeSpecialty(user.NurseProfile?.Specialty),
-                user.CreatedAtUtc))
-            .ToArray();
+                specialty,
+                user.CreatedAtUtc));
+        }
+
+        return results;
     }
 
     public async Task<IReadOnlyList<AdminNurseProfileSummaryResponse>> GetActiveNurseProfilesAsync(
@@ -91,7 +103,7 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
         CancellationToken cancellationToken = default)
     {
         EnsureActorUserId(actorUserId);
-        ValidateCreateRequest(request);
+        await ValidateCreateRequestAsync(request, cancellationToken);
 
         var normalizedEmail = request.Email.Trim();
         var existingUserWithEmail = await _userRepository.GetByEmailAsync(normalizedEmail, cancellationToken);
@@ -105,6 +117,15 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
         {
             throw new InvalidOperationException("Nurse role not found in the system.");
         }
+
+        var normalizedSpecialty = await _nurseCatalog.NormalizeRequiredSpecialtyAsync(
+            request.Specialty,
+            nameof(request.Specialty),
+            cancellationToken);
+        var normalizedCategory = await _nurseCatalog.NormalizeRequiredCategoryAsync(
+            request.Category,
+            nameof(request.Category),
+            cancellationToken);
 
         var user = new User
         {
@@ -124,11 +145,11 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
                 UserId = Guid.Empty,
                 IsActive = request.IsOperationallyActive,
                 HireDate = request.HireDate,
-                Specialty = NurseProfileCatalog.NormalizeRequiredSpecialty(request.Specialty, nameof(request.Specialty)),
+                Specialty = normalizedSpecialty,
                 LicenseId = TrimOptional(request.LicenseId),
                 BankName = request.BankName.Trim(),
                 AccountNumber = TrimOptional(request.AccountNumber),
-                Category = NurseProfileCatalog.NormalizeRequiredCategory(request.Category, nameof(request.Category)),
+                Category = normalizedCategory,
             }
         };
 
@@ -173,7 +194,7 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
             throw new InvalidOperationException("Pending nurse profiles must be completed through the review flow.");
         }
 
-        ValidateProfileRequest(
+        await ValidateProfileRequestAsync(
             request.Name,
             request.LastName,
             request.IdentificationNumber,
@@ -184,12 +205,13 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
             request.LicenseId,
             request.BankName,
             request.AccountNumber,
-            request.Category);
+            request.Category,
+            cancellationToken);
 
         await EnsureEmailUniquenessAsync(userId, request.Email, cancellationToken);
 
         var before = CreateAuditSnapshot(user);
-        ApplyProfileFields(
+        await ApplyProfileFieldsAsync(
             user,
             request.Name,
             request.LastName,
@@ -201,7 +223,8 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
             request.LicenseId,
             request.BankName,
             request.AccountNumber,
-            request.Category);
+            request.Category,
+            cancellationToken);
 
         await _userRepository.UpdateAsync(user, cancellationToken);
 
@@ -231,7 +254,7 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
     {
         EnsureActorUserId(actorUserId);
         var user = await GetRequiredNurseUserAsync(userId, cancellationToken);
-        ValidateProfileRequest(
+        await ValidateProfileRequestAsync(
             request.Name,
             request.LastName,
             request.IdentificationNumber,
@@ -242,12 +265,13 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
             request.LicenseId,
             request.BankName,
             request.AccountNumber,
-            request.Category);
+            request.Category,
+            cancellationToken);
 
         await EnsureEmailUniquenessAsync(userId, request.Email, cancellationToken);
 
         var before = CreateAuditSnapshot(user);
-        ApplyProfileFields(
+        await ApplyProfileFieldsAsync(
             user,
             request.Name,
             request.LastName,
@@ -259,7 +283,8 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
             request.LicenseId,
             request.BankName,
             request.AccountNumber,
-            request.Category);
+            request.Category,
+            cancellationToken);
 
         user.IsActive = true;
         user.NurseProfile!.IsActive = true;
@@ -366,21 +391,27 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
             users.Select(user => user.Id).ToArray(),
             cancellationToken);
 
-        return users
-            .Select(user => new AdminNurseProfileSummaryResponse(
+        var results = new List<AdminNurseProfileSummaryResponse>(users.Count);
+        foreach (var user in users)
+        {
+            var specialty = await _nurseCatalog.NormalizeSpecialtyAsync(user.NurseProfile?.Specialty, cancellationToken);
+            var category = await _nurseCatalog.NormalizeCategoryAsync(user.NurseProfile?.Category, cancellationToken);
+            results.Add(new AdminNurseProfileSummaryResponse(
                 user.Id,
                 user.Email,
                 user.Name,
                 user.LastName,
-                NurseProfileCatalog.NormalizeSpecialty(user.NurseProfile?.Specialty),
-                NurseProfileCatalog.NormalizeCategory(user.NurseProfile?.Category),
+                specialty,
+                category,
                 user.IsActive,
                 user.NurseProfile?.IsActive == true,
                 IsProfileComplete(user),
                 IsAssignmentReady(user),
                 user.CreatedAtUtc,
-                workloads.TryGetValue(user.Id, out var workload) ? workload : EmptyWorkload))
-            .ToArray();
+                workloads.TryGetValue(user.Id, out var workload) ? workload : EmptyWorkload));
+        }
+
+        return results;
     }
 
     private async Task<NurseProfileAdminResponse> MapResponseAsync(User user, CancellationToken cancellationToken)
@@ -389,6 +420,8 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
         var workloads = await _userRepository.GetNurseWorkloadsAsync([user.Id], cancellationToken);
         var hasHistoricalCareRequests = await _userRepository.HasAssignedCareRequestsAsync(user.Id, cancellationToken);
         var isProfileComplete = IsProfileComplete(user);
+        var specialty = await _nurseCatalog.NormalizeSpecialtyAsync(nurse.Specialty, cancellationToken);
+        var category = await _nurseCatalog.NormalizeCategoryAsync(nurse.Category, cancellationToken);
 
         return new NurseProfileAdminResponse(
             user.Id,
@@ -406,11 +439,11 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
             hasHistoricalCareRequests,
             user.CreatedAtUtc,
             nurse.HireDate,
-            NurseProfileCatalog.NormalizeSpecialty(nurse.Specialty),
+            specialty,
             nurse.LicenseId,
             nurse.BankName,
             nurse.AccountNumber,
-            NurseProfileCatalog.NormalizeCategory(nurse.Category),
+            category,
             workloads.TryGetValue(user.Id, out var workload) ? workload : EmptyWorkload);
     }
 
@@ -423,9 +456,9 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
         }
     }
 
-    private static void ValidateCreateRequest(AdminCreateNurseProfileRequest request)
+    private async Task ValidateCreateRequestAsync(AdminCreateNurseProfileRequest request, CancellationToken cancellationToken)
     {
-        ValidateProfileRequest(
+        await ValidateProfileRequestAsync(
             request.Name,
             request.LastName,
             request.IdentificationNumber,
@@ -436,7 +469,8 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
             request.LicenseId,
             request.BankName,
             request.AccountNumber,
-            request.Category);
+            request.Category,
+            cancellationToken);
 
         if (string.IsNullOrWhiteSpace(request.Password))
         {
@@ -454,7 +488,7 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
         }
     }
 
-    private static void ValidateProfileRequest(
+    private async Task ValidateProfileRequestAsync(
         string name,
         string lastName,
         string identificationNumber,
@@ -465,7 +499,8 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
         string? licenseId,
         string bankName,
         string? accountNumber,
-        string category)
+        string category,
+        CancellationToken cancellationToken)
     {
         IdentityInputRules.EnsureTextOnlyRequired(name, nameof(name), "Name");
         IdentityInputRules.EnsureTextOnlyRequired(lastName, nameof(lastName), "Last name");
@@ -487,14 +522,14 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
             throw new ArgumentException("Bank name is required.", nameof(bankName));
         }
 
-        NurseProfileCatalog.NormalizeRequiredSpecialty(specialty, nameof(specialty));
+        await _nurseCatalog.NormalizeRequiredSpecialtyAsync(specialty, nameof(specialty), cancellationToken);
         IdentityInputRules.EnsureTextOnlyRequired(bankName, nameof(bankName), "Bank name");
         IdentityInputRules.EnsureNumericOnlyOptional(licenseId, nameof(licenseId), "License ID");
         IdentityInputRules.EnsureNumericOnlyOptional(accountNumber, nameof(accountNumber), "Account number");
-        NurseProfileCatalog.NormalizeRequiredCategory(category, nameof(category));
+        await _nurseCatalog.NormalizeRequiredCategoryAsync(category, nameof(category), cancellationToken);
     }
 
-    private static void ApplyProfileFields(
+    private async Task ApplyProfileFieldsAsync(
         User user,
         string name,
         string lastName,
@@ -506,7 +541,8 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
         string? licenseId,
         string bankName,
         string? accountNumber,
-        string category)
+        string category,
+        CancellationToken cancellationToken)
     {
         var nurse = user.NurseProfile!;
 
@@ -518,11 +554,11 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
         user.DisplayName = $"{user.Name} {user.LastName}".Trim();
 
         nurse.HireDate = hireDate;
-        nurse.Specialty = NurseProfileCatalog.NormalizeRequiredSpecialty(specialty, nameof(specialty));
+        nurse.Specialty = await _nurseCatalog.NormalizeRequiredSpecialtyAsync(specialty, nameof(specialty), cancellationToken);
         nurse.LicenseId = TrimOptional(licenseId);
         nurse.BankName = bankName.Trim();
         nurse.AccountNumber = TrimOptional(accountNumber);
-        nurse.Category = NurseProfileCatalog.NormalizeRequiredCategory(category, nameof(category));
+        nurse.Category = await _nurseCatalog.NormalizeRequiredCategoryAsync(category, nameof(category), cancellationToken);
     }
 
     private static bool IsProfileComplete(User user)
@@ -535,9 +571,9 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
             && !string.IsNullOrWhiteSpace(user.Phone)
             && !string.IsNullOrWhiteSpace(user.Email)
             && nurse.HireDate is not null
-            && !string.IsNullOrWhiteSpace(NurseProfileCatalog.NormalizeSpecialty(nurse.Specialty))
+            && !string.IsNullOrWhiteSpace(nurse.Specialty?.Trim())
             && !string.IsNullOrWhiteSpace(nurse.BankName)
-            && !string.IsNullOrWhiteSpace(NurseProfileCatalog.NormalizeCategory(nurse.Category));
+            && !string.IsNullOrWhiteSpace(nurse.Category?.Trim());
     }
 
     private static bool IsPendingReview(User user)
@@ -567,11 +603,11 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
             isPendingReview = IsPendingReview(user),
             isAssignmentReady = IsAssignmentReady(user),
             hireDate = nurse?.HireDate,
-            specialty = NurseProfileCatalog.NormalizeSpecialty(nurse?.Specialty),
+            specialty = nurse?.Specialty,
             licenseId = nurse?.LicenseId,
             bankName = nurse?.BankName,
             accountNumber = nurse?.AccountNumber,
-            category = NurseProfileCatalog.NormalizeCategory(nurse?.Category)
+            category = nurse?.Category
         };
     }
 

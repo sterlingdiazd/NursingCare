@@ -75,7 +75,7 @@ Tokens obtained from registration and login endpoints should be different becaus
 
 #### Step 4: Decode and Inspect Token
 
-Go to https://jwt.io and paste your token:
+Go to <https://jwt.io> and paste your token:
 
 **Expected Payload:**
 ```json
@@ -594,7 +594,7 @@ curl -X POST http://localhost:5050/api/auth/register \
 
 #### Step 3: Decode Token to See Expiration
 
-Go to https://jwt.io and paste your token.
+Go to <https://jwt.io> and paste your token.
 
 **Look for the `exp` claim (expiration time in seconds since epoch)**
 
@@ -618,7 +618,7 @@ date -d @1710249030
 #### Step 5: Wait for Expiration (Optional)
 
 1. Wait until expiration time
-2. Try to use token: `curl -H "Authorization: Bearer <token>" http://localhost:5050/api/care-requests`
+2. Try to use token: `curl -H "Authorization: Bearer <token>" <http://localhost:5050/api/care-requests>`
 3. Expect 401 Unauthorized
 
 #### Step 6: Renew Token by Logging In

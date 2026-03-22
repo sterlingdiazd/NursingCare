@@ -1,6 +1,6 @@
+using NursingCareBackend.Application.CareRequests;
 using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
 using NursingCareBackend.Application.CareRequests.Commands.TransitionCareRequest;
-using NursingCareBackend.Application.CareRequests;
 using NursingCareBackend.Domain.CareRequests;
 
 namespace NursingCareBackend.Application.Tests;
@@ -9,24 +9,39 @@ public sealed class TransitionCareRequestHandlerTests
 {
   private static readonly Guid AssignedNurseId = Guid.Parse("11111111-1111-1111-1111-111111111111");
 
-  [Fact]
-  public async Task Handle_Should_Approve_And_Persist_Pending_Request()
+  private static CareRequest CreateDomicilioSample(
+    Guid userId,
+    string description,
+    DateOnly? careRequestDate = null)
   {
-    var careRequest = CareRequest.Create(
-      userID: Guid.NewGuid(),
-      description: "Approve me",
+    return CareRequest.Create(
+      userID: userId,
+      description: description,
       careRequestReason: null,
       careRequestType: "domicilio_24h",
+      unitType: "dia_completo",
       suggestedNurse: null,
       assignedNurse: AssignedNurseId,
       unit: 1,
-      price: null,
+      price: 3500m,
+      total: 4200m,
       clientBasePrice: null,
-      distanceFactor: null,
-      complexityLevel: null,
+      distanceFactor: "local",
+      complexityLevel: "estandar",
       medicalSuppliesCost: null,
-      careRequestDate: null,
-      existingSameUnitTypeCount: 0);
+      careRequestDate: careRequestDate,
+      pricingCategoryCode: "domicilio",
+      categoryFactorSnapshot: 1.2m,
+      distanceFactorMultiplierSnapshot: 1.0m,
+      complexityMultiplierSnapshot: 1.0m,
+      volumeDiscountPercentSnapshot: 0,
+      createdAtUtc: DateTime.UtcNow);
+  }
+
+  [Fact]
+  public async Task Handle_Should_Approve_And_Persist_Pending_Request()
+  {
+    var careRequest = CreateDomicilioSample(Guid.NewGuid(), "Approve me");
     var repository = new FakeCareRequestRepository(careRequest);
     var handler = new TransitionCareRequestHandler(repository);
 
@@ -42,21 +57,7 @@ public sealed class TransitionCareRequestHandlerTests
   [Fact]
   public async Task Handle_Should_Reject_And_Persist_Pending_Request()
   {
-    var careRequest = CareRequest.Create(
-      userID: Guid.NewGuid(),
-      description: "Reject me",
-      careRequestReason: null,
-      careRequestType: "domicilio_24h",
-      suggestedNurse: null,
-      assignedNurse: AssignedNurseId,
-      unit: 1,
-      price: null,
-      clientBasePrice: null,
-      distanceFactor: null,
-      complexityLevel: null,
-      medicalSuppliesCost: null,
-      careRequestDate: null,
-      existingSameUnitTypeCount: 0);
+    var careRequest = CreateDomicilioSample(Guid.NewGuid(), "Reject me");
     var repository = new FakeCareRequestRepository(careRequest);
     var handler = new TransitionCareRequestHandler(repository);
 
@@ -72,21 +73,7 @@ public sealed class TransitionCareRequestHandlerTests
   [Fact]
   public async Task Handle_Should_Complete_And_Persist_Approved_Request()
   {
-    var careRequest = CareRequest.Create(
-      userID: Guid.NewGuid(),
-      description: "Complete me",
-      careRequestReason: null,
-      careRequestType: "domicilio_24h",
-      suggestedNurse: null,
-      assignedNurse: AssignedNurseId,
-      unit: 1,
-      price: null,
-      clientBasePrice: null,
-      distanceFactor: null,
-      complexityLevel: null,
-      medicalSuppliesCost: null,
-      careRequestDate: null,
-      existingSameUnitTypeCount: 0);
+    var careRequest = CreateDomicilioSample(Guid.NewGuid(), "Complete me");
     careRequest.Approve(DateTime.UtcNow.AddMinutes(-5));
 
     var repository = new FakeCareRequestRepository(careRequest);
@@ -104,21 +91,10 @@ public sealed class TransitionCareRequestHandlerTests
   [Fact]
   public async Task Handle_Should_Throw_When_Completion_Date_Is_In_The_Future()
   {
-    var careRequest = CareRequest.Create(
-      userID: Guid.NewGuid(),
-      description: "Future completion",
-      careRequestReason: null,
-      careRequestType: "domicilio_24h",
-      suggestedNurse: null,
-      assignedNurse: AssignedNurseId,
-      unit: 1,
-      price: null,
-      clientBasePrice: null,
-      distanceFactor: null,
-      complexityLevel: null,
-      medicalSuppliesCost: null,
-      careRequestDate: DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)),
-      existingSameUnitTypeCount: 0);
+    var careRequest = CreateDomicilioSample(
+      Guid.NewGuid(),
+      "Future completion",
+      DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)));
     careRequest.Approve(DateTime.UtcNow.AddMinutes(-5));
 
     var repository = new FakeCareRequestRepository(careRequest);

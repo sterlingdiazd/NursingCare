@@ -8,9 +8,10 @@ This guide explains how to run and test the Nursing Care Backend API locally wit
 2. [Environment Variables Setup](#environment-variables-setup)
 3. [Start SQL Server (Docker)](#start-sql-server-docker)
 4. [Run the API Locally](#run-the-api-locally)
-5. [Testing the Endpoints](#testing-the-endpoints)
-6. [Troubleshooting](#troubleshooting)
-7. [Stop Services](#stop-services)
+5. [Run the Apps Remotely](#run-the-apps-remotely)
+6. [Testing the Endpoints](#testing-the-endpoints)
+7. [Troubleshooting](#troubleshooting)
+8. [Stop Services](#stop-services)
 
 ---
 
@@ -233,15 +234,48 @@ Expected response: `200 OK`
 
 ---
 
+## Run the Apps Remotely
+
+Use these production links when you want to validate the deployed Azure environment instead of your local machine.
+
+### Production URLs
+
+- **Backend health:** [https://nursingcarebackend-f9f7h3gafhg2gjc9.centralus-01.azurewebsites.net/api/health](https://nursingcarebackend-f9f7h3gafhg2gjc9.centralus-01.azurewebsites.net/api/health)
+- **Web app:** [https://witty-forest-00b6eb010.2.azurestaticapps.net](https://witty-forest-00b6eb010.2.azurestaticapps.net)
+- **Mobile web app:** [https://thankful-forest-0e5e45410.2.azurestaticapps.net](https://thankful-forest-0e5e45410.2.azurestaticapps.net)
+
+### Quick Remote Checks
+
+Verify the backend health endpoint:
+
+```bash
+curl https://nursingcarebackend-f9f7h3gafhg2gjc9.centralus-01.azurewebsites.net/api/health
+```
+
+Open the frontend apps in your browser:
+
+```text
+https://witty-forest-00b6eb010.2.azurestaticapps.net
+https://thankful-forest-0e5e45410.2.azurestaticapps.net
+```
+
+If login or data loading fails remotely, confirm that:
+
+- the latest push to `main` finished successfully in GitHub Actions
+- the backend health URL returns a healthy response
+- you sign out and sign back in after role or auth changes
+
+---
+
 ## Testing the Endpoints
 
 The API provides authentication and care request management endpoints.
 
 ### API Base URLs
 
-- **Local:** `http://localhost:5050`
-- **Swagger UI:** `http://localhost:5050/swagger`
-- **Health Check:** `http://localhost:5050/health`
+- **Local:** [http://localhost:5050](http://localhost:5050)
+- **Swagger UI:** [http://localhost:5050/swagger](http://localhost:5050/swagger)
+- **Health Check:** [http://localhost:5050/health](http://localhost:5050/health)
 
 ### 1. Authentication Endpoints
 
@@ -514,7 +548,7 @@ To make testing easier, set these variables in Postman:
 
 | Variable | Initial Value | Current Value |
 |----------|---------------|---------------|
-| `BASE_URL` | `http://localhost:5050` | `http://localhost:5050` |
+| `BASE_URL` | [http://localhost:5050](http://localhost:5050) | [http://localhost:5050](http://localhost:5050) |
 | `TOKEN` | `` | (set after login/register) |
 | `REQUEST_ID` | `` | (set after create request) |
 
@@ -528,7 +562,7 @@ The API includes Swagger documentation for easier exploration.
 
 ### Step 1: Open Swagger UI
 
-Navigate to: **http://localhost:5050/swagger**
+Navigate to: **<http://localhost:5050/swagger**>
 
 ### Step 2: Test Registration
 
@@ -734,7 +768,7 @@ SELECT * FROM CareRequests;
 
 ### JWT Token Inspection
 
-Decode and inspect JWT tokens at: **https://jwt.io**
+Decode and inspect JWT tokens at: **<https://jwt.io**>
 
 Paste your token to see:
 - Subject (sub)
@@ -764,9 +798,9 @@ Appsettings.json placeholders:
 | Start SQL Server | `docker run -d --name nursingcare-sql -e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=YourStrong!Passw0rd" -p 1433:1433 mcr.microsoft.com/mssql/server:2022-latest` |
 | Set environment variables | `export DB_PASSWORD="YourStrong!Passw0rd" && export JWT_KEY="dev-key"` |
 | Run API | `dotnet run --project src/NursingCareBackend.Api` |
-| Test registration | `curl -X POST http://localhost:5050/api/auth/register ...` |
-| Test protected endpoint | `curl -H "Authorization: Bearer $TOKEN" http://localhost:5050/api/care-requests` |
-| View Swagger | Open http://localhost:5050/swagger in browser |
+| Test registration | `curl -X POST <http://localhost:5050/api/auth/register> ...` |
+| Test protected endpoint | `curl -H "Authorization: Bearer $TOKEN" <http://localhost:5050/api/care-requests>` |
+| View Swagger | Open <http://localhost:5050/swagger> in browser |
 | Stop API | Press Ctrl+C |
 | Stop SQL Server | `docker stop nursingcare-sql` |
 

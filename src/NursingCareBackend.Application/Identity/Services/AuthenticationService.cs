@@ -1,3 +1,4 @@
+using NursingCareBackend.Application.Catalogs;
 using NursingCareBackend.Application.Identity.Authentication;
 using NursingCareBackend.Application.Identity.OAuth;
 using NursingCareBackend.Application.Identity.Commands;
@@ -19,6 +20,7 @@ public sealed class AuthenticationService : IAuthenticationService
     private readonly ITokenGenerator _tokenGenerator;
     private readonly IGoogleOAuthClient _googleOAuthClient;
     private readonly IAdminBootstrapPolicy _adminBootstrapPolicy;
+    private readonly INurseCatalogService _nurseCatalog;
 
     public AuthenticationService(
         IUserRepository userRepository,
@@ -27,7 +29,8 @@ public sealed class AuthenticationService : IAuthenticationService
         IPasswordHasher passwordHasher,
         ITokenGenerator tokenGenerator,
         IGoogleOAuthClient googleOAuthClient,
-        IAdminBootstrapPolicy adminBootstrapPolicy)
+        IAdminBootstrapPolicy adminBootstrapPolicy,
+        INurseCatalogService nurseCatalog)
     {
         _userRepository = userRepository;
         _roleRepository = roleRepository;
@@ -36,6 +39,7 @@ public sealed class AuthenticationService : IAuthenticationService
         _tokenGenerator = tokenGenerator;
         _googleOAuthClient = googleOAuthClient;
         _adminBootstrapPolicy = adminBootstrapPolicy;
+        _nurseCatalog = nurseCatalog;
     }
 
     public async Task<AuthResponse> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default)
@@ -127,13 +131,17 @@ public sealed class AuthenticationService : IAuthenticationService
 
         if (request.ProfileType == UserProfileType.Nurse)
         {
-            ValidateNurseRegistrationFields(request);
+            await ValidateNurseRegistrationFieldsAsync(request, cancellationToken);
+            var specialty = await _nurseCatalog.NormalizeRequiredSpecialtyAsync(
+                request.Specialty,
+                nameof(request.Specialty),
+                cancellationToken);
             user.NurseProfile = new Nurse
             {
                 UserId = user.Id,
                 IsActive = false,
                 HireDate = request.HireDate,
-                Specialty = NurseProfileCatalog.NormalizeRequiredSpecialty(request.Specialty, nameof(request.Specialty)),
+                Specialty = specialty,
                 LicenseId = TrimOptional(request.LicenseId),
                 BankName = request.BankName?.Trim(),
                 AccountNumber = TrimOptional(request.AccountNumber)
@@ -538,7 +546,7 @@ public sealed class AuthenticationService : IAuthenticationService
         IdentityInputRules.EnsurePhone(phone, nameof(phone));
     }
 
-    private static void ValidateNurseRegistrationFields(RegisterRequest request)
+    private async Task ValidateNurseRegistrationFieldsAsync(RegisterRequest request, CancellationToken cancellationToken)
     {
         if (request.HireDate is null)
         {
@@ -550,7 +558,7 @@ public sealed class AuthenticationService : IAuthenticationService
             throw new ArgumentException("Bank name is required for nurse registration.", nameof(request.BankName));
         }
 
-        NurseProfileCatalog.NormalizeRequiredSpecialty(request.Specialty, nameof(request.Specialty));
+        await _nurseCatalog.NormalizeRequiredSpecialtyAsync(request.Specialty, nameof(request.Specialty), cancellationToken);
         IdentityInputRules.EnsureTextOnlyRequired(request.BankName, nameof(request.BankName), "Bank name");
         IdentityInputRules.EnsureNumericOnlyOptional(request.LicenseId, nameof(request.LicenseId), "License ID");
         IdentityInputRules.EnsureNumericOnlyOptional(request.AccountNumber, nameof(request.AccountNumber), "Account number");

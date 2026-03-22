@@ -24,10 +24,18 @@ public sealed class AdminCareRequestRepository : IAdminCareRequestRepository
       .AsNoTracking()
       .ToListAsync(cancellationToken);
 
+    var typeDisplayNames = await _dbContext.CareRequestTypeCatalogs
+      .AsNoTracking()
+      .ToDictionaryAsync(
+        row => row.Code,
+        row => row.DisplayName,
+        StringComparer.OrdinalIgnoreCase,
+        cancellationToken);
+
     var userLookup = await LoadUserLookupAsync(careRequests, cancellationToken);
     var items = careRequests
       .Select(careRequest => ToListItem(careRequest, userLookup, utcNow))
-      .Where(item => MatchesFilter(item, filter, utcNow))
+      .Where(item => MatchesFilter(item, filter, utcNow, typeDisplayNames))
       .ToList();
 
     return ApplySort(items, filter.Sort)
@@ -188,7 +196,8 @@ public sealed class AdminCareRequestRepository : IAdminCareRequestRepository
   private static bool MatchesFilter(
     AdminCareRequestListItem item,
     AdminCareRequestListFilter filter,
-    DateTime utcNow)
+    DateTime utcNow,
+    IReadOnlyDictionary<string, string> careRequestTypeDisplayNames)
   {
     if (!MatchesView(item, filter.View, utcNow))
     {
@@ -221,7 +230,9 @@ public sealed class AdminCareRequestRepository : IAdminCareRequestRepository
     return item.Id.ToString().ToLowerInvariant().Contains(normalizedSearch)
       || item.CareRequestDescription.ToLowerInvariant().Contains(normalizedSearch)
       || item.CareRequestType.ToLowerInvariant().Contains(normalizedSearch)
-      || GetCareRequestTypeLabel(item.CareRequestType).Contains(normalizedSearch)
+      || ResolveCareRequestTypeDisplayName(item.CareRequestType, careRequestTypeDisplayNames)
+        .ToLowerInvariant()
+        .Contains(normalizedSearch)
       || item.Status.ToLowerInvariant().Contains(normalizedSearch)
       || GetStatusLabel(item.Status).Contains(normalizedSearch)
       || item.ClientDisplayName.ToLowerInvariant().Contains(normalizedSearch)
@@ -280,34 +291,18 @@ public sealed class AdminCareRequestRepository : IAdminCareRequestRepository
 
   private static AdminCareRequestPricingBreakdown BuildPricingBreakdown(CareRequest careRequest)
   {
-    var careRequestType = CareRequest.CareRequestTypes[careRequest.CareRequestType];
-    var category = careRequestType.Category;
-    var categoryFactor = CareRequest.CategoryComplexity.TryGetValue(category, out var resolvedCategoryFactor)
-      ? resolvedCategoryFactor
-      : 1.0m;
-    var distanceFactorValue = !string.IsNullOrWhiteSpace(careRequest.DistanceFactor)
-      && CareRequest.DistanceFactors.TryGetValue(careRequest.DistanceFactor, out var resolvedDistanceFactor)
-        ? resolvedDistanceFactor
-        : 1.0m;
-    var complexityFactorValue = !string.IsNullOrWhiteSpace(careRequest.ComplexityLevel)
-      && CareRequest.ComplexityFactors.TryGetValue(careRequest.ComplexityLevel, out var resolvedComplexityFactor)
-        ? resolvedComplexityFactor
-        : 1.0m;
+    var category = careRequest.PricingCategoryCode ?? string.Empty;
+    var categoryFactor = careRequest.CategoryFactorSnapshot ?? 1.0m;
+    var distanceFactorValue = careRequest.DistanceFactorMultiplierSnapshot ?? 1.0m;
+    var complexityFactorValue = careRequest.ComplexityMultiplierSnapshot ?? 1.0m;
     var medicalSuppliesCost = careRequest.MedicalSuppliesCost ?? 0m;
     var subtotalBeforeSupplies = decimal.Round(
       Math.Max(0m, careRequest.Total - medicalSuppliesCost),
       2,
       MidpointRounding.AwayFromZero);
-    var undiscountedSubtotal = decimal.Round(
-      careRequest.Price * categoryFactor * distanceFactorValue * complexityFactorValue * careRequest.Unit,
-      2,
-      MidpointRounding.AwayFromZero);
-    var volumeDiscountPercent = undiscountedSubtotal <= 0m
-      ? 0m
-      : decimal.Round(
-        Math.Clamp((1 - (subtotalBeforeSupplies / undiscountedSubtotal)) * 100m, 0m, 100m),
-        2,
-        MidpointRounding.AwayFromZero);
+    var volumeDiscountPercent = careRequest.VolumeDiscountPercentSnapshot.HasValue
+      ? (decimal)careRequest.VolumeDiscountPercentSnapshot.Value
+      : 0m;
 
     return new AdminCareRequestPricingBreakdown(
       Category: category,
@@ -408,25 +403,13 @@ public sealed class AdminCareRequestRepository : IAdminCareRequestRepository
     };
   }
 
-  private static string GetCareRequestTypeLabel(string careRequestType)
+  private static string ResolveCareRequestTypeDisplayName(
+    string careRequestType,
+    IReadOnlyDictionary<string, string> displayNames)
   {
-    return careRequestType switch
-    {
-      "hogar_diario" => "hogar diario",
-      "hogar_basico" => "hogar basico",
-      "hogar_estandar" => "hogar estandar",
-      "hogar_premium" => "hogar premium",
-      "domicilio_dia_12h" => "domicilio de dia 12h",
-      "domicilio_noche_12h" => "domicilio de noche 12h",
-      "domicilio_24h" => "domicilio 24h",
-      "suero" => "suero",
-      "medicamentos" => "medicamentos",
-      "sonda_vesical" => "sonda vesical",
-      "sonda_nasogastrica" => "sonda nasogastrica",
-      "sonda_peg" => "sonda peg",
-      "curas" => "curas",
-      _ => careRequestType.ToLowerInvariant(),
-    };
+    return displayNames.TryGetValue(careRequestType, out var label)
+      ? label
+      : careRequestType.ToLowerInvariant();
   }
 
   private static string ResolveDisplayName(UserLookup user)

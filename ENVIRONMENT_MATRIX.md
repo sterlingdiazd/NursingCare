@@ -45,10 +45,10 @@ The goal is that web and mobile switch environments by configuration only, with 
 
 | Environment | Backend public URL | Backend run mode | Web variables | Mobile variables | Notes |
 | --- | --- | --- | --- | --- | --- |
-| `local` | `https://<lan-ip>:5050` | Docker Compose + Nginx reverse proxy | `VITE_API_BASE_URL=https://<lan-ip>:5050/api` `VITE_API_PROXY_TARGET=https://<lan-ip>:5050` | `EXPO_PUBLIC_API_BASE_URL=https://<lan-ip>:5050` | Preferred day-to-day dev mode. Works for Swagger, web, Expo Go, and device testing. |
+| `local` | `https://<lan-ip>:5050` | Docker Compose + Nginx reverse proxy | `VITE_API_BASE_URL=<https://<lan-ip>>:5050/api` `VITE_API_PROXY_TARGET=<https://<lan-ip>>:5050` | `EXPO_PUBLIC_API_BASE_URL=<https://<lan-ip>>:5050` | Preferred day-to-day dev mode. Works for Swagger, web, Expo Go, and device testing. |
 | `docker` | `https://<lan-ip>:5050` | Same as local | Same as local | Same as local | In this project, `docker` is the same public endpoint strategy as local. The difference is just whether you are using the composed stack as your main runtime. |
-| `staging` | `https://api-staging.<your-domain>` | Hosted environment | `VITE_API_BASE_URL=https://api-staging.<your-domain>/api` `VITE_API_PROXY_TARGET=https://api-staging.<your-domain>` | `EXPO_PUBLIC_API_BASE_URL=https://api-staging.<your-domain>` | No local cert trust steps should be required in staging. |
-| `production` | `https://api.<your-domain>` | Hosted environment | `VITE_API_BASE_URL=https://api.<your-domain>/api` `VITE_API_PROXY_TARGET=https://api.<your-domain>` | `EXPO_PUBLIC_API_BASE_URL=https://api.<your-domain>` | Production secrets must come from secure environment configuration, not committed files. |
+| `staging` | `https://api-staging.<your-domain>` | Hosted environment | `VITE_API_BASE_URL=<https://api-staging.<your-domain>>/api` `VITE_API_PROXY_TARGET=<https://api-staging.<your-domain>>` | `EXPO_PUBLIC_API_BASE_URL=<https://api-staging.<your-domain>>` | No local cert trust steps should be required in staging. |
+| `production` | `https://api.<your-domain>` | Hosted environment | `VITE_API_BASE_URL=<https://api.<your-domain>>/api` `VITE_API_PROXY_TARGET=<https://api.<your-domain>>` | `EXPO_PUBLIC_API_BASE_URL=<https://api.<your-domain>>` | Production secrets must come from secure environment configuration, not committed files. |
 
 ## Local Development Setup
 

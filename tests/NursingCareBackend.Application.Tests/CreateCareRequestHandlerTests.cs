@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
 using NursingCareBackend.Domain.CareRequests;
 using NursingCareBackend.Infrastructure.CareRequests;
+using NursingCareBackend.Infrastructure.Catalogs;
 using NursingCareBackend.Infrastructure.Persistence;
 using NursingCareBackend.Tests.Infrastructure;
 using Xunit;
@@ -22,6 +23,7 @@ public sealed class CreateCareRequestHandlerTests
     // EnsureCreated uses the current EF model to create the database schema.
     // This avoids failures when migrations are applied to an unexpected pre-existing DB state.
     context.Database.EnsureCreated();
+    CatalogSeeding.EnsureSeededAsync(context).GetAwaiter().GetResult();
 
     return context;
   }
@@ -32,7 +34,8 @@ public sealed class CreateCareRequestHandlerTests
     // Arrange
     await using var dbContext = CreateDbContext();
     var repository = new CareRequestRepository(dbContext);
-    var handler = new CreateCareRequestHandler(repository);
+    var pricing = new CareRequestPricingCalculator(dbContext);
+    var handler = new CreateCareRequestHandler(repository, pricing);
 
     var userID = Guid.NewGuid();
     var description = "Help with daily activities";

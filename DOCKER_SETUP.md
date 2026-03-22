@@ -18,9 +18,9 @@ Complete guide for setting up and managing SQL Server in Docker for local develo
 ## Prerequisites
 
 - **Docker Desktop** installed and running
-  - macOS: https://docs.docker.com/desktop/install/mac-install/
-  - Windows: https://docs.docker.com/desktop/install/windows-install/
-  - Linux: https://docs.docker.com/engine/install/
+  - macOS: <https://docs.docker.com/desktop/install/mac-install/>
+  - Windows: <https://docs.docker.com/desktop/install/windows-install/>
+  - Linux: <https://docs.docker.com/engine/install/>
 - **Command line access** (Terminal, PowerShell, or Command Prompt)
 
 Verify Docker is installed:

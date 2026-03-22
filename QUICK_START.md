@@ -49,9 +49,9 @@ cd /Users/sterlingdiazd/Projects/NursingCareProject/NursingCareBackend
 dotnet run --project src/NursingCareBackend.Api
 ```
 
-**API URL:** http://localhost:5050
+**API URL:** <http://localhost:5050>
 
-**Swagger:** http://localhost:5050/swagger
+**Swagger:** <http://localhost:5050/swagger>
 
 ---
 
@@ -111,7 +111,7 @@ curl -H "Authorization: Bearer $TOKEN" \
 3. Set `Authorization` header with Bearer token from login
 
 ### Option B: Using Swagger UI
-1. Open http://localhost:5050/swagger
+1. Open <http://localhost:5050/swagger>
 2. Test `/api/auth/register` endpoint
 3. Copy token from response
 4. Click **Authorize** button and paste token

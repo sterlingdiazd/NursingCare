@@ -7,7 +7,7 @@ Shared cross-project source of truth:
 This backend is designed to run behind a local Nginx reverse proxy so the web app, Swagger, and Expo Go can all use the same stable public endpoint:
 
 - Public API: `https://<your-lan-ip>:5050`
-- Internal API container: `http://api:8080`
+- Internal API container: [http://api:8080](http://api:8080)
 - SQL Server: `localhost:1433`
 
 ## What Is Committed
@@ -138,7 +138,7 @@ Use Docker + Nginx:
 
 Use `dotnet run` only when you want to debug the API process itself:
 
-- HTTP: `http://localhost:8080`
-- HTTPS: `https://localhost:8443`
+- HTTP: [http://localhost:8080](http://localhost:8080)
+- HTTPS: [https://localhost:8443](https://localhost:8443)
 
 Do not run `dotnet run` and the Docker public proxy on the same public port.

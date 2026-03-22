@@ -175,7 +175,7 @@ info: Microsoft.AspNetCore.Hosting.Hosting[14]
       Now listening on: http://localhost:5050
 ```
 
-**Leave this terminal running.** The API is now ready at: **http://localhost:5050**
+**Leave this terminal running.** The API is now ready at: **<http://localhost:5050**>
 
 ---
 
@@ -185,7 +185,7 @@ Open a **new terminal** (don't close the one running the API).
 
 ### Option A: Using Swagger UI (Easiest)
 
-1. Open browser: **http://localhost:5050/swagger**
+1. Open browser: **<http://localhost:5050/swagger**>
 2. You'll see all endpoints
 3. Click "Try it out" on any endpoint
 4. Click "Execute" to send request
@@ -328,7 +328,7 @@ Expected response: `200 OK`
 1. Open Postman
 2. Create new request
 3. Set method to POST
-4. URL: `http://localhost:5050/api/auth/register`
+4. URL: [http://localhost:5050/api/auth/register](http://localhost:5050/api/auth/register)
 5. Headers: `Content-Type: application/json`
 6. Body (raw):
    ```json
@@ -342,7 +342,7 @@ Expected response: `200 OK`
 8. Copy the `token` from response
 9. For protected endpoints:
    - Create new request
-   - URL: `http://localhost:5050/api/care-requests`
+   - URL: [http://localhost:5050/api/care-requests](http://localhost:5050/api/care-requests)
    - Headers:
      - `Content-Type: application/json`
      - `Authorization: Bearer <paste-token-here>`
@@ -727,8 +727,8 @@ docker start nursingcare-sql
 | View SQL Server logs | `docker logs nursingcare-sql --tail 20` |
 | Set env vars (macOS/Linux) | `export DB_PASSWORD="YourStrong!Passw0rd" && export JWT_KEY="dev-key"` |
 | Run API | `dotnet run --project src/NursingCareBackend.Api` |
-| Register user (cURL) | `curl -X POST http://localhost:5050/api/auth/register -H "Content-Type: application/json" -d '{"email":"test@example.com","password":"Pass123!","confirmPassword":"Pass123!"}'` |
-| View Swagger | Open http://localhost:5050/swagger |
+| Register user (cURL) | `curl -X POST <http://localhost:5050/api/auth/register> -H "Content-Type: application/json" -d '{"email":"test@example.com","password":"Pass123!","confirmPassword":"Pass123!"}'` |
+| View Swagger | Open <http://localhost:5050/swagger> |
 | Stop API | Ctrl + C |
 | Stop SQL Server | `docker stop nursingcare-sql` |
 
@@ -740,7 +740,7 @@ docker start nursingcare-sql
 1. API builds and starts
 2. Database migrations apply automatically
 3. Three roles created: Admin, Nurse, User
-4. API ready at http://localhost:5050
+4. API ready at <http://localhost:5050>
 
 ### Register Flow
 1. Call register endpoint with email/password

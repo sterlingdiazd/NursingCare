@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using NursingCareBackend.Domain.Admin;
 using NursingCareBackend.Domain.CareRequests;
+using NursingCareBackend.Domain.Catalogs;
 using NursingCareBackend.Domain.Identity;
 
 namespace NursingCareBackend.Infrastructure.Persistence;
@@ -20,6 +21,15 @@ public sealed class NursingCareDbContext : DbContext
        public DbSet<UserRole> UserRoles => Set<UserRole>();
        public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
        public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+
+       public DbSet<CareRequestCategoryCatalog> CareRequestCategoryCatalogs => Set<CareRequestCategoryCatalog>();
+       public DbSet<UnitTypeCatalog> UnitTypeCatalogs => Set<UnitTypeCatalog>();
+       public DbSet<CareRequestTypeCatalog> CareRequestTypeCatalogs => Set<CareRequestTypeCatalog>();
+       public DbSet<DistanceFactorCatalog> DistanceFactorCatalogs => Set<DistanceFactorCatalog>();
+       public DbSet<ComplexityLevelCatalog> ComplexityLevelCatalogs => Set<ComplexityLevelCatalog>();
+       public DbSet<VolumeDiscountRule> VolumeDiscountRules => Set<VolumeDiscountRule>();
+       public DbSet<NurseSpecialtyCatalog> NurseSpecialtyCatalogs => Set<NurseSpecialtyCatalog>();
+       public DbSet<NurseCategoryCatalog> NurseCategoryCatalogs => Set<NurseCategoryCatalog>();
 
        protected override void OnModelCreating(ModelBuilder modelBuilder)
        {
@@ -80,6 +90,11 @@ public sealed class NursingCareDbContext : DbContext
 
                      builder.Property(x => x.SuggestedNurse);
                      builder.Property(x => x.AssignedNurse);
+
+                     builder.Property(x => x.PricingCategoryCode).HasMaxLength(64);
+                     builder.Property(x => x.CategoryFactorSnapshot).HasColumnType("decimal(10,4)");
+                     builder.Property(x => x.DistanceFactorMultiplierSnapshot).HasColumnType("decimal(10,4)");
+                     builder.Property(x => x.ComplexityMultiplierSnapshot).HasColumnType("decimal(10,4)");
               });
 
               modelBuilder.Entity<User>(builder =>
@@ -287,6 +302,171 @@ public sealed class NursingCareDbContext : DbContext
 
                      builder.Property(x => x.CreatedAtUtc)
                   .IsRequired();
+              });
+
+              modelBuilder.Entity<CareRequestCategoryCatalog>(builder =>
+              {
+                     builder.ToTable("CareRequestCategoryCatalogs");
+
+                     builder.HasKey(x => x.Id);
+
+                     builder.Property(x => x.Code)
+                  .IsRequired()
+                  .HasMaxLength(64);
+
+                     builder.Property(x => x.DisplayName)
+                  .IsRequired()
+                  .HasMaxLength(200);
+
+                     builder.Property(x => x.CategoryFactor)
+                  .HasColumnType("decimal(10,4)");
+
+                     builder.HasIndex(x => x.Code)
+                  .IsUnique();
+              });
+
+              modelBuilder.Entity<UnitTypeCatalog>(builder =>
+              {
+                     builder.ToTable("UnitTypeCatalogs");
+
+                     builder.HasKey(x => x.Id);
+
+                     builder.Property(x => x.Code)
+                  .IsRequired()
+                  .HasMaxLength(64);
+
+                     builder.Property(x => x.DisplayName)
+                  .IsRequired()
+                  .HasMaxLength(200);
+
+                     builder.HasIndex(x => x.Code)
+                  .IsUnique();
+              });
+
+              modelBuilder.Entity<CareRequestTypeCatalog>(builder =>
+              {
+                     builder.ToTable("CareRequestTypeCatalogs");
+
+                     builder.HasKey(x => x.Id);
+
+                     builder.Property(x => x.Code)
+                  .IsRequired()
+                  .HasMaxLength(64);
+
+                     builder.Property(x => x.DisplayName)
+                  .IsRequired()
+                  .HasMaxLength(200);
+
+                     builder.Property(x => x.CareRequestCategoryCode)
+                  .IsRequired()
+                  .HasMaxLength(64);
+
+                     builder.Property(x => x.UnitTypeCode)
+                  .IsRequired()
+                  .HasMaxLength(64);
+
+                     builder.Property(x => x.BasePrice)
+                  .HasColumnType("decimal(12,2)");
+
+                     builder.HasIndex(x => x.Code)
+                  .IsUnique();
+              });
+
+              modelBuilder.Entity<DistanceFactorCatalog>(builder =>
+              {
+                     builder.ToTable("DistanceFactorCatalogs");
+
+                     builder.HasKey(x => x.Id);
+
+                     builder.Property(x => x.Code)
+                  .IsRequired()
+                  .HasMaxLength(64);
+
+                     builder.Property(x => x.DisplayName)
+                  .IsRequired()
+                  .HasMaxLength(200);
+
+                     builder.Property(x => x.Multiplier)
+                  .HasColumnType("decimal(10,4)");
+
+                     builder.HasIndex(x => x.Code)
+                  .IsUnique();
+              });
+
+              modelBuilder.Entity<ComplexityLevelCatalog>(builder =>
+              {
+                     builder.ToTable("ComplexityLevelCatalogs");
+
+                     builder.HasKey(x => x.Id);
+
+                     builder.Property(x => x.Code)
+                  .IsRequired()
+                  .HasMaxLength(64);
+
+                     builder.Property(x => x.DisplayName)
+                  .IsRequired()
+                  .HasMaxLength(200);
+
+                     builder.Property(x => x.Multiplier)
+                  .HasColumnType("decimal(10,4)");
+
+                     builder.HasIndex(x => x.Code)
+                  .IsUnique();
+              });
+
+              modelBuilder.Entity<VolumeDiscountRule>(builder =>
+              {
+                     builder.ToTable("VolumeDiscountRules");
+
+                     builder.HasKey(x => x.Id);
+
+                     builder.Property(x => x.MinimumCount)
+                  .IsRequired();
+
+                     builder.Property(x => x.DiscountPercent)
+                  .IsRequired();
+              });
+
+              modelBuilder.Entity<NurseSpecialtyCatalog>(builder =>
+              {
+                     builder.ToTable("NurseSpecialtyCatalogs");
+
+                     builder.HasKey(x => x.Id);
+
+                     builder.Property(x => x.Code)
+                  .IsRequired()
+                  .HasMaxLength(150);
+
+                     builder.Property(x => x.DisplayName)
+                  .IsRequired()
+                  .HasMaxLength(200);
+
+                     builder.Property(x => x.AlternativeCodes)
+                  .HasMaxLength(1000);
+
+                     builder.HasIndex(x => x.Code)
+                  .IsUnique();
+              });
+
+              modelBuilder.Entity<NurseCategoryCatalog>(builder =>
+              {
+                     builder.ToTable("NurseCategoryCatalogs");
+
+                     builder.HasKey(x => x.Id);
+
+                     builder.Property(x => x.Code)
+                  .IsRequired()
+                  .HasMaxLength(100);
+
+                     builder.Property(x => x.DisplayName)
+                  .IsRequired()
+                  .HasMaxLength(200);
+
+                     builder.Property(x => x.AlternativeCodes)
+                  .HasMaxLength(1000);
+
+                     builder.HasIndex(x => x.Code)
+                  .IsUnique();
               });
        }
 }

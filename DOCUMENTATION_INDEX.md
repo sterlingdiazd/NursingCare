@@ -68,7 +68,7 @@ Complete guide to all documentation files in this project.
   - Ready to use
 
 ### Swagger UI
-- **Built-in:** http://localhost:5050/swagger (when API is running)
+- **Built-in:** <http://localhost:5050/swagger> (when API is running)
   - Interactive API documentation
   - Try it out functionality
   - Request/response examples
@@ -241,7 +241,7 @@ GET /swagger
 
 ### 1. Swagger UI (Easiest)
 - Run API
-- Open http://localhost:5050/swagger
+- Open <http://localhost:5050/swagger>
 - Use "Try it out" button
 - See [RUN_AND_TEST_GUIDE.md](src/RUN_AND_TEST_GUIDE.md#testing-with-swagger-ui)
 
@@ -397,15 +397,15 @@ GET /swagger
 
 ### Inside This Project
 - All documentation files above
-- Swagger UI: http://localhost:5050/swagger
+- Swagger UI: <http://localhost:5050/swagger>
 - Code comments in source files
 
 ### External Resources
-- JWT Documentation: https://jwt.io
-- .NET Documentation: https://docs.microsoft.com/dotnet
-- Entity Framework: https://docs.microsoft.com/ef
-- Docker: https://docs.docker.com
-- SQL Server: https://docs.microsoft.com/sql
+- JWT Documentation: <https://jwt.io>
+- .NET Documentation: <https://docs.microsoft.com/dotnet>
+- Entity Framework: <https://docs.microsoft.com/ef>
+- Docker: <https://docs.docker.com>
+- SQL Server: <https://docs.microsoft.com/sql>
 
 ---
 

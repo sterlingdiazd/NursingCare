@@ -11,7 +11,10 @@ using NursingCareBackend.Application.Identity.Authentication;
 using NursingCareBackend.Application.Identity.OAuth;
 using NursingCareBackend.Application.Identity.Repositories;
 using NursingCareBackend.Application.Identity.Services;
+using NursingCareBackend.Application.AdminPortal.Catalog;
+using NursingCareBackend.Application.Catalogs;
 using NursingCareBackend.Infrastructure.AdminPortal;
+using NursingCareBackend.Infrastructure.Catalogs;
 using NursingCareBackend.Infrastructure.Authentication;
 using NursingCareBackend.Infrastructure.CareRequests;
 using NursingCareBackend.Infrastructure.Identity;
@@ -86,6 +89,12 @@ public static class DependencyInjection
         services.AddScoped<IAuthenticationService, AuthenticationService>();
         services.AddScoped<IAdminBootstrapPolicy, AdminBootstrapPolicy>();
         services.AddScoped<INurseProfileAdministrationService, NurseProfileAdministrationService>();
+
+        services.AddScoped<ICareRequestPricingCalculator, CareRequestPricingCalculator>();
+        services.AddScoped<IPricingPreviewService>(sp => sp.GetRequiredService<CareRequestPricingCalculator>());
+        services.AddScoped<INurseCatalogService, NurseCatalogService>();
+        services.AddScoped<ICatalogOptionsService, CatalogOptionsService>();
+        services.AddScoped<IAdminCatalogManagementService, AdminCatalogManagementService>();
 
         return services;
     }

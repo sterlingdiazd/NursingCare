@@ -310,7 +310,8 @@ public sealed class AuthenticationServiceTests
       tokenGenerator ?? new FakeTokenGenerator(),
       googleOAuthClient ?? new FakeGoogleOAuthClient(
         new GoogleOAuthUserInfo("default-google-subject", "default@example.com", "Default User", true)),
-      adminBootstrapPolicy ?? new FakeAdminBootstrapPolicy());
+      adminBootstrapPolicy ?? new FakeAdminBootstrapPolicy(),
+      new FakeNurseCatalogService());
   }
 
   private static User CreateUser(string email, Role role)

@@ -226,7 +226,8 @@ public sealed class NurseProfileAdministrationServiceTests
       userRepository,
       roleRepository ?? new FakeRoleRepository(),
       passwordHasher ?? new FakePasswordHasher(),
-      auditService ?? new FakeAdminAuditService());
+      auditService ?? new FakeAdminAuditService(),
+      new FakeNurseCatalogService());
   }
 
   private static User CreateNurseUser(

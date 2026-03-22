@@ -125,15 +125,22 @@ public class CareRequestTests
             description: description,
             careRequestReason: null,
             careRequestType: "domicilio_24h",
+            unitType: "dia_completo",
             suggestedNurse: null,
             assignedNurse: assignedNurse,
             unit: 1,
-            price: null,
+            price: 3500m,
+            total: 4200m,
             clientBasePrice: null,
-            distanceFactor: null,
-            complexityLevel: null,
+            distanceFactor: "local",
+            complexityLevel: "estandar",
             medicalSuppliesCost: null,
             careRequestDate: null,
-            existingSameUnitTypeCount: 0);
+            pricingCategoryCode: "domicilio",
+            categoryFactorSnapshot: 1.2m,
+            distanceFactorMultiplierSnapshot: 1.0m,
+            complexityMultiplierSnapshot: 1.0m,
+            volumeDiscountPercentSnapshot: 0,
+            createdAtUtc: DateTime.UtcNow);
     }
 }
