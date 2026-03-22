@@ -53,6 +53,7 @@ public static class DependencyInjection
         // Care Request Repository
         services.AddScoped<ICareRequestRepository, CareRequestRepository>();
         services.AddScoped<IAdminDashboardRepository, AdminDashboardRepository>();
+        services.AddScoped<IAdminActionQueueRepository, AdminActionQueueRepository>();
 
         // Identity Repositories
         services.AddScoped<IUserRepository, UserRepository>();
