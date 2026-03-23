@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 using NursingCareBackend.Api.ErrorHandling;
 using NursingCareBackend.Api.Extensions;
+using NursingCareBackend.Application.AdminPortal.Notifications;
 
 namespace NursingCareBackend.Api.Middleware;
 
@@ -9,15 +11,18 @@ public sealed class ExceptionHandlingMiddleware
   private readonly RequestDelegate _next;
   private readonly IHostEnvironment _environment;
   private readonly ILogger<ExceptionHandlingMiddleware> _logger;
+  private readonly IServiceScopeFactory _scopeFactory;
 
   public ExceptionHandlingMiddleware(
     RequestDelegate next,
     IHostEnvironment environment,
-    ILogger<ExceptionHandlingMiddleware> logger)
+    ILogger<ExceptionHandlingMiddleware> logger,
+    IServiceScopeFactory scopeFactory)
   {
     _next = next;
     _environment = environment;
     _logger = logger;
+    _scopeFactory = scopeFactory;
   }
 
   public async Task InvokeAsync(HttpContext context)
@@ -75,6 +80,11 @@ public sealed class ExceptionHandlingMiddleware
       statusCode,
       correlationId);
 
+    if (statusCode == StatusCodes.Status500InternalServerError)
+    {
+      await PublishSystemErrorNotificationAsync(context, correlationId, cancellationToken: default);
+    }
+
     var problemDetails = new ProblemDetails
     {
       Status = statusCode,
@@ -89,5 +99,33 @@ public sealed class ExceptionHandlingMiddleware
     context.Response.ContentType = "application/problem+json";
 
     await context.Response.WriteAsJsonAsync(problemDetails);
+  }
+
+  private async Task PublishSystemErrorNotificationAsync(
+    HttpContext context,
+    string correlationId,
+    CancellationToken cancellationToken)
+  {
+    try
+    {
+      using var scope = _scopeFactory.CreateScope();
+      var notifications = scope.ServiceProvider.GetRequiredService<IAdminNotificationPublisher>();
+      await notifications.PublishToAdminsAsync(
+        new AdminNotificationPublishRequest(
+          Category: "system_error",
+          Severity: "High",
+          Title: "Error de sistema de alta severidad",
+          Body: $"Se detecto un error en {context.Request.Method} {context.Request.Path} (correlacion {correlationId}).",
+          EntityType: "SystemIssue",
+          EntityId: correlationId,
+          DeepLinkPath: "/admin/alerts",
+          Source: "Sistema",
+          RequiresAction: true),
+        cancellationToken);
+    }
+    catch (Exception notificationError)
+    {
+      _logger.LogWarning(notificationError, "Failed to publish admin system-error notification.");
+    }
   }
 }

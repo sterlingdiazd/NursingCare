@@ -6,6 +6,7 @@ using NursingCareBackend.Application.Identity.Repositories;
 using NursingCareBackend.Application.Identity.Responses;
 using NursingCareBackend.Application.Identity.Users;
 using NursingCareBackend.Application.Identity.Validation;
+using NursingCareBackend.Application.AdminPortal.Notifications;
 using NursingCareBackend.Domain.Identity;
 using System.Security.Cryptography;
 
@@ -21,6 +22,7 @@ public sealed class AuthenticationService : IAuthenticationService
     private readonly IGoogleOAuthClient _googleOAuthClient;
     private readonly IAdminBootstrapPolicy _adminBootstrapPolicy;
     private readonly INurseCatalogService _nurseCatalog;
+    private readonly IAdminNotificationPublisher _notifications;
 
     public AuthenticationService(
         IUserRepository userRepository,
@@ -30,7 +32,8 @@ public sealed class AuthenticationService : IAuthenticationService
         ITokenGenerator tokenGenerator,
         IGoogleOAuthClient googleOAuthClient,
         IAdminBootstrapPolicy adminBootstrapPolicy,
-        INurseCatalogService nurseCatalog)
+        INurseCatalogService nurseCatalog,
+        IAdminNotificationPublisher notifications)
     {
         _userRepository = userRepository;
         _roleRepository = roleRepository;
@@ -40,6 +43,7 @@ public sealed class AuthenticationService : IAuthenticationService
         _googleOAuthClient = googleOAuthClient;
         _adminBootstrapPolicy = adminBootstrapPolicy;
         _nurseCatalog = nurseCatalog;
+        _notifications = notifications;
     }
 
     public async Task<AuthResponse> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default)
@@ -157,6 +161,35 @@ public sealed class AuthenticationService : IAuthenticationService
 
         // Save user
         await _userRepository.CreateAsync(user, cancellationToken);
+
+        if (request.ProfileType == UserProfileType.Nurse)
+        {
+            await _notifications.PublishToAdminsAsync(
+                new AdminNotificationPublishRequest(
+                    Category: "nurse_registration_created",
+                    Severity: "Medium",
+                    Title: "Nueva enfermera registrada",
+                    Body: $"Se registro una nueva enfermera ({user.Email}) y requiere revision administrativa.",
+                    EntityType: "NurseProfile",
+                    EntityId: user.Id.ToString(),
+                    DeepLinkPath: $"/admin/nurse-profiles/{user.Id}",
+                    Source: "Registro publico",
+                    RequiresAction: true),
+                cancellationToken);
+
+            await _notifications.PublishToAdminsAsync(
+                new AdminNotificationPublishRequest(
+                    Category: "nurse_profile_pending_completion",
+                    Severity: "Medium",
+                    Title: "Perfil de enfermeria pendiente de completar",
+                    Body: $"El perfil de la enfermera {user.Email} esta pendiente de validacion y activacion operativa.",
+                    EntityType: "NurseProfile",
+                    EntityId: user.Id.ToString(),
+                    DeepLinkPath: $"/admin/nurse-profiles?view=pending&userId={user.Id}",
+                    Source: "Registro publico",
+                    RequiresAction: true),
+                cancellationToken);
+        }
 
         return await CreateAuthResponseAsync(user, cancellationToken);
     }

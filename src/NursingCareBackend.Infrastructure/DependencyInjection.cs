@@ -12,6 +12,7 @@ using NursingCareBackend.Application.Identity.OAuth;
 using NursingCareBackend.Application.Identity.Repositories;
 using NursingCareBackend.Application.Identity.Services;
 using NursingCareBackend.Application.AdminPortal.Catalog;
+using NursingCareBackend.Application.AdminPortal.Notifications;
 using NursingCareBackend.Application.Catalogs;
 using NursingCareBackend.Infrastructure.AdminPortal;
 using NursingCareBackend.Infrastructure.Catalogs;
@@ -73,6 +74,8 @@ public static class DependencyInjection
         services.AddScoped<IAdminClientManagementRepository, AdminClientManagementRepository>();
         services.AddScoped<IAdminUserManagementRepository, AdminUserManagementRepository>();
         services.AddScoped<IAdminAuditService, AdminAuditService>();
+        services.AddScoped<IAdminNotificationService, AdminNotificationService>();
+        services.AddScoped<IAdminNotificationPublisher, AdminNotificationPublisher>();
 
         // Identity Repositories
         services.AddScoped<IUserRepository, UserRepository>();

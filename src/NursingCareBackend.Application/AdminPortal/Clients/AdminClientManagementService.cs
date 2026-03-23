@@ -3,6 +3,7 @@ using NursingCareBackend.Application.AdminPortal.Auditing;
 using NursingCareBackend.Application.Identity.Authentication;
 using NursingCareBackend.Application.Identity.Repositories;
 using NursingCareBackend.Application.Identity.Validation;
+using NursingCareBackend.Application.AdminPortal.Notifications;
 using NursingCareBackend.Domain.Identity;
 
 namespace NursingCareBackend.Application.AdminPortal.Clients;
@@ -15,6 +16,7 @@ public sealed class AdminClientManagementService : IAdminClientManagementService
   private readonly IRefreshTokenRepository _refreshTokenRepository;
   private readonly IAdminClientManagementRepository _adminClientManagementRepository;
   private readonly IAdminAuditService _adminAuditService;
+  private readonly IAdminNotificationPublisher _notifications;
 
   public AdminClientManagementService(
     IUserRepository userRepository,
@@ -22,7 +24,8 @@ public sealed class AdminClientManagementService : IAdminClientManagementService
     IPasswordHasher passwordHasher,
     IRefreshTokenRepository refreshTokenRepository,
     IAdminClientManagementRepository adminClientManagementRepository,
-    IAdminAuditService adminAuditService)
+    IAdminAuditService adminAuditService,
+    IAdminNotificationPublisher notifications)
   {
     _userRepository = userRepository;
     _roleRepository = roleRepository;
@@ -30,6 +33,7 @@ public sealed class AdminClientManagementService : IAdminClientManagementService
     _refreshTokenRepository = refreshTokenRepository;
     _adminClientManagementRepository = adminClientManagementRepository;
     _adminAuditService = adminAuditService;
+    _notifications = notifications;
   }
 
   public async Task<AdminClientDetail> CreateClientAsync(
@@ -169,6 +173,18 @@ public sealed class AdminClientManagementService : IAdminClientManagementService
     if (!request.IsActive)
     {
       await _refreshTokenRepository.RevokeActiveTokensForUserAsync(user.Id, cancellationToken);
+      await _notifications.PublishToAdminsAsync(
+        new AdminNotificationPublishRequest(
+          Category: "user_deactivated",
+          Severity: "High",
+          Title: "Cliente desactivado",
+          Body: $"La cuenta de cliente {user.Email} fue desactivada.",
+          EntityType: "User",
+          EntityId: user.Id.ToString(),
+          DeepLinkPath: $"/admin/clients/{user.Id}",
+          Source: "Administracion",
+          RequiresAction: false),
+        cancellationToken);
     }
 
     await _adminAuditService.WriteAsync(

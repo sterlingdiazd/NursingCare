@@ -90,6 +90,11 @@ public sealed class AdminDashboardRepository : IAdminDashboardRepository
         && user.UserRoles.Any(userRole => userRole.Role.Name == SystemRoles.Client))
       .CountAsync(cancellationToken);
 
+    var unreadAdminNotificationsCount = await _dbContext.AdminNotifications
+      .AsNoTracking()
+      .Where(item => item.ArchivedAtUtc == null && item.ReadAtUtc == null)
+      .CountAsync(cancellationToken);
+
     return new AdminDashboardSnapshot(
       PendingNurseProfilesCount: pendingNurseProfilesCount,
       CareRequestsWaitingForAssignmentCount: waitingForAssignmentCount,
@@ -99,7 +104,7 @@ public sealed class AdminDashboardRepository : IAdminDashboardRepository
       OverdueOrStaleRequestsCount: overdueOrStaleCount,
       ActiveNursesCount: activeNursesCount,
       ActiveClientsCount: activeClientsCount,
-      UnreadAdminNotificationsCount: 0,
+      UnreadAdminNotificationsCount: unreadAdminNotificationsCount,
       HighSeverityAlerts: PlaceholderAlerts,
       GeneratedAtUtc: utcNow);
   }

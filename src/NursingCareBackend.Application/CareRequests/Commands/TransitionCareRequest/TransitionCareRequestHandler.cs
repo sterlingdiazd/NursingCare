@@ -1,5 +1,6 @@
 using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
 using NursingCareBackend.Application.CareRequests;
+using NursingCareBackend.Application.AdminPortal.Notifications;
 using NursingCareBackend.Domain.CareRequests;
 
 namespace NursingCareBackend.Application.CareRequests.Commands.TransitionCareRequest;
@@ -7,10 +8,14 @@ namespace NursingCareBackend.Application.CareRequests.Commands.TransitionCareReq
 public sealed class TransitionCareRequestHandler
 {
   private readonly ICareRequestRepository _repository;
+  private readonly IAdminNotificationPublisher _notifications;
 
-  public TransitionCareRequestHandler(ICareRequestRepository repository)
+  public TransitionCareRequestHandler(
+    ICareRequestRepository repository,
+    IAdminNotificationPublisher notifications)
   {
     _repository = repository;
+    _notifications = notifications;
   }
 
   public async Task<CareRequest> Handle(
@@ -50,6 +55,39 @@ public sealed class TransitionCareRequestHandler
     }
 
     await _repository.UpdateAsync(careRequest, cancellationToken);
+
+    if (command.Action == CareRequestTransitionAction.Reject)
+    {
+      await _notifications.PublishToAdminsAsync(
+        new AdminNotificationPublishRequest(
+          Category: "care_request_rejected",
+          Severity: "High",
+          Title: "Solicitud rechazada",
+          Body: $"La solicitud \"{careRequest.Description}\" fue rechazada y requiere seguimiento comercial u operativo.",
+          EntityType: "CareRequest",
+          EntityId: careRequest.Id.ToString(),
+          DeepLinkPath: $"/admin/care-requests/{careRequest.Id}",
+          Source: "Administracion",
+          RequiresAction: true),
+        cancellationToken);
+    }
+
+    if (command.Action == CareRequestTransitionAction.Complete)
+    {
+      await _notifications.PublishToAdminsAsync(
+        new AdminNotificationPublishRequest(
+          Category: "care_request_completed",
+          Severity: "Medium",
+          Title: "Solicitud completada",
+          Body: $"La solicitud \"{careRequest.Description}\" fue completada por la enfermera asignada.",
+          EntityType: "CareRequest",
+          EntityId: careRequest.Id.ToString(),
+          DeepLinkPath: $"/admin/care-requests/{careRequest.Id}",
+          Source: "Operacion de enfermeria",
+          RequiresAction: false),
+        cancellationToken);
+    }
+
     return careRequest;
   }
 }

@@ -3,6 +3,7 @@ using NursingCareBackend.Application.AdminPortal.Auditing;
 using NursingCareBackend.Application.Identity.Authentication;
 using NursingCareBackend.Application.Identity.Repositories;
 using NursingCareBackend.Application.Identity.Validation;
+using NursingCareBackend.Application.AdminPortal.Notifications;
 using NursingCareBackend.Domain.Identity;
 
 namespace NursingCareBackend.Application.AdminPortal.Users;
@@ -14,19 +15,22 @@ public sealed class AdminAccountProvisioningService : IAdminAccountProvisioningS
   private readonly IPasswordHasher _passwordHasher;
   private readonly IAdminUserManagementRepository _adminUserManagementRepository;
   private readonly IAdminAuditService _adminAuditService;
+  private readonly IAdminNotificationPublisher _notifications;
 
   public AdminAccountProvisioningService(
     IUserRepository userRepository,
     IRoleRepository roleRepository,
     IPasswordHasher passwordHasher,
     IAdminUserManagementRepository adminUserManagementRepository,
-    IAdminAuditService adminAuditService)
+    IAdminAuditService adminAuditService,
+    IAdminNotificationPublisher notifications)
   {
     _userRepository = userRepository;
     _roleRepository = roleRepository;
     _passwordHasher = passwordHasher;
     _adminUserManagementRepository = adminUserManagementRepository;
     _adminAuditService = adminAuditService;
+    _notifications = notifications;
   }
 
   public async Task<AdminUserDetail> CreateAsync(
@@ -95,6 +99,19 @@ public sealed class AdminAccountProvisioningService : IAdminAccountProvisioningS
           profileType = user.ProfileType.ToString(),
           roleNames = new[] { SystemRoles.Admin }
         })),
+      cancellationToken);
+
+    await _notifications.PublishToAdminsAsync(
+      new AdminNotificationPublishRequest(
+        Category: "admin_account_created",
+        Severity: "Medium",
+        Title: "Nueva cuenta administrativa creada",
+        Body: $"Se creo la cuenta administrativa {user.Email}.",
+        EntityType: "User",
+        EntityId: user.Id.ToString(),
+        DeepLinkPath: $"/admin/users/{user.Id}",
+        Source: "Administracion",
+        RequiresAction: false),
       cancellationToken);
 
     var detail = await _adminUserManagementRepository.GetByIdAsync(user.Id, cancellationToken);

@@ -21,6 +21,7 @@ public sealed class NursingCareDbContext : DbContext
        public DbSet<UserRole> UserRoles => Set<UserRole>();
        public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
        public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+       public DbSet<AdminNotification> AdminNotifications => Set<AdminNotification>();
 
        public DbSet<CareRequestCategoryCatalog> CareRequestCategoryCatalogs => Set<CareRequestCategoryCatalog>();
        public DbSet<UnitTypeCatalog> UnitTypeCatalogs => Set<UnitTypeCatalog>();
@@ -302,6 +303,46 @@ public sealed class NursingCareDbContext : DbContext
 
                      builder.Property(x => x.CreatedAtUtc)
                   .IsRequired();
+              });
+
+              modelBuilder.Entity<AdminNotification>(builder =>
+              {
+                     builder.ToTable("AdminNotifications");
+
+                     builder.HasKey(x => x.Id);
+
+                     builder.Property(x => x.Category)
+                  .IsRequired()
+                  .HasMaxLength(80);
+
+                     builder.Property(x => x.Severity)
+                  .IsRequired()
+                  .HasMaxLength(20);
+
+                     builder.Property(x => x.Title)
+                  .IsRequired()
+                  .HasMaxLength(220);
+
+                     builder.Property(x => x.Body)
+                  .IsRequired()
+                  .HasMaxLength(2000);
+
+                     builder.Property(x => x.EntityType)
+                  .HasMaxLength(80);
+
+                     builder.Property(x => x.EntityId)
+                  .HasMaxLength(120);
+
+                     builder.Property(x => x.DeepLinkPath)
+                  .HasMaxLength(600);
+
+                     builder.Property(x => x.Source)
+                  .HasMaxLength(180);
+
+                     builder.Property(x => x.CreatedAtUtc)
+                  .IsRequired();
+
+                     builder.HasIndex(x => new { x.RecipientUserId, x.ArchivedAtUtc, x.ReadAtUtc });
               });
 
               modelBuilder.Entity<CareRequestCategoryCatalog>(builder =>

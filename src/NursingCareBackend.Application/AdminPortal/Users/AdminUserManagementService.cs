@@ -3,6 +3,7 @@ using NursingCareBackend.Application.AdminPortal.Auditing;
 using NursingCareBackend.Application.Identity.Repositories;
 using NursingCareBackend.Application.Identity.Users;
 using NursingCareBackend.Application.Identity.Validation;
+using NursingCareBackend.Application.AdminPortal.Notifications;
 using NursingCareBackend.Domain.Identity;
 
 namespace NursingCareBackend.Application.AdminPortal.Users;
@@ -18,19 +19,22 @@ public sealed class AdminUserManagementService : IAdminUserManagementService
   private readonly IRefreshTokenRepository _refreshTokenRepository;
   private readonly IAdminUserManagementRepository _adminUserManagementRepository;
   private readonly IAdminAuditService _adminAuditService;
+  private readonly IAdminNotificationPublisher _notifications;
 
   public AdminUserManagementService(
     IUserRepository userRepository,
     IRoleRepository roleRepository,
     IRefreshTokenRepository refreshTokenRepository,
     IAdminUserManagementRepository adminUserManagementRepository,
-    IAdminAuditService adminAuditService)
+    IAdminAuditService adminAuditService,
+    IAdminNotificationPublisher notifications)
   {
     _userRepository = userRepository;
     _roleRepository = roleRepository;
     _refreshTokenRepository = refreshTokenRepository;
     _adminUserManagementRepository = adminUserManagementRepository;
     _adminAuditService = adminAuditService;
+    _notifications = notifications;
   }
 
   public async Task<AdminUserDetail> UpdateIdentityAsync(
@@ -177,6 +181,19 @@ public sealed class AdminUserManagementService : IAdminUserManagementService
     if (!isActive)
     {
       await _refreshTokenRepository.RevokeActiveTokensForUserAsync(userId, cancellationToken);
+
+      await _notifications.PublishToAdminsAsync(
+        new AdminNotificationPublishRequest(
+          Category: "user_deactivated",
+          Severity: "High",
+          Title: "Cuenta de usuario desactivada",
+          Body: $"La cuenta {user.Email} fue desactivada por administracion.",
+          EntityType: "User",
+          EntityId: user.Id.ToString(),
+          DeepLinkPath: $"/admin/users/{user.Id}",
+          Source: "Administracion",
+          RequiresAction: false),
+        cancellationToken);
     }
 
     return await GetRequiredDetailAsync(userId, cancellationToken);

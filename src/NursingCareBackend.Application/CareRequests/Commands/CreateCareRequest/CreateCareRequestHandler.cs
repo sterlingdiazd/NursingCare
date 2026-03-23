@@ -1,4 +1,5 @@
 using NursingCareBackend.Application.Catalogs;
+using NursingCareBackend.Application.AdminPortal.Notifications;
 using NursingCareBackend.Domain.CareRequests;
 
 namespace NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
@@ -7,11 +8,16 @@ public sealed class CreateCareRequestHandler
 {
     private readonly ICareRequestRepository _repository;
     private readonly ICareRequestPricingCalculator _pricingCalculator;
+    private readonly IAdminNotificationPublisher _notifications;
 
-    public CreateCareRequestHandler(ICareRequestRepository repository, ICareRequestPricingCalculator pricingCalculator)
+    public CreateCareRequestHandler(
+        ICareRequestRepository repository,
+        ICareRequestPricingCalculator pricingCalculator,
+        IAdminNotificationPublisher notifications)
     {
         _repository = repository;
         _pricingCalculator = pricingCalculator;
+        _notifications = notifications;
     }
 
     public async Task<Guid> Handle(CreateCareRequestCommand command, CancellationToken cancellationToken)
@@ -48,6 +54,32 @@ public sealed class CreateCareRequestHandler
             createdAtUtc: DateTime.UtcNow);
 
         await _repository.AddAsync(careRequest, cancellationToken);
+
+        await _notifications.PublishToAdminsAsync(
+            new AdminNotificationPublishRequest(
+                Category: "care_request_created",
+                Severity: "Medium",
+                Title: "Nueva solicitud de cuidado creada",
+                Body: $"La solicitud \"{careRequest.Description}\" fue creada y requiere seguimiento administrativo.",
+                EntityType: "CareRequest",
+                EntityId: careRequest.Id.ToString(),
+                DeepLinkPath: $"/admin/care-requests/{careRequest.Id}",
+                Source: "Sistema",
+                RequiresAction: true),
+            cancellationToken);
+
+        await _notifications.PublishToAdminsAsync(
+            new AdminNotificationPublishRequest(
+                Category: "care_request_pending_assignment",
+                Severity: "High",
+                Title: "Solicitud pendiente de asignacion",
+                Body: $"La solicitud \"{careRequest.Description}\" requiere asignar una enfermera activa.",
+                EntityType: "CareRequest",
+                EntityId: careRequest.Id.ToString(),
+                DeepLinkPath: $"/admin/care-requests/{careRequest.Id}",
+                Source: "Sistema",
+                RequiresAction: true),
+            cancellationToken);
 
         return careRequest.Id;
     }

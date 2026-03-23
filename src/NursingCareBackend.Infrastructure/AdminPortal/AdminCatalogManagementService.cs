@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using NursingCareBackend.Application.AdminPortal.Catalog;
+using NursingCareBackend.Application.AdminPortal.Notifications;
 using NursingCareBackend.Application.Catalogs;
 using NursingCareBackend.Domain.Catalogs;
 using NursingCareBackend.Infrastructure.Persistence;
@@ -10,13 +11,16 @@ public sealed class AdminCatalogManagementService : IAdminCatalogManagementServi
 {
     private readonly NursingCareDbContext _db;
     private readonly IPricingPreviewService _pricingPreview;
+    private readonly IAdminNotificationPublisher _notifications;
 
     public AdminCatalogManagementService(
         NursingCareDbContext db,
-        IPricingPreviewService pricingPreview)
+        IPricingPreviewService pricingPreview,
+        IAdminNotificationPublisher notifications)
     {
         _db = db;
         _pricingPreview = pricingPreview;
+        _notifications = notifications;
     }
 
     public async Task<IReadOnlyList<CareRequestCategoryListItemDto>> ListCareRequestCategoriesAsync(
@@ -216,7 +220,7 @@ public sealed class AdminCatalogManagementService : IAdminCatalogManagementServi
         row.CategoryFactor = categoryFactor;
         row.IsActive = isActive;
         row.DisplayOrder = displayOrder;
-        await _db.SaveChangesAsync(cancellationToken);
+        await SaveAndPublishCatalogChangeAsync("categoria de solicitud", row.Code, cancellationToken);
     }
 
     public async Task UpdateCareRequestTypeAsync(
@@ -244,7 +248,7 @@ public sealed class AdminCatalogManagementService : IAdminCatalogManagementServi
         row.BasePrice = basePrice;
         row.IsActive = isActive;
         row.DisplayOrder = displayOrder;
-        await _db.SaveChangesAsync(cancellationToken);
+        await SaveAndPublishCatalogChangeAsync("tipo de solicitud", row.Code, cancellationToken);
     }
 
     public async Task UpdateUnitTypeAsync(
@@ -263,7 +267,7 @@ public sealed class AdminCatalogManagementService : IAdminCatalogManagementServi
         row.DisplayName = displayName.Trim();
         row.IsActive = isActive;
         row.DisplayOrder = displayOrder;
-        await _db.SaveChangesAsync(cancellationToken);
+        await SaveAndPublishCatalogChangeAsync("tipo de unidad", row.Code, cancellationToken);
     }
 
     public async Task UpdateDistanceFactorAsync(
@@ -284,7 +288,7 @@ public sealed class AdminCatalogManagementService : IAdminCatalogManagementServi
         row.Multiplier = multiplier;
         row.IsActive = isActive;
         row.DisplayOrder = displayOrder;
-        await _db.SaveChangesAsync(cancellationToken);
+        await SaveAndPublishCatalogChangeAsync("factor de distancia", row.Code, cancellationToken);
     }
 
     public async Task UpdateComplexityLevelAsync(
@@ -305,7 +309,7 @@ public sealed class AdminCatalogManagementService : IAdminCatalogManagementServi
         row.Multiplier = multiplier;
         row.IsActive = isActive;
         row.DisplayOrder = displayOrder;
-        await _db.SaveChangesAsync(cancellationToken);
+        await SaveAndPublishCatalogChangeAsync("nivel de complejidad", row.Code, cancellationToken);
     }
 
     public async Task UpdateVolumeDiscountRuleAsync(
@@ -326,7 +330,7 @@ public sealed class AdminCatalogManagementService : IAdminCatalogManagementServi
         row.DiscountPercent = discountPercent;
         row.IsActive = isActive;
         row.DisplayOrder = displayOrder;
-        await _db.SaveChangesAsync(cancellationToken);
+        await SaveAndPublishCatalogChangeAsync("regla de descuento por volumen", row.MinimumCount.ToString(), cancellationToken);
     }
 
     public async Task UpdateNurseSpecialtyAsync(
@@ -347,7 +351,7 @@ public sealed class AdminCatalogManagementService : IAdminCatalogManagementServi
         row.AlternativeCodes = string.IsNullOrWhiteSpace(alternativeCodes) ? null : alternativeCodes.Trim();
         row.IsActive = isActive;
         row.DisplayOrder = displayOrder;
-        await _db.SaveChangesAsync(cancellationToken);
+        await SaveAndPublishCatalogChangeAsync("especialidad de enfermeria", row.Code, cancellationToken);
     }
 
     public async Task UpdateNurseCategoryAsync(
@@ -368,7 +372,7 @@ public sealed class AdminCatalogManagementService : IAdminCatalogManagementServi
         row.AlternativeCodes = string.IsNullOrWhiteSpace(alternativeCodes) ? null : alternativeCodes.Trim();
         row.IsActive = isActive;
         row.DisplayOrder = displayOrder;
-        await _db.SaveChangesAsync(cancellationToken);
+        await SaveAndPublishCatalogChangeAsync("categoria de enfermeria", row.Code, cancellationToken);
     }
 
     public async Task<Guid> CreateCareRequestCategoryAsync(
@@ -396,7 +400,7 @@ public sealed class AdminCatalogManagementService : IAdminCatalogManagementServi
         };
 
         _db.CareRequestCategoryCatalogs.Add(row);
-        await _db.SaveChangesAsync(cancellationToken);
+        await SaveAndPublishCatalogChangeAsync("categoria de solicitud", row.Code, cancellationToken);
         return row.Id;
     }
 
@@ -432,7 +436,7 @@ public sealed class AdminCatalogManagementService : IAdminCatalogManagementServi
         };
 
         _db.CareRequestTypeCatalogs.Add(row);
-        await _db.SaveChangesAsync(cancellationToken);
+        await SaveAndPublishCatalogChangeAsync("tipo de solicitud", row.Code, cancellationToken);
         return row.Id;
     }
 
@@ -459,7 +463,7 @@ public sealed class AdminCatalogManagementService : IAdminCatalogManagementServi
         };
 
         _db.UnitTypeCatalogs.Add(row);
-        await _db.SaveChangesAsync(cancellationToken);
+        await SaveAndPublishCatalogChangeAsync("tipo de unidad", row.Code, cancellationToken);
         return row.Id;
     }
 
@@ -488,7 +492,7 @@ public sealed class AdminCatalogManagementService : IAdminCatalogManagementServi
         };
 
         _db.DistanceFactorCatalogs.Add(row);
-        await _db.SaveChangesAsync(cancellationToken);
+        await SaveAndPublishCatalogChangeAsync("factor de distancia", row.Code, cancellationToken);
         return row.Id;
     }
 
@@ -517,7 +521,7 @@ public sealed class AdminCatalogManagementService : IAdminCatalogManagementServi
         };
 
         _db.ComplexityLevelCatalogs.Add(row);
-        await _db.SaveChangesAsync(cancellationToken);
+        await SaveAndPublishCatalogChangeAsync("nivel de complejidad", row.Code, cancellationToken);
         return row.Id;
     }
 
@@ -538,7 +542,7 @@ public sealed class AdminCatalogManagementService : IAdminCatalogManagementServi
         };
 
         _db.VolumeDiscountRules.Add(row);
-        await _db.SaveChangesAsync(cancellationToken);
+        await SaveAndPublishCatalogChangeAsync("regla de descuento por volumen", row.MinimumCount.ToString(), cancellationToken);
         return row.Id;
     }
 
@@ -567,7 +571,7 @@ public sealed class AdminCatalogManagementService : IAdminCatalogManagementServi
         };
 
         _db.NurseSpecialtyCatalogs.Add(row);
-        await _db.SaveChangesAsync(cancellationToken);
+        await SaveAndPublishCatalogChangeAsync("especialidad de enfermeria", row.Code, cancellationToken);
         return row.Id;
     }
 
@@ -596,7 +600,7 @@ public sealed class AdminCatalogManagementService : IAdminCatalogManagementServi
         };
 
         _db.NurseCategoryCatalogs.Add(row);
-        await _db.SaveChangesAsync(cancellationToken);
+        await SaveAndPublishCatalogChangeAsync("categoria de enfermeria", row.Code, cancellationToken);
         return row.Id;
     }
 
@@ -625,6 +629,27 @@ public sealed class AdminCatalogManagementService : IAdminCatalogManagementServi
         {
             throw new InvalidOperationException("El tipo de unidad referenciado no existe.");
         }
+    }
+
+    private async Task SaveAndPublishCatalogChangeAsync(
+        string catalogName,
+        string recordCode,
+        CancellationToken cancellationToken)
+    {
+        await _db.SaveChangesAsync(cancellationToken);
+
+        await _notifications.PublishToAdminsAsync(
+            new AdminNotificationPublishRequest(
+                Category: "catalog_or_pricing_published",
+                Severity: "Medium",
+                Title: "Catalogo o precio publicado",
+                Body: $"Se publico un cambio en {catalogName} ({recordCode}).",
+                EntityType: "Catalog",
+                EntityId: recordCode,
+                DeepLinkPath: "/admin/catalog",
+                Source: "Administracion",
+                RequiresAction: false),
+            cancellationToken);
     }
 
 }
