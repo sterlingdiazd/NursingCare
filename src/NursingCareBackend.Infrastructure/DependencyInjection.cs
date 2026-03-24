@@ -93,7 +93,8 @@ public static class DependencyInjection
         services.AddScoped<IAdminBootstrapPolicy, AdminBootstrapPolicy>();
         services.AddScoped<INurseProfileAdministrationService, NurseProfileAdministrationService>();
 
-        services.AddScoped<ICareRequestPricingCalculator, CareRequestPricingCalculator>();
+        services.AddScoped<CareRequestPricingCalculator>();
+        services.AddScoped<ICareRequestPricingCalculator>(sp => sp.GetRequiredService<CareRequestPricingCalculator>());
         services.AddScoped<IPricingPreviewService>(sp => sp.GetRequiredService<CareRequestPricingCalculator>());
         services.AddScoped<INurseCatalogService, NurseCatalogService>();
         services.AddScoped<ICatalogOptionsService, CatalogOptionsService>();
