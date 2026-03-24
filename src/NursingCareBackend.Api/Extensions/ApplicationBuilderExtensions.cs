@@ -19,6 +19,11 @@ public static class ApplicationBuilderExtensions
     return app.UseMiddleware<ExceptionHandlingMiddleware>();
   }
 
+  public static IApplicationBuilder UseDetailedErrorLogging(this IApplicationBuilder app)
+  {
+    return app.UseMiddleware<DetailedErrorLoggingMiddleware>();
+  }
+
   public static WebApplication UseApiMiddleware(this WebApplication app)
   {
     app.UseForwardedHeadersForProxy();
@@ -30,6 +35,7 @@ public static class ApplicationBuilderExtensions
 
     app.UseAuthentication();
     app.UseAuthorization();
+    app.UseDetailedErrorLogging(); // Add after UseAuthorization to catch all error responses
 
     app.UseSwagger();
     app.UseSwaggerUI(options =>
