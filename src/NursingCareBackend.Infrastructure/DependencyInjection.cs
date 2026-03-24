@@ -74,6 +74,7 @@ public static class DependencyInjection
         services.AddScoped<IAdminClientManagementRepository, AdminClientManagementRepository>();
         services.AddScoped<IAdminUserManagementRepository, AdminUserManagementRepository>();
         services.AddScoped<IAdminAuditService, AdminAuditService>();
+        services.AddScoped<IAuditLogQueryService, AuditLogQueryService>();
         services.AddScoped<IAdminNotificationService, AdminNotificationService>();
         services.AddScoped<IAdminNotificationPublisher, AdminNotificationPublisher>();
 
