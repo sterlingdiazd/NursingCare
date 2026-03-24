@@ -9,6 +9,7 @@ namespace NursingCareBackend.Api.Extensions
   {
     /// <summary>
     /// Applies all pending EF Core migrations at application startup.
+    /// NOTE: Database must have valid data that satisfies all constraints.
     /// </summary>
     /// <param name="app">WebApplication instance</param>
     public static void ApplyMigrations(this WebApplication app)
