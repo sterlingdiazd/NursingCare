@@ -8,9 +8,7 @@ public static class LoggingExtensions
 {
   public static WebApplicationBuilder AddStructuredLogging(this WebApplicationBuilder builder)
   {
-    var logsDirectory = ResolveLogsDirectory(builder.Environment);
-    var fileLoggingEnabled = EnsureDirectoryExists(logsDirectory);
-
+    // Don't create file logs in Azure to avoid startup issues
     builder.Host.UseSerilog((context, services, configuration) =>
     {
       configuration
@@ -22,17 +20,6 @@ public static class LoggingExtensions
         .MinimumLevel.Information()
         .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
         .WriteTo.Console();
-
-      if (fileLoggingEnabled)
-      {
-        configuration.WriteTo.File(
-          Path.Combine(logsDirectory, "backend-.log"),
-          rollingInterval: RollingInterval.Day,
-          retainedFileCountLimit: 14,
-          shared: true,
-          outputTemplate:
-            "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] ({CorrelationId}) {Message:lj} {Properties:j}{NewLine}{Exception}");
-      }
     });
 
     return builder;

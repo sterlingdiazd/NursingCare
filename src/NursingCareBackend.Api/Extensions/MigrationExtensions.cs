@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using NursingCareBackend.Domain.Identity;
 using NursingCareBackend.Infrastructure.Persistence;
 
@@ -14,6 +15,7 @@ namespace NursingCareBackend.Api.Extensions
     {
       using var scope = app.Services.CreateScope();
       var db = scope.ServiceProvider.GetRequiredService<NursingCareDbContext>();
+      var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
 
       try
       {
@@ -24,18 +26,19 @@ namespace NursingCareBackend.Api.Extensions
         {
           db.Database.EnsureCreated();
           EnsureSystemRoles(db);
-          Console.WriteLine("In-memory database created successfully.");
+          logger.LogInformation("In-memory database created successfully.");
           return;
         }
 
+        logger.LogInformation("Applying database migrations...");
         db.Database.Migrate();
         EnsureSystemRoles(db);
-        Console.WriteLine("Database created and migrations applied successfully.");
+        logger.LogInformation("Database migrations applied successfully.");
       }
       catch (Exception ex)
       {
-        Console.WriteLine("Error applying migrations:");
-        Console.WriteLine(ex);
+        logger.LogError(ex, "FATAL: Failed to apply database migrations. Application cannot start.");
+        throw new InvalidOperationException($"Database migration failed: {ex.Message}", ex);
       }
     }
 
