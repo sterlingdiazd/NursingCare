@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using NursingCareBackend.Application.AdminPortal.Notifications;
 using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
 using NursingCareBackend.Domain.CareRequests;
 using NursingCareBackend.Infrastructure.CareRequests;
@@ -35,7 +36,7 @@ public sealed class CreateCareRequestHandlerTests
     await using var dbContext = CreateDbContext();
     var repository = new CareRequestRepository(dbContext);
     var pricing = new CareRequestPricingCalculator(dbContext);
-    var handler = new CreateCareRequestHandler(repository, pricing);
+    var handler = new CreateCareRequestHandler(repository, pricing, new FakeAdminNotificationPublisher());
 
     var userID = Guid.NewGuid();
     var description = "Help with daily activities";

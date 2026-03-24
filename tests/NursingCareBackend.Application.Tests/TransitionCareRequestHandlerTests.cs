@@ -43,7 +43,7 @@ public sealed class TransitionCareRequestHandlerTests
   {
     var careRequest = CreateDomicilioSample(Guid.NewGuid(), "Approve me");
     var repository = new FakeCareRequestRepository(careRequest);
-    var handler = new TransitionCareRequestHandler(repository);
+    var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher());
 
     var result = await handler.Handle(
       new TransitionCareRequestCommand(careRequest.Id, CareRequestTransitionAction.Approve),
@@ -59,7 +59,7 @@ public sealed class TransitionCareRequestHandlerTests
   {
     var careRequest = CreateDomicilioSample(Guid.NewGuid(), "Reject me");
     var repository = new FakeCareRequestRepository(careRequest);
-    var handler = new TransitionCareRequestHandler(repository);
+    var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher());
 
     var result = await handler.Handle(
       new TransitionCareRequestCommand(careRequest.Id, CareRequestTransitionAction.Reject),
@@ -77,7 +77,7 @@ public sealed class TransitionCareRequestHandlerTests
     careRequest.Approve(DateTime.UtcNow.AddMinutes(-5));
 
     var repository = new FakeCareRequestRepository(careRequest);
-    var handler = new TransitionCareRequestHandler(repository);
+    var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher());
 
     var result = await handler.Handle(
       new TransitionCareRequestCommand(careRequest.Id, CareRequestTransitionAction.Complete, AssignedNurseId),
@@ -98,7 +98,7 @@ public sealed class TransitionCareRequestHandlerTests
     careRequest.Approve(DateTime.UtcNow.AddMinutes(-5));
 
     var repository = new FakeCareRequestRepository(careRequest);
-    var handler = new TransitionCareRequestHandler(repository);
+    var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher());
 
     var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => handler.Handle(
       new TransitionCareRequestCommand(careRequest.Id, CareRequestTransitionAction.Complete, AssignedNurseId),
@@ -111,7 +111,7 @@ public sealed class TransitionCareRequestHandlerTests
   public async Task Handle_Should_Throw_When_Request_Does_Not_Exist()
   {
     var repository = new FakeCareRequestRepository();
-    var handler = new TransitionCareRequestHandler(repository);
+    var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher());
 
     var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() => handler.Handle(
       new TransitionCareRequestCommand(Guid.NewGuid(), CareRequestTransitionAction.Approve),

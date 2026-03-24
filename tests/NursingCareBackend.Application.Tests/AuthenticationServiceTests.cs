@@ -1,3 +1,4 @@
+using NursingCareBackend.Application.AdminPortal.Notifications;
 using NursingCareBackend.Application.Identity.Authentication;
 using NursingCareBackend.Application.Identity.Commands;
 using NursingCareBackend.Application.Identity.Models;
@@ -300,7 +301,8 @@ public sealed class AuthenticationServiceTests
     IPasswordHasher? passwordHasher = null,
     ITokenGenerator? tokenGenerator = null,
     IGoogleOAuthClient? googleOAuthClient = null,
-    IAdminBootstrapPolicy? adminBootstrapPolicy = null)
+    IAdminBootstrapPolicy? adminBootstrapPolicy = null,
+    IAdminNotificationPublisher? notifications = null)
   {
     return new AuthenticationService(
       userRepository ?? new FakeUserRepository(),
@@ -311,7 +313,8 @@ public sealed class AuthenticationServiceTests
       googleOAuthClient ?? new FakeGoogleOAuthClient(
         new GoogleOAuthUserInfo("default-google-subject", "default@example.com", "Default User", true)),
       adminBootstrapPolicy ?? new FakeAdminBootstrapPolicy(),
-      new FakeNurseCatalogService());
+      new FakeNurseCatalogService(),
+      notifications ?? new FakeAdminNotificationPublisher());
   }
 
   private static User CreateUser(string email, Role role)
