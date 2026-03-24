@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace NursingCareBackend.Api.Tests;
 
@@ -11,6 +13,7 @@ public sealed class AdminNotificationsApiTests : IClassFixture<CustomWebApplicat
   public AdminNotificationsApiTests(CustomWebApplicationFactory factory)
   {
     _factory = factory;
+    _factory.EnsureDatabaseInitialized();
   }
 
   [Fact]
@@ -23,6 +26,19 @@ public sealed class AdminNotificationsApiTests : IClassFixture<CustomWebApplicat
     var response = await client.GetAsync("/api/admin/notifications");
 
     Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+  }
+
+  [Fact]
+  public async Task Admin_User_Should_Exist_In_Database()
+  {
+    using var scope = _factory.Services.CreateScope();
+    var dbContext = scope.ServiceProvider.GetRequiredService<NursingCareBackend.Infrastructure.Persistence.NursingCareDbContext>();
+    
+    var adminUsers = await dbContext.Users
+      .Where(u => u.IsActive && u.UserRoles.Any(ur => ur.Role.Name == "Admin"))
+      .ToListAsync();
+    
+    Assert.NotEmpty(adminUsers);
   }
 
   [Fact]

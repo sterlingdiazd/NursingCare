@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using NursingCareBackend.Application.Identity.OAuth;
+using NursingCareBackend.Domain.Identity;
 using NursingCareBackend.Infrastructure.Persistence;
 using NursingCareBackend.Tests.Infrastructure;
 
@@ -13,6 +14,8 @@ namespace NursingCareBackend.Api.Tests;
 public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
   private readonly string _testConnectionString = TestSqlConnectionResolver.CreateUniqueDatabaseConnectionString();
+  private bool _databaseInitialized;
+  private readonly object _lock = new();
 
   protected override void ConfigureWebHost(IWebHostBuilder builder)
   {
@@ -45,6 +48,95 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         options.UseSqlServer(_testConnectionString);
       });
     });
+  }
+
+  public void EnsureDatabaseInitialized()
+  {
+    if (_databaseInitialized)
+    {
+      return;
+    }
+
+    lock (_lock)
+    {
+      if (_databaseInitialized)
+      {
+        return;
+      }
+
+      using var scope = Services.CreateScope();
+      var dbContext = scope.ServiceProvider.GetRequiredService<NursingCareDbContext>();
+      
+      dbContext.Database.Migrate();
+      EnsureSystemRoles(dbContext);
+      EnsureTestAdminUser(dbContext);
+      
+      _databaseInitialized = true;
+    }
+  }
+
+  private static void EnsureSystemRoles(NursingCareDbContext db)
+  {
+    var existingRoleNames = db.Roles
+      .Select(role => role.Name)
+      .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    var missingRoles = SystemRoles.Defaults
+      .Where(role => !existingRoleNames.Contains(role.Name))
+      .Select(role => new Role
+      {
+        Id = role.Id,
+        Name = role.Name
+      })
+      .ToArray();
+
+    if (missingRoles.Length > 0)
+    {
+      db.Roles.AddRange(missingRoles);
+      db.SaveChanges();
+    }
+  }
+
+  private static void EnsureTestAdminUser(NursingCareDbContext db)
+  {
+    var adminRoleId = SystemRoles.Defaults.First(r => r.Name == SystemRoles.Admin).Id;
+    var testAdminUserId = Guid.Parse("00000000-0000-0000-0000-000000000001"); // Fixed GUID for test admin
+    var testAdminEmail = "test.admin@nursingcare.local";
+
+    var existingAdmin = db.Users
+      .FirstOrDefault(u => u.Id == testAdminUserId);
+
+    if (existingAdmin != null)
+    {
+      return;
+    }
+
+    var testAdminUser = new User
+    {
+      Id = testAdminUserId,
+      Email = testAdminEmail,
+      PasswordHash = "test-hash-not-used-in-tests",
+      ProfileType = UserProfileType.Client,
+      IsActive = true,
+      CreatedAtUtc = DateTime.UtcNow
+    };
+
+    var testAdminClient = new Client
+    {
+      UserId = testAdminUser.Id
+    };
+
+    db.Users.Add(testAdminUser);
+    db.Clients.Add(testAdminClient);
+    
+    var userRole = new UserRole
+    {
+      UserId = testAdminUser.Id,
+      RoleId = adminRoleId
+    };
+
+    db.UserRoles.Add(userRole);
+    db.SaveChanges();
   }
 
   private sealed class FakeGoogleOAuthClient : IGoogleOAuthClient

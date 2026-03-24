@@ -11,18 +11,18 @@ namespace NursingCareBackend.Api.Tests;
 internal static class JwtTestTokens
 {
   public static string CreateWriterToken(IServiceProvider services)
-    => CreateToken(services, "Nurse");
+    => CreateToken(services, userId: null, includeUserId: true, "Nurse");
 
   public static string CreateAdminToken(IServiceProvider services)
-    => CreateToken(services, "Admin");
+    => CreateToken(services, userId: Guid.Parse("00000000-0000-0000-0000-000000000001"), includeUserId: true, "Admin");
 
   public static string CreateTokenWithoutUserId(IServiceProvider services, params string[] roles)
-    => CreateToken(services, includeUserId: false, roles);
+    => CreateToken(services, userId: null, includeUserId: false, roles);
 
   public static string CreateToken(IServiceProvider services, params string[] roles)
-    => CreateToken(services, includeUserId: true, roles);
+    => CreateToken(services, userId: null, includeUserId: true, roles);
 
-  private static string CreateToken(IServiceProvider services, bool includeUserId, params string[] roles)
+  private static string CreateToken(IServiceProvider services, Guid? userId, bool includeUserId, params string[] roles)
   {
     var configuration = services.GetRequiredService<IConfiguration>();
     var jwtSection = configuration.GetSection("Jwt");
@@ -46,7 +46,8 @@ internal static class JwtTestTokens
 
     if (includeUserId)
     {
-      claims.Add(new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()));
+      var userIdToUse = userId ?? Guid.NewGuid();
+      claims.Add(new Claim(ClaimTypes.NameIdentifier, userIdToUse.ToString()));
     }
 
     claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
