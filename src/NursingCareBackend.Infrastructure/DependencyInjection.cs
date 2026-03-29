@@ -15,10 +15,12 @@ using NursingCareBackend.Application.AdminPortal.Reports;
 using NursingCareBackend.Application.AdminPortal.Catalog;
 using NursingCareBackend.Application.AdminPortal.Notifications;
 using NursingCareBackend.Application.AdminPortal.Settings;
+using NursingCareBackend.Application.Email;
 using NursingCareBackend.Application.Catalogs;
 using NursingCareBackend.Infrastructure.AdminPortal;
 using NursingCareBackend.Infrastructure.Catalogs;
 using NursingCareBackend.Infrastructure.Authentication;
+using NursingCareBackend.Infrastructure.Email;
 using NursingCareBackend.Infrastructure.CareRequests;
 using NursingCareBackend.Infrastructure.Identity;
 using NursingCareBackend.Infrastructure.Persistence;
@@ -68,6 +70,20 @@ public static class DependencyInjection
             }
         });
 
+        services.Configure<EmailOptions>(options =>
+        {
+            var section = configuration.GetSection(EmailOptions.SectionName);
+            options.ConnectionString = Environment.GetEnvironmentVariable("ACS_EMAIL_CONNECTION_STRING")
+                ?? section["ConnectionString"]
+                ?? string.Empty;
+            options.SenderAddress = Environment.GetEnvironmentVariable("ACS_EMAIL_SENDER_ADDRESS")
+                ?? section["SenderAddress"]
+                ?? string.Empty;
+            options.SenderDisplayName = Environment.GetEnvironmentVariable("ACS_EMAIL_SENDER_DISPLAY_NAME")
+                ?? section["SenderDisplayName"]
+                ?? "NursingCare";
+        });
+
         // Care Request Repository
         services.AddScoped<ICareRequestRepository, CareRequestRepository>();
         services.AddScoped<IAdminDashboardRepository, AdminDashboardRepository>();
@@ -95,6 +111,7 @@ public static class DependencyInjection
                 new HttpClient(),
                 serviceProvider.GetRequiredService<IOptions<GoogleOAuthOptions>>()));
         services.AddScoped<IAuthenticationService, AuthenticationService>();
+        services.AddScoped<IEmailService, AcsEmailService>();
         services.AddScoped<IAdminBootstrapPolicy, AdminBootstrapPolicy>();
         services.AddScoped<INurseProfileAdministrationService, NurseProfileAdministrationService>();
 

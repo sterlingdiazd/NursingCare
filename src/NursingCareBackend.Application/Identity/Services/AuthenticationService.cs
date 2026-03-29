@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using NursingCareBackend.Application.Email;
 using NursingCareBackend.Application.Catalogs;
 using NursingCareBackend.Application.Identity.Authentication;
 using NursingCareBackend.Application.Identity.OAuth;
@@ -24,6 +25,7 @@ public sealed class AuthenticationService : IAuthenticationService
     private readonly IAdminBootstrapPolicy _adminBootstrapPolicy;
     private readonly INurseCatalogService _nurseCatalog;
     private readonly IAdminNotificationPublisher _notifications;
+    private readonly IEmailService _emailService;
     private readonly ILogger<AuthenticationService> _logger;
 
     public AuthenticationService(
@@ -36,6 +38,7 @@ public sealed class AuthenticationService : IAuthenticationService
         IAdminBootstrapPolicy adminBootstrapPolicy,
         INurseCatalogService nurseCatalog,
         IAdminNotificationPublisher notifications,
+        IEmailService emailService,
         ILogger<AuthenticationService> logger)
     {
         _userRepository = userRepository;
@@ -47,6 +50,7 @@ public sealed class AuthenticationService : IAuthenticationService
         _adminBootstrapPolicy = adminBootstrapPolicy;
         _nurseCatalog = nurseCatalog;
         _notifications = notifications;
+        _emailService = emailService;
         _logger = logger;
     }
 
@@ -525,8 +529,28 @@ public sealed class AuthenticationService : IAuthenticationService
 
         await _userRepository.UpdateAsync(user, cancellationToken);
 
-        // MOCK: In a real system we would send an email here.
-        _logger.LogInformation("PASSWORD RESET CODE FOR {Email}: {Code}", normalizedEmail, code);
+        var htmlBody = $"""
+            <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+                <h2 style="color: #225F91;">Restablecimiento de contraseña</h2>
+                <p>Hola,</p>
+                <p>Recibimos una solicitud para restablecer tu contraseña. Usa el siguiente código:</p>
+                <div style="text-align: center; margin: 24px 0;">
+                    <span style="font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #225F91;">{code}</span>
+                </div>
+                <p>Este código expira en <strong>15 minutos</strong>.</p>
+                <p style="color: #888; font-size: 13px;">Si no solicitaste este cambio, puedes ignorar este correo.</p>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+                <p style="color: #aaa; font-size: 12px;">NursingCare &mdash; Plataforma de cuidado de enfermería</p>
+            </div>
+            """;
+
+        await _emailService.SendAsync(
+            normalizedEmail,
+            "Tu código de recuperación — NursingCare",
+            htmlBody,
+            cancellationToken);
+
+        _logger.LogInformation("Password reset code sent to {Email}", normalizedEmail);
     }
 
     public async Task<AuthResponse> ResetPasswordAsync(string email, string code, string newPassword, CancellationToken cancellationToken = default)

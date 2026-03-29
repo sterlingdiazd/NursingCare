@@ -7,6 +7,7 @@ using NursingCareBackend.Application.Identity.Models;
 using NursingCareBackend.Application.Identity.OAuth;
 using NursingCareBackend.Application.Identity.Repositories;
 using NursingCareBackend.Application.Identity.Services;
+using NursingCareBackend.Application.Email;
 using NursingCareBackend.Domain.Identity;
 
 namespace NursingCareBackend.Application.Tests;
@@ -304,7 +305,8 @@ public sealed class AuthenticationServiceTests
     ITokenGenerator? tokenGenerator = null,
     IGoogleOAuthClient? googleOAuthClient = null,
     IAdminBootstrapPolicy? adminBootstrapPolicy = null,
-    IAdminNotificationPublisher? notifications = null)
+    IAdminNotificationPublisher? notifications = null,
+    IEmailService? emailService = null)
   {
     return new AuthenticationService(
       userRepository ?? new FakeUserRepository(),
@@ -317,6 +319,7 @@ public sealed class AuthenticationServiceTests
       adminBootstrapPolicy ?? new FakeAdminBootstrapPolicy(),
       new FakeNurseCatalogService(),
       notifications ?? new FakeAdminNotificationPublisher(),
+      emailService ?? new FakeEmailService(),
       NullLogger<AuthenticationService>.Instance);
   }
 
