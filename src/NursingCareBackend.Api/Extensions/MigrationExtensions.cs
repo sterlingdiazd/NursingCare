@@ -32,7 +32,25 @@ namespace NursingCareBackend.Api.Extensions
         }
 
         logger.LogInformation("Applying database migrations...");
-        db.Database.Migrate();
+        if (!db.Database.CanConnect())
+        {
+          logger.LogInformation("Database does not exist, creating...");
+          db.Database.Migrate();
+        }
+        else
+        {
+          logger.LogInformation("Database exists, checking for pending migrations...");
+          var pendingMigrations = db.Database.GetPendingMigrations();
+          if (pendingMigrations.Any())
+          {
+            logger.LogInformation($"Applying {pendingMigrations.Count()} pending migrations...");
+            db.Database.Migrate();
+          }
+          else
+          {
+            logger.LogInformation("No pending migrations found.");
+          }
+        }
         EnsureSystemRoles(db);
         logger.LogInformation("Database migrations applied successfully.");
       }
@@ -45,12 +63,12 @@ namespace NursingCareBackend.Api.Extensions
 
     private static void EnsureSystemRoles(NursingCareDbContext db)
     {
-      var existingRoleNames = db.Roles
-        .Select(role => role.Name)
-        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+      var existingRoleIds = db.Roles
+        .Select(role => role.Id)
+        .ToHashSet();
 
       var missingRoles = SystemRoles.Defaults
-        .Where(role => !existingRoleNames.Contains(role.Name))
+        .Where(role => !existingRoleIds.Contains(role.Id))
         .Select(role => new Role
         {
           Id = role.Id,
