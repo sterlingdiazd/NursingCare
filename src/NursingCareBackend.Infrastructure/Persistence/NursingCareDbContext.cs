@@ -165,6 +165,11 @@ public sealed class NursingCareDbContext : DbContext
                      builder.Property(x => x.CreatedAtUtc)
                       .IsRequired();
 
+                     builder.Property(x => x.ResetPasswordCode)
+                      .HasMaxLength(10);
+
+                     builder.Property(x => x.ResetPasswordCodeExpiresAtUtc);
+
                      builder.HasOne(x => x.NurseProfile)
                       .WithOne(x => x.User)
                       .HasForeignKey<Nurse>(x => x.UserId)
