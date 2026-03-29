@@ -61,7 +61,7 @@ public sealed class AdminClientManagementService : IAdminClientManagementService
     {
       Id = Guid.NewGuid(),
       Email = normalizedEmail,
-      ProfileType = UserProfileType.Client,
+      ProfileType = UserProfileType.CLIENT,
       Name = request.Name.Trim(),
       LastName = request.LastName.Trim(),
       IdentificationNumber = request.IdentificationNumber.Trim(),
@@ -220,7 +220,7 @@ public sealed class AdminClientManagementService : IAdminClientManagementService
       throw new KeyNotFoundException($"User with ID {userId} not found.");
     }
 
-    if (user.ProfileType != UserProfileType.Client
+    if (user.ProfileType != UserProfileType.CLIENT
       || user.ClientProfile is null
       || !HasClientRole(user))
     {

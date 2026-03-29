@@ -22,7 +22,7 @@ public sealed class AdminClientManagementRepository : IAdminClientManagementRepo
     var query = _dbContext.Users
       .AsNoTracking()
       .Where(user =>
-        user.ProfileType == UserProfileType.Client
+        user.ProfileType == UserProfileType.CLIENT
         && user.ClientProfile != null
         && user.UserRoles.Any(userRole => userRole.Role.Name == SystemRoles.Client));
 
@@ -97,7 +97,7 @@ public sealed class AdminClientManagementRepository : IAdminClientManagementRepo
       .AsNoTracking()
       .Where(item =>
         item.Id == userId
-        && item.ProfileType == UserProfileType.Client
+        && item.ProfileType == UserProfileType.CLIENT
         && item.ClientProfile != null
         && item.UserRoles.Any(userRole => userRole.Role.Name == SystemRoles.Client))
       .Select(item => new ClientUserRow(

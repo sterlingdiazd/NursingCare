@@ -9,7 +9,7 @@ namespace NursingCareBackend.Api.Controllers.Admin;
 
 [ApiController]
 [Route("api/admin/nurse-profiles")]
-[Authorize(Roles = "Admin")]
+[Authorize(Roles = "ADMIN")]
 public sealed class NurseProfilesController : ControllerBase
 {
     private readonly INurseProfileAdministrationService _nurseProfileAdministrationService;

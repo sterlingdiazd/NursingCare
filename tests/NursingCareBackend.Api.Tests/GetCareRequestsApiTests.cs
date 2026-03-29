@@ -128,7 +128,7 @@ public sealed class GetCareRequestsApiTests : IClassFixture<CustomWebApplication
     var client = _factory.CreateClient();
     client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
       "Bearer",
-      JwtTestTokens.CreateTokenWithoutUserId(_factory.Services, "Client"));
+      JwtTestTokens.CreateTokenWithoutUserId(_factory.Services, "CLIENT"));
 
     var response = await client.GetAsync("/api/care-requests");
 

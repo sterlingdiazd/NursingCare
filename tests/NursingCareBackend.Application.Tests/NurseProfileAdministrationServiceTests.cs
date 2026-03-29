@@ -82,7 +82,7 @@ public sealed class NurseProfileAdministrationServiceTests
 
     var stored = await repository.GetByEmailAsync("laura.gomez@example.com");
     Assert.NotNull(stored);
-    Assert.Equal(UserProfileType.Nurse, stored!.ProfileType);
+    Assert.Equal(UserProfileType.NURSE, stored!.ProfileType);
     Assert.Contains(stored.UserRoles, userRole => userRole.Role.Name == SystemRoles.Nurse);
     Assert.Single(auditService.Records);
     Assert.Equal(AdminAuditActions.NurseProfileCreatedByAdmin, auditService.Records[0].Action);
@@ -246,7 +246,7 @@ public sealed class NurseProfileAdministrationServiceTests
     {
       Id = Guid.NewGuid(),
       Email = email,
-      ProfileType = UserProfileType.Nurse,
+      ProfileType = UserProfileType.NURSE,
       Name = "Laura",
       LastName = "Gomez",
       IdentificationNumber = "00100000001",
@@ -290,8 +290,8 @@ public sealed class NurseProfileAdministrationServiceTests
     {
       Id = Guid.NewGuid(),
       Email = email,
-      ProfileType = UserProfileType.Client,
-      Name = "Client",
+      ProfileType = UserProfileType.CLIENT,
+      Name = "CLIENT",
       LastName = "User",
       IdentificationNumber = "00100000002",
       Phone = "8095550101",
@@ -352,7 +352,7 @@ public sealed class NurseProfileAdministrationServiceTests
     public Task<IReadOnlyList<User>> GetNurseProfilesAsync(CancellationToken cancellationToken = default)
       => Task.FromResult<IReadOnlyList<User>>(
         _usersById.Values
-          .Where(user => user.ProfileType == UserProfileType.Nurse && user.NurseProfile is not null)
+          .Where(user => user.ProfileType == UserProfileType.NURSE && user.NurseProfile is not null)
           .OrderBy(user => user.Name)
           .ThenBy(user => user.LastName)
           .ToArray());

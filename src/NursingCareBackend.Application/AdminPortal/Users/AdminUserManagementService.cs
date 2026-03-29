@@ -266,13 +266,13 @@ public sealed class AdminUserManagementService : IAdminUserManagementService
       }
 
       if (string.Equals(roleName, SystemRoles.Nurse, StringComparison.OrdinalIgnoreCase)
-        && user.ProfileType != UserProfileType.Nurse)
+        && user.ProfileType != UserProfileType.NURSE)
       {
         throw new InvalidOperationException("The Nurse role can only be assigned to nurse profiles.");
       }
 
       if (string.Equals(roleName, SystemRoles.Client, StringComparison.OrdinalIgnoreCase)
-        && user.ProfileType != UserProfileType.Client)
+        && user.ProfileType != UserProfileType.CLIENT)
       {
         throw new InvalidOperationException("The Client role can only be assigned to client profiles.");
       }

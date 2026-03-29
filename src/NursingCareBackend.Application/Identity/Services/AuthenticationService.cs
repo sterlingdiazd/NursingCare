@@ -119,7 +119,7 @@ public sealed class AuthenticationService : IAuthenticationService
         };
 
         // Add appropriate role based on profile type
-        string roleName = request.ProfileType == UserProfileType.Nurse ? SystemRoles.Nurse : SystemRoles.Client;
+        string roleName = request.ProfileType == UserProfileType.NURSE ? SystemRoles.Nurse : SystemRoles.Client;
         var role = await _roleRepository.GetByNameAsync(roleName, cancellationToken);
         if (role is null)
         {
@@ -133,7 +133,7 @@ public sealed class AuthenticationService : IAuthenticationService
             Role = role
         });
 
-        if (request.ProfileType == UserProfileType.Nurse)
+        if (request.ProfileType == UserProfileType.NURSE)
         {
             await ValidateNurseRegistrationFieldsAsync(request, cancellationToken);
             var specialty = await _nurseCatalog.NormalizeRequiredSpecialtyAsync(
@@ -162,7 +162,7 @@ public sealed class AuthenticationService : IAuthenticationService
         // Save user
         await _userRepository.CreateAsync(user, cancellationToken);
 
-        if (request.ProfileType == UserProfileType.Nurse)
+        if (request.ProfileType == UserProfileType.NURSE)
         {
             await _notifications.PublishToAdminsAsync(
                 new AdminNotificationPublishRequest(
@@ -448,7 +448,7 @@ public sealed class AuthenticationService : IAuthenticationService
         {
             Id = Guid.NewGuid(),
             Email = normalizedEmail,
-            ProfileType = UserProfileType.Client,
+            ProfileType = UserProfileType.CLIENT,
             PasswordHash = _passwordHasher.Hash(request.AdminPassword),
             IsActive = true,
             CreatedAtUtc = DateTime.UtcNow,
@@ -486,14 +486,14 @@ public sealed class AuthenticationService : IAuthenticationService
         }
 
         // Check if already active
-        if (user.IsActive && (user.ProfileType != UserProfileType.Nurse || user.NurseProfile?.IsActive == true))
+        if (user.IsActive && (user.ProfileType != UserProfileType.NURSE || user.NurseProfile?.IsActive == true))
         {
             throw new InvalidOperationException("User account is already active.");
         }
 
         // Activate user
         user.IsActive = true;
-        if (user.ProfileType == UserProfileType.Nurse && user.NurseProfile is not null)
+        if (user.ProfileType == UserProfileType.NURSE && user.NurseProfile is not null)
         {
             user.NurseProfile.IsActive = true;
         }
@@ -546,7 +546,7 @@ public sealed class AuthenticationService : IAuthenticationService
         {
             Id = Guid.NewGuid(),
             Email = googleUser.Email,
-            ProfileType = UserProfileType.Client,
+            ProfileType = UserProfileType.CLIENT,
             DisplayName = googleUser.Name,
             GoogleSubjectId = googleUser.Subject,
             PasswordHash = _passwordHasher.Hash(Convert.ToHexString(RandomNumberGenerator.GetBytes(16))),

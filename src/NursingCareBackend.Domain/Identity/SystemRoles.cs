@@ -2,9 +2,9 @@ namespace NursingCareBackend.Domain.Identity;
 
 public static class SystemRoles
 {
-  public const string Admin = "Admin";
-  public const string Nurse = "Nurse";
-  public const string Client = "Client";
+  public const string Admin = "ADMIN";
+  public const string Nurse = "NURSE";
+  public const string Client = "CLIENT";
 
   public static readonly (Guid Id, string Name)[] Defaults =
   [

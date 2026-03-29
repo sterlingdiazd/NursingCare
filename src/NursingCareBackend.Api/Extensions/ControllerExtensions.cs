@@ -7,7 +7,12 @@ public static class ControllerExtensions
 {
     public static IServiceCollection AddApiControllers(this IServiceCollection services)
     {
-        services.AddControllers().ConfigureApiBehaviorOptions(options =>
+        services.AddControllers()
+            .AddJsonOptions(options =>
+            {
+                options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+            })
+            .ConfigureApiBehaviorOptions(options =>
         {
             options.InvalidModelStateResponseFactory = context =>
             {

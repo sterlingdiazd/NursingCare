@@ -41,7 +41,7 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
     Assert.False(string.IsNullOrWhiteSpace(payload.RefreshToken));
     Assert.NotNull(payload.ExpiresAtUtc);
     Assert.Equal(email, payload.Email);
-    Assert.Contains("Client", payload.Roles);
+    Assert.Contains("CLIENT", payload.Roles);
     Assert.False(payload.RequiresAdminReview);
   }
 
@@ -75,7 +75,7 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
     Assert.False(string.IsNullOrWhiteSpace(payload.RefreshToken));
     Assert.NotNull(payload.ExpiresAtUtc);
     Assert.Equal(email, payload.Email);
-    Assert.Contains("Nurse", payload.Roles);
+    Assert.Contains("NURSE", payload.Roles);
     Assert.True(payload.RequiresAdminReview);
   }
 
@@ -283,7 +283,7 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
     var parameters = QueryHelpers.ParseQuery("?" + response.Headers.Location.Fragment.TrimStart('#'));
     Assert.Equal("success", parameters["oauth"].ToString());
     Assert.Equal("google-success-web@example.com", parameters["email"].ToString());
-    Assert.Equal("Client", parameters["roles"].ToString());
+    Assert.Equal("CLIENT", parameters["roles"].ToString());
     Assert.Equal("true", parameters["requiresProfileCompletion"].ToString());
     Assert.Equal("false", parameters["requiresAdminReview"].ToString());
     Assert.False(string.IsNullOrWhiteSpace(parameters["token"].ToString()));
@@ -331,7 +331,7 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
     var parameters = QueryHelpers.ParseQuery(response.Headers.Location.Query);
     Assert.Equal("success", parameters["oauth"].ToString());
     Assert.Equal("google-success-mobile@example.com", parameters["email"].ToString());
-    Assert.Equal("Client", parameters["roles"].ToString());
+    Assert.Equal("CLIENT", parameters["roles"].ToString());
     Assert.Equal("true", parameters["requiresProfileCompletion"].ToString());
     Assert.Equal("false", parameters["requiresAdminReview"].ToString());
   }
@@ -408,12 +408,12 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
     var client = _factory.CreateClient();
     client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
       "Bearer",
-      JwtTestTokens.CreateToken(_factory.Services, "Nurse"));
+      JwtTestTokens.CreateToken(_factory.Services, "NURSE"));
 
     var response = await client.PostAsJsonAsync("/api/auth/assign-role", new
     {
       userId = Guid.NewGuid().ToString(),
-      roleName = "Admin"
+      roleName = "ADMIN"
     });
 
     Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
@@ -430,7 +430,7 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
     var response = await client.PostAsJsonAsync("/api/auth/assign-role", new
     {
       userId = Guid.NewGuid().ToString(),
-      roleName = "Admin"
+      roleName = "ADMIN"
     });
 
     Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);

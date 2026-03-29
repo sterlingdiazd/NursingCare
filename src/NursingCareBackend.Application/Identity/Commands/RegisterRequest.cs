@@ -36,5 +36,5 @@ public sealed record RegisterRequest(
     string? BankName = null,
     [RegularExpression(IdentityInputRules.NumericOnlyPattern, ErrorMessage = "El numero de cuenta solo puede contener digitos.")]
     string? AccountNumber = null,
-    UserProfileType ProfileType = UserProfileType.Client
+    UserProfileType ProfileType = UserProfileType.CLIENT
 );

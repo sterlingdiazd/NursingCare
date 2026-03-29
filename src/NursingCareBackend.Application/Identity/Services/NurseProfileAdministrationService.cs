@@ -131,7 +131,7 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
         {
             Id = Guid.NewGuid(),
             Email = normalizedEmail,
-            ProfileType = UserProfileType.Nurse,
+            ProfileType = UserProfileType.NURSE,
             Name = request.Name.Trim(),
             LastName = request.LastName.Trim(),
             IdentificationNumber = request.IdentificationNumber.Trim(),
@@ -362,7 +362,7 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
             throw new KeyNotFoundException($"User with ID {userId} not found.");
         }
 
-        if (user.ProfileType != UserProfileType.Nurse || user.NurseProfile is null)
+        if (user.ProfileType != UserProfileType.NURSE || user.NurseProfile is null)
         {
             throw new InvalidOperationException("The requested user does not have a nurse profile.");
         }

@@ -74,5 +74,5 @@ public sealed class TokenGenerator : ITokenGenerator
     }
 
     private static bool IsNurseProfileActive(User user)
-        => user.ProfileType != UserProfileType.Nurse || user.NurseProfile?.IsActive == true;
+        => user.ProfileType != UserProfileType.NURSE || user.NurseProfile?.IsActive == true;
 }

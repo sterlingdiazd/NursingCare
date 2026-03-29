@@ -123,7 +123,9 @@ public sealed class NursingCareDbContext : DbContext
                       .HasMaxLength(256);
 
                      builder.Property(x => x.ProfileType)
-                      .HasConversion<string>()
+                      .HasConversion(
+                          v => v.ToString().ToUpperInvariant(),
+                          v => Enum.Parse<UserProfileType>(v, true))
                       .IsRequired()
                       .HasMaxLength(20);
 

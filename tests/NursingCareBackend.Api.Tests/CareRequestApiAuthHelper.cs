@@ -21,7 +21,7 @@ internal static class CareRequestApiAuthHelper
       email,
       password = "Pass123!",
       confirmPassword = "Pass123!",
-      profileType = 0
+      profileType = 2
     });
 
     registerResponse.EnsureSuccessStatusCode();

@@ -12,10 +12,10 @@ public static class UserAccountStateEvaluator
             || string.IsNullOrWhiteSpace(user.Phone));
 
   public static bool RequiresAdminReview(User user)
-    => user.ProfileType == UserProfileType.Nurse && user.NurseProfile?.IsActive != true;
+    => user.ProfileType == UserProfileType.NURSE && user.NurseProfile?.IsActive != true;
 
   public static bool RequiresManualIntervention(User user)
     => !user.UserRoles.Any()
-        || (user.ProfileType == UserProfileType.Nurse && user.NurseProfile is null)
-        || (user.ProfileType == UserProfileType.Client && user.ClientProfile is null);
+        || (user.ProfileType == UserProfileType.NURSE && user.NurseProfile is null)
+        || (user.ProfileType == UserProfileType.CLIENT && user.ClientProfile is null);
 }

@@ -35,7 +35,7 @@ public sealed class AdminNotificationsApiTests : IClassFixture<CustomWebApplicat
     var dbContext = scope.ServiceProvider.GetRequiredService<NursingCareBackend.Infrastructure.Persistence.NursingCareDbContext>();
     
     var adminUsers = await dbContext.Users
-      .Where(u => u.IsActive && u.UserRoles.Any(ur => ur.Role.Name == "Admin"))
+      .Where(u => u.IsActive && u.UserRoles.Any(ur => ur.Role.Name == "ADMIN"))
       .ToListAsync();
     
     Assert.NotEmpty(adminUsers);

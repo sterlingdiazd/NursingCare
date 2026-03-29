@@ -2,6 +2,7 @@ namespace NursingCareBackend.Domain.Identity;
 
 public enum UserProfileType
 {
-  Client = 0,
-  Nurse = 1
+  ADMIN = 0,
+  NURSE = 1,
+  CLIENT = 2
 }

@@ -65,7 +65,7 @@ public sealed class UserRepository : IUserRepository
             .Include(u => u.UserRoles)
             .ThenInclude(ur => ur.Role)
             .Where(u =>
-                u.ProfileType == UserProfileType.Nurse &&
+                u.ProfileType == UserProfileType.NURSE &&
                 u.NurseProfile != null)
             .OrderBy(u => u.Name)
             .ThenBy(u => u.LastName)
@@ -80,7 +80,7 @@ public sealed class UserRepository : IUserRepository
             .Include(u => u.UserRoles)
             .ThenInclude(ur => ur.Role)
             .Where(u =>
-                u.ProfileType == UserProfileType.Nurse &&
+                u.ProfileType == UserProfileType.NURSE &&
                 u.NurseProfile != null &&
                 !u.NurseProfile.IsActive)
             .OrderBy(u => u.CreatedAtUtc)
@@ -94,7 +94,7 @@ public sealed class UserRepository : IUserRepository
             .Include(u => u.UserRoles)
             .ThenInclude(ur => ur.Role)
             .Where(u =>
-                u.ProfileType == UserProfileType.Nurse &&
+                u.ProfileType == UserProfileType.NURSE &&
                 u.IsActive &&
                 u.NurseProfile != null &&
                 u.NurseProfile.IsActive)

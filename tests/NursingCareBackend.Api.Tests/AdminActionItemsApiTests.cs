@@ -181,7 +181,7 @@ public sealed class AdminActionItemsApiTests : IClassFixture<CustomWebApplicatio
     {
       Id = Guid.NewGuid(),
       Email = $"manual-{Guid.NewGuid():N}@nursingcare.local",
-      ProfileType = UserProfileType.Client,
+      ProfileType = UserProfileType.CLIENT,
       Name = "Mario",
       LastName = "Lopez",
       IdentificationNumber = "00122334455",

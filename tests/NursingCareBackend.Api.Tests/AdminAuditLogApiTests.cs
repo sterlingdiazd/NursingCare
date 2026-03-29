@@ -36,7 +36,7 @@ public sealed class AdminAuditLogApiTests
     {
       Id = Guid.NewGuid(),
       ActorUserId = adminSession.UserId,
-      ActorRole = "Admin",
+      ActorRole = "ADMIN",
       Action = "TestAction",
       EntityType = "TestEntity",
       EntityId = Guid.NewGuid().ToString(),
@@ -72,7 +72,7 @@ public sealed class AdminAuditLogApiTests
     {
       Id = Guid.NewGuid(),
       ActorUserId = adminSession.UserId,
-      ActorRole = "Admin",
+      ActorRole = "ADMIN",
       Action = specificAction,
       EntityType = "FilterTestEntity",
       EntityId = Guid.NewGuid().ToString(),
@@ -106,7 +106,7 @@ public sealed class AdminAuditLogApiTests
     {
       Id = Guid.NewGuid(),
       ActorUserId = adminSession.UserId,
-      ActorRole = "Admin",
+      ActorRole = "ADMIN",
       Action = "DetailTestAction",
       EntityType = "DetailTestEntity",
       EntityId = Guid.NewGuid().ToString(),
@@ -158,7 +158,7 @@ public sealed class AdminAuditLogApiTests
       {
         Id = Guid.NewGuid(),
         ActorUserId = adminSession.UserId,
-        ActorRole = "Admin",
+        ActorRole = "ADMIN",
         Action = $"{testPrefix}_{i}",
         EntityType = "PaginationEntity",
         EntityId = Guid.NewGuid().ToString(),

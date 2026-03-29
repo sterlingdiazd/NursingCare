@@ -25,7 +25,7 @@ public sealed class AdminActionQueueRepository : IAdminActionQueueRepository
     var pendingNurseProfiles = await _dbContext.Users
       .AsNoTracking()
       .Where(user =>
-        user.ProfileType == UserProfileType.Nurse
+        user.ProfileType == UserProfileType.NURSE
         && user.NurseProfile != null
         && !user.NurseProfile.IsActive)
       .OrderBy(user => user.CreatedAtUtc)
@@ -147,8 +147,8 @@ public sealed class AdminActionQueueRepository : IAdminActionQueueRepository
       .AsNoTracking()
       .Where(user =>
         !user.UserRoles.Any()
-        || (user.ProfileType == UserProfileType.Nurse && user.NurseProfile == null)
-        || (user.ProfileType == UserProfileType.Client && user.ClientProfile == null))
+        || (user.ProfileType == UserProfileType.NURSE && user.NurseProfile == null)
+        || (user.ProfileType == UserProfileType.CLIENT && user.ClientProfile == null))
       .OrderByDescending(user => user.CreatedAtUtc)
       .Select(user => new
       {
@@ -158,8 +158,8 @@ public sealed class AdminActionQueueRepository : IAdminActionQueueRepository
         user.LastName,
         user.CreatedAtUtc,
         MissingRoles = !user.UserRoles.Any(),
-        MissingNurseProfile = user.ProfileType == UserProfileType.Nurse && user.NurseProfile == null,
-        MissingClientProfile = user.ProfileType == UserProfileType.Client && user.ClientProfile == null,
+        MissingNurseProfile = user.ProfileType == UserProfileType.NURSE && user.NurseProfile == null,
+        MissingClientProfile = user.ProfileType == UserProfileType.CLIENT && user.ClientProfile == null,
       })
       .ToListAsync(cancellationToken);
 
@@ -268,7 +268,7 @@ public sealed class AdminActionQueueRepository : IAdminActionQueueRepository
       return "Revisar la asignacion porque la enfermera vinculada ya no existe en el sistema.";
     }
 
-    if (nurse.ProfileType != UserProfileType.Nurse || !nurse.UserIsActive || !nurse.NurseProfileIsActive)
+    if (nurse.ProfileType != UserProfileType.NURSE || !nurse.UserIsActive || !nurse.NurseProfileIsActive)
     {
       return "Reasignar o corregir la enfermera vinculada porque la cuenta actual no esta lista para operar.";
     }

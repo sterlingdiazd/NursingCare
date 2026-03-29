@@ -215,7 +215,7 @@ public sealed class AdminUserManagementRepository : IAdminUserManagementReposito
 
   private static IReadOnlyList<string> ResolveAllowedRoleNames(UserProfileType profileType)
   {
-    return profileType == UserProfileType.Nurse
+    return profileType == UserProfileType.NURSE
       ? new[] { SystemRoles.Admin, SystemRoles.Nurse }
       : new[] { SystemRoles.Admin, SystemRoles.Client };
   }
@@ -269,7 +269,7 @@ public sealed class AdminUserManagementRepository : IAdminUserManagementReposito
   {
     return profileType switch
     {
-      nameof(UserProfileType.Nurse) => "enfermeria",
+      nameof(UserProfileType.NURSE) => "enfermeria",
       _ => "cliente",
     };
   }

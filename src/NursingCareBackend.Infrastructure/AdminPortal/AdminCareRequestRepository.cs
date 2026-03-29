@@ -104,7 +104,7 @@ public sealed class AdminCareRequestRepository : IAdminCareRequestRepository
     var query = _dbContext.Users
       .AsNoTracking()
       .Where(user =>
-        user.ProfileType == UserProfileType.Client
+        user.ProfileType == UserProfileType.CLIENT
         && user.IsActive
         && user.ClientProfile != null
         && user.UserRoles.Any(userRole => userRole.Role.Name == SystemRoles.Client));

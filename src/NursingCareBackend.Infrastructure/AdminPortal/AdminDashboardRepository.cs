@@ -27,7 +27,7 @@ public sealed class AdminDashboardRepository : IAdminDashboardRepository
     var pendingNurseProfilesCount = await _dbContext.Users
       .AsNoTracking()
       .Where(user =>
-        user.ProfileType == UserProfileType.Nurse
+        user.ProfileType == UserProfileType.NURSE
         && user.NurseProfile != null
         && !user.NurseProfile.IsActive)
       .CountAsync(cancellationToken);
@@ -75,7 +75,7 @@ public sealed class AdminDashboardRepository : IAdminDashboardRepository
     var activeNursesCount = await _dbContext.Users
       .AsNoTracking()
       .Where(user =>
-        user.ProfileType == UserProfileType.Nurse
+        user.ProfileType == UserProfileType.NURSE
         && user.IsActive
         && user.NurseProfile != null
         && user.NurseProfile.IsActive)
@@ -84,7 +84,7 @@ public sealed class AdminDashboardRepository : IAdminDashboardRepository
     var activeClientsCount = await _dbContext.Users
       .AsNoTracking()
       .Where(user =>
-        user.ProfileType == UserProfileType.Client
+        user.ProfileType == UserProfileType.CLIENT
         && user.IsActive
         && user.ClientProfile != null
         && user.UserRoles.Any(userRole => userRole.Role.Name == SystemRoles.Client))

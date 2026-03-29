@@ -11,10 +11,10 @@ namespace NursingCareBackend.Api.Tests;
 internal static class JwtTestTokens
 {
   public static string CreateWriterToken(IServiceProvider services)
-    => CreateToken(services, userId: null, includeUserId: true, "Nurse");
+    => CreateToken(services, userId: null, includeUserId: true, "NURSE");
 
   public static string CreateAdminToken(IServiceProvider services)
-    => CreateToken(services, userId: Guid.Parse("00000000-0000-0000-0000-000000000001"), includeUserId: true, "Admin");
+    => CreateToken(services, userId: Guid.Parse("00000000-0000-0000-0000-000000000001"), includeUserId: true, "ADMIN");
 
   public static string CreateTokenWithoutUserId(IServiceProvider services, params string[] roles)
     => CreateToken(services, userId: null, includeUserId: false, roles);
@@ -41,7 +41,7 @@ internal static class JwtTestTokens
       new(ClaimTypes.Email, "test.user@nursingcare.local"),
       new(
         AuthClaimTypes.NurseProfileActive,
-        roles.Contains("Nurse", StringComparer.OrdinalIgnoreCase) ? "true" : "false")
+        roles.Contains("NURSE", StringComparer.OrdinalIgnoreCase) ? "true" : "false")
     };
 
     if (includeUserId)

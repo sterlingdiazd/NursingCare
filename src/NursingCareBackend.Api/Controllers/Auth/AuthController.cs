@@ -237,7 +237,7 @@ public sealed class AuthController : ControllerBase
     /// <response code="401">Unauthorized - not authenticated</response>
     /// <response code="403">Forbidden - only admins can assign roles</response>
     [HttpPost("assign-role")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "ADMIN")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -292,7 +292,7 @@ public sealed class AuthController : ControllerBase
     /// <response code="401">Unauthorized - not authenticated</response>
     /// <response code="403">Forbidden - only admins can activate users</response>
     [HttpPost("activate-user")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "ADMIN")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]

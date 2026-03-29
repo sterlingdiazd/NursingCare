@@ -47,7 +47,7 @@ public sealed class AssignCareRequestNurseHandler
             throw new InvalidOperationException("Assigned nurse was not found.");
         }
 
-        if (nurseUser.ProfileType != UserProfileType.Nurse || nurseUser.NurseProfile is null)
+        if (nurseUser.ProfileType != UserProfileType.NURSE || nurseUser.NurseProfile is null)
         {
             throw new InvalidOperationException("Assigned user is not a nurse profile.");
         }

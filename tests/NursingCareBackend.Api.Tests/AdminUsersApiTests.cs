@@ -33,9 +33,9 @@ public sealed class AdminUsersApiTests : IClassFixture<CustomWebApplicationFacto
     Assert.Contains(clientPayload!, item =>
       item.Id == clientAccount.UserId
       && item.Email == clientAccount.Email
-      && item.ProfileType == "Client"
+      && item.ProfileType == "CLIENT"
       && item.AccountStatus == "Active"
-      && item.RoleNames.SequenceEqual(["Client"]));
+      && item.RoleNames.SequenceEqual(["CLIENT"]));
     Assert.DoesNotContain(clientPayload!, item => item.Id == nurseAccount.UserId);
 
     var nurseResponse = await adminClient.GetAsync(
@@ -48,10 +48,10 @@ public sealed class AdminUsersApiTests : IClassFixture<CustomWebApplicationFacto
     Assert.Contains(nursePayload!, item =>
       item.Id == nurseAccount.UserId
       && item.Email == nurseAccount.Email
-      && item.ProfileType == "Nurse"
+      && item.ProfileType == "NURSE"
       && item.AccountStatus == "AdminReview"
       && item.RequiresAdminReview
-      && item.RoleNames.SequenceEqual(["Nurse"]));
+      && item.RoleNames.SequenceEqual(["NURSE"]));
   }
 
   [Fact]
@@ -71,11 +71,11 @@ public sealed class AdminUsersApiTests : IClassFixture<CustomWebApplicationFacto
 
     Assert.NotNull(nursePayload);
     Assert.Equal(nurseAccount.UserId, nursePayload!.Id);
-    Assert.Equal("Nurse", nursePayload.ProfileType);
+    Assert.Equal("NURSE", nursePayload.ProfileType);
     Assert.Equal("Active", nursePayload.AccountStatus);
     Assert.Equal(1, nursePayload.ActiveRefreshTokenCount);
     Assert.True(nursePayload.HasOperationalHistory);
-    Assert.Equal(new[] { "Admin", "Nurse" }, nursePayload.AllowedRoleNames);
+    Assert.Equal(new[] { "ADMIN", "NURSE" }, nursePayload.AllowedRoleNames);
     Assert.NotNull(nursePayload.NurseProfile);
     Assert.Null(nursePayload.ClientProfile);
     Assert.True(nursePayload.NurseProfile!.IsActive);
@@ -90,11 +90,11 @@ public sealed class AdminUsersApiTests : IClassFixture<CustomWebApplicationFacto
 
     Assert.NotNull(clientPayload);
     Assert.Equal(clientAccount.UserId, clientPayload!.Id);
-    Assert.Equal("Client", clientPayload.ProfileType);
+    Assert.Equal("CLIENT", clientPayload.ProfileType);
     Assert.Equal("Active", clientPayload.AccountStatus);
     Assert.Equal(1, clientPayload.ActiveRefreshTokenCount);
     Assert.True(clientPayload.HasOperationalHistory);
-    Assert.Equal(new[] { "Admin", "Client" }, clientPayload.AllowedRoleNames);
+    Assert.Equal(new[] { "ADMIN", "CLIENT" }, clientPayload.AllowedRoleNames);
     Assert.Null(clientPayload.NurseProfile);
     Assert.NotNull(clientPayload.ClientProfile);
     Assert.Equal(1, clientPayload.ClientProfile!.OwnedCareRequestsCount);
@@ -157,18 +157,18 @@ public sealed class AdminUsersApiTests : IClassFixture<CustomWebApplicationFacto
 
     var updateResponse = await adminClient.PutAsJsonAsync($"/api/admin/users/{account.UserId}/roles", new
     {
-      roleNames = new[] { "Admin", "Client" }
+      roleNames = new[] { "ADMIN", "CLIENT" }
     });
 
     updateResponse.EnsureSuccessStatusCode();
     var updated = await updateResponse.Content.ReadFromJsonAsync<AdminUserDetailDto>();
 
     Assert.NotNull(updated);
-    Assert.Equal(new[] { "Admin", "Client" }, updated!.RoleNames);
+    Assert.Equal(new[] { "ADMIN", "CLIENT" }, updated!.RoleNames);
 
     var invalidResponse = await adminClient.PutAsJsonAsync($"/api/admin/users/{account.UserId}/roles", new
     {
-      roleNames = new[] { "Nurse" }
+      roleNames = new[] { "NURSE" }
     });
 
     Assert.Equal(HttpStatusCode.BadRequest, invalidResponse.StatusCode);
@@ -266,7 +266,7 @@ public sealed class AdminUsersApiTests : IClassFixture<CustomWebApplicationFacto
       email,
       password = "Pass123!",
       confirmPassword = "Pass123!",
-      profileType = 0
+      profileType = 2
     });
 
     registerResponse.EnsureSuccessStatusCode();

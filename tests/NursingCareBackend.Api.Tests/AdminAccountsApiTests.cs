@@ -30,9 +30,9 @@ public sealed class AdminAccountsApiTests
 
     var payload = await response.Content.ReadFromJsonAsync<AdminUserDetailDto>();
     Assert.NotNull(payload);
-    Assert.Equal("Client", payload!.ProfileType);
+    Assert.Equal("ADMIN", payload!.ProfileType);
     Assert.Equal("Active", payload.AccountStatus);
-    Assert.Equal(new[] { "Admin" }, payload.RoleNames);
+    Assert.Equal(new[] { "ADMIN" }, payload.RoleNames);
 
     using var scope = factory.Services.CreateScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<NursingCareDbContext>();
@@ -43,13 +43,13 @@ public sealed class AdminAccountsApiTests
       .SingleAsync(user => user.Id == payload.Id);
 
     Assert.Equal(payload.Email, createdUser.Email);
-    Assert.Contains(createdUser.UserRoles, userRole => userRole.Role.Name == "Admin");
+    Assert.Contains(createdUser.UserRoles, userRole => userRole.Role.Name == "ADMIN");
 
     var auditLog = await dbContext.AuditLogs
       .SingleAsync(item => item.Action == "AdminAccountCreated" && item.EntityId == payload.Id.ToString());
 
     Assert.Equal(adminSession.UserId, auditLog.ActorUserId);
-    Assert.Equal("Admin", auditLog.ActorRole);
+    Assert.Equal("ADMIN", auditLog.ActorRole);
   }
 
   [Fact]

@@ -116,7 +116,7 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
       Id = testAdminUserId,
       Email = testAdminEmail,
       PasswordHash = "test-hash-not-used-in-tests",
-      ProfileType = UserProfileType.Client,
+      ProfileType = UserProfileType.CLIENT,
       IsActive = true,
       CreatedAtUtc = DateTime.UtcNow
     };

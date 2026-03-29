@@ -67,14 +67,12 @@ public sealed class AdminAccountProvisioningService : IAdminAccountProvisioningS
       Phone = request.Phone.Trim(),
       Email = normalizedEmail,
       DisplayName = $"{request.Name.Trim()} {request.LastName.Trim()}".Trim(),
-      ProfileType = UserProfileType.Client,
+      ProfileType = UserProfileType.ADMIN,
       PasswordHash = _passwordHasher.Hash(request.Password),
       IsActive = true,
-      CreatedAtUtc = DateTime.UtcNow,
-      ClientProfile = new Client()
+      CreatedAtUtc = DateTime.UtcNow
     };
 
-    user.ClientProfile.UserId = user.Id;
 
     user.UserRoles.Add(new UserRole
     {

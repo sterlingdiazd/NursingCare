@@ -130,7 +130,7 @@ public sealed class AdminCareRequestsController : ControllerBase
     var clientUser = await _userRepository.GetByIdAsync(request.ClientUserId, cancellationToken);
 
     if (clientUser is null
-      || clientUser.ProfileType != UserProfileType.Client
+      || clientUser.ProfileType != UserProfileType.CLIENT
       || !clientUser.IsActive
       || clientUser.ClientProfile is null
       || !clientUser.UserRoles.Any(userRole => string.Equals(

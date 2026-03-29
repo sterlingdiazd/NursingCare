@@ -17,7 +17,7 @@ public sealed class AuthenticationServiceTests
     var nurseRole = new Role
     {
       Id = Guid.NewGuid(),
-      Name = "Nurse"
+      Name = "NURSE"
     };
 
     var userRepository = new FakeUserRepository();
@@ -36,17 +36,17 @@ public sealed class AuthenticationServiceTests
       HireDate: new DateOnly(2026, 3, 21),
       Specialty: "Atencion domiciliaria",
       BankName: "Banco Central",
-      ProfileType: UserProfileType.Nurse));
+      ProfileType: UserProfileType.NURSE));
 
     Assert.False(string.IsNullOrWhiteSpace(response.Token));
     Assert.False(string.IsNullOrWhiteSpace(response.RefreshToken));
     Assert.NotNull(response.ExpiresAtUtc);
-    Assert.Contains("Nurse", response.Roles);
+    Assert.Contains("NURSE", response.Roles);
     Assert.True(response.RequiresAdminReview);
 
     var createdUser = Assert.Single(userRepository.CreatedUsers);
     Assert.True(createdUser.IsActive);
-    Assert.Equal(UserProfileType.Nurse, createdUser.ProfileType);
+    Assert.Equal(UserProfileType.NURSE, createdUser.ProfileType);
     Assert.Equal("Ana", createdUser.Name);
     Assert.Equal("Lopez", createdUser.LastName);
     Assert.Equal("00112345678", createdUser.IdentificationNumber);
@@ -58,7 +58,7 @@ public sealed class AuthenticationServiceTests
     Assert.Equal("Atencion domiciliaria", createdUser.NurseProfile.Specialty);
     Assert.Equal("Banco Central", createdUser.NurseProfile.BankName);
     Assert.Null(createdUser.ClientProfile);
-    Assert.Contains(createdUser.UserRoles, userRole => userRole.Role.Name == "Nurse");
+    Assert.Contains(createdUser.UserRoles, userRole => userRole.Role.Name == "NURSE");
   }
 
   [Fact]
@@ -67,7 +67,7 @@ public sealed class AuthenticationServiceTests
     var nurseRole = new Role
     {
       Id = Guid.NewGuid(),
-      Name = "Nurse"
+      Name = "NURSE"
     };
 
     var service = CreateService(roleRepository: new FakeRoleRepository(nurseRole));
@@ -81,7 +81,7 @@ public sealed class AuthenticationServiceTests
         Email: "nurse@example.com",
         Password: "Pass123!",
         ConfirmPassword: "Pass123!",
-        ProfileType: UserProfileType.Nurse)));
+        ProfileType: UserProfileType.NURSE)));
 
     Assert.Equal("Hire date is required for nurse registration. (Parameter 'HireDate')", exception.Message);
   }
@@ -100,9 +100,9 @@ public sealed class AuthenticationServiceTests
         Email: "client@example.com",
         Password: "Pass123!",
         ConfirmPassword: "Pass123!",
-        ProfileType: UserProfileType.Client)));
+        ProfileType: UserProfileType.CLIENT)));
 
-    Assert.Equal("Client role not found in the system.", exception.Message);
+    Assert.Equal("CLIENT role not found in the system.", exception.Message);
   }
 
   [Fact]
@@ -111,7 +111,7 @@ public sealed class AuthenticationServiceTests
     var adminRole = new Role
     {
       Id = Guid.NewGuid(),
-      Name = "Admin"
+      Name = "ADMIN"
     };
 
     var user = CreateUser("admin@example.com", adminRole);
@@ -135,7 +135,7 @@ public sealed class AuthenticationServiceTests
     Assert.Equal("jwt-token-1", response.Token);
     Assert.NotEqual(existingRefreshToken.Token, response.RefreshToken);
     Assert.Equal(existingRefreshToken.User.Email, response.Email);
-    Assert.Contains("Admin", response.Roles);
+    Assert.Contains("ADMIN", response.Roles);
     Assert.NotNull(existingRefreshToken.RevokedAtUtc);
     Assert.Single(refreshTokenRepository.CreatedTokens);
     Assert.Equal(response.RefreshToken, refreshTokenRepository.CreatedTokens[0].Token);
@@ -147,7 +147,7 @@ public sealed class AuthenticationServiceTests
     var role = new Role
     {
       Id = Guid.NewGuid(),
-      Name = "Client"
+      Name = "CLIENT"
     };
 
     var user = CreateUser("client@example.com", role);
@@ -179,7 +179,7 @@ public sealed class AuthenticationServiceTests
     var userRole = new Role
     {
       Id = Guid.NewGuid(),
-      Name = "Client"
+      Name = "CLIENT"
     };
 
     var userRepository = new FakeUserRepository();
@@ -193,12 +193,12 @@ public sealed class AuthenticationServiceTests
 
     Assert.Equal("jwt-token-1", response.Token);
     Assert.Equal("google-user@example.com", response.Email);
-    Assert.Contains("Client", response.Roles);
+    Assert.Contains("CLIENT", response.Roles);
     Assert.True(response.RequiresProfileCompletion);
 
     var createdUser = Assert.Single(userRepository.CreatedUsers);
     Assert.False(createdUser.IsActive);
-    Assert.Equal(UserProfileType.Client, createdUser.ProfileType);
+    Assert.Equal(UserProfileType.CLIENT, createdUser.ProfileType);
     Assert.Equal("google-subject-1", createdUser.GoogleSubjectId);
     Assert.Equal("Google User", createdUser.DisplayName);
     Assert.Null(createdUser.Name);
@@ -207,7 +207,7 @@ public sealed class AuthenticationServiceTests
     Assert.Null(createdUser.Phone);
     Assert.NotNull(createdUser.ClientProfile);
     Assert.Equal(createdUser.Id, createdUser.ClientProfile!.UserId);
-    Assert.Contains(createdUser.UserRoles, userRoleLink => userRoleLink.Role.Name == "Client");
+    Assert.Contains(createdUser.UserRoles, userRoleLink => userRoleLink.Role.Name == "CLIENT");
   }
 
   [Fact]
@@ -216,7 +216,7 @@ public sealed class AuthenticationServiceTests
     var userRole = new Role
     {
       Id = Guid.NewGuid(),
-      Name = "Client"
+      Name = "CLIENT"
     };
 
     var existingUser = CreateUser("existing@example.com", userRole);
@@ -242,7 +242,7 @@ public sealed class AuthenticationServiceTests
     var userRole = new Role
     {
       Id = Guid.NewGuid(),
-      Name = "Client"
+      Name = "CLIENT"
     };
 
     var existingUser = CreateUser("google-existing@example.com", userRole);
@@ -276,7 +276,7 @@ public sealed class AuthenticationServiceTests
     var nurseRole = new Role
     {
       Id = Guid.NewGuid(),
-      Name = "Nurse"
+      Name = "NURSE"
     };
 
     var existingUser = CreateUser("pending@example.com", nurseRole);
@@ -322,7 +322,7 @@ public sealed class AuthenticationServiceTests
     var user = new User
     {
       Id = Guid.NewGuid(),
-      ProfileType = role.Name == "Nurse" ? UserProfileType.Nurse : UserProfileType.Client,
+      ProfileType = role.Name == "NURSE" ? UserProfileType.NURSE : UserProfileType.CLIENT,
       Name = "Existing",
       LastName = "User",
       IdentificationNumber = "00176543210",
@@ -331,10 +331,10 @@ public sealed class AuthenticationServiceTests
       PasswordHash = "hashed-password",
       IsActive = true,
       CreatedAtUtc = DateTime.UtcNow,
-      ClientProfile = role.Name == "Nurse" ? null : new Client()
+      ClientProfile = role.Name == "NURSE" ? null : new Client()
     };
 
-    if (role.Name == "Nurse")
+    if (role.Name == "NURSE")
     {
       user.NurseProfile = new Nurse
       {
@@ -409,21 +409,21 @@ public sealed class AuthenticationServiceTests
     public Task<IReadOnlyList<User>> GetNurseProfilesAsync(CancellationToken cancellationToken = default)
       => Task.FromResult<IReadOnlyList<User>>(
         _usersById.Values
-          .Where(user => user.ProfileType == UserProfileType.Nurse && user.NurseProfile is not null)
+          .Where(user => user.ProfileType == UserProfileType.NURSE && user.NurseProfile is not null)
           .OrderBy(user => user.CreatedAtUtc)
           .ToArray());
 
     public Task<IReadOnlyList<User>> GetPendingNurseProfilesAsync(CancellationToken cancellationToken = default)
       => Task.FromResult<IReadOnlyList<User>>(
         _usersById.Values
-          .Where(user => user.ProfileType == UserProfileType.Nurse && user.NurseProfile?.IsActive == false)
+          .Where(user => user.ProfileType == UserProfileType.NURSE && user.NurseProfile?.IsActive == false)
           .OrderBy(user => user.CreatedAtUtc)
           .ToArray());
 
     public Task<IReadOnlyList<User>> GetActiveNurseProfilesAsync(CancellationToken cancellationToken = default)
       => Task.FromResult<IReadOnlyList<User>>(
         _usersById.Values
-          .Where(user => user.ProfileType == UserProfileType.Nurse && user.IsActive && user.NurseProfile?.IsActive == true)
+          .Where(user => user.ProfileType == UserProfileType.NURSE && user.IsActive && user.NurseProfile?.IsActive == true)
           .OrderBy(user => user.CreatedAtUtc)
           .ToArray());
 
