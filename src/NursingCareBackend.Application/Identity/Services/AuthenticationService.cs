@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using NursingCareBackend.Application.Catalogs;
 using NursingCareBackend.Application.Identity.Authentication;
 using NursingCareBackend.Application.Identity.OAuth;
@@ -23,6 +24,7 @@ public sealed class AuthenticationService : IAuthenticationService
     private readonly IAdminBootstrapPolicy _adminBootstrapPolicy;
     private readonly INurseCatalogService _nurseCatalog;
     private readonly IAdminNotificationPublisher _notifications;
+    private readonly ILogger<AuthenticationService> _logger;
 
     public AuthenticationService(
         IUserRepository userRepository,
@@ -33,7 +35,8 @@ public sealed class AuthenticationService : IAuthenticationService
         IGoogleOAuthClient googleOAuthClient,
         IAdminBootstrapPolicy adminBootstrapPolicy,
         INurseCatalogService nurseCatalog,
-        IAdminNotificationPublisher notifications)
+        IAdminNotificationPublisher notifications,
+        ILogger<AuthenticationService> logger)
     {
         _userRepository = userRepository;
         _roleRepository = roleRepository;
@@ -44,6 +47,7 @@ public sealed class AuthenticationService : IAuthenticationService
         _adminBootstrapPolicy = adminBootstrapPolicy;
         _nurseCatalog = nurseCatalog;
         _notifications = notifications;
+        _logger = logger;
     }
 
     public async Task<AuthResponse> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default)
@@ -500,6 +504,59 @@ public sealed class AuthenticationService : IAuthenticationService
 
         // Save changes
         await _userRepository.UpdateAsync(user, cancellationToken);
+    }
+
+    public async Task RequestPasswordResetAsync(string email, CancellationToken cancellationToken = default)
+    {
+        var normalizedEmail = email.Trim().ToLowerInvariant();
+        var user = await _userRepository.GetByEmailAsync(normalizedEmail, cancellationToken);
+
+        // Security: Don't leak if email exists or not, just return successfully if logic finishes
+        if (user is null)
+        {
+            _logger.LogInformation("Password reset requested for non-existing email: {Email}", normalizedEmail);
+            return;
+        }
+
+        // Generate a 6-digit code
+        var code = RandomNumberGenerator.GetInt32(100000, 999999).ToString();
+        user.ResetPasswordCode = code;
+        user.ResetPasswordCodeExpiresAtUtc = DateTime.UtcNow.AddMinutes(15);
+
+        await _userRepository.UpdateAsync(user, cancellationToken);
+
+        // MOCK: In a real system we would send an email here.
+        _logger.LogInformation("PASSWORD RESET CODE FOR {Email}: {Code}", normalizedEmail, code);
+    }
+
+    public async Task<AuthResponse> ResetPasswordAsync(string email, string code, string newPassword, CancellationToken cancellationToken = default)
+    {
+        var normalizedEmail = email.Trim().ToLowerInvariant();
+        var user = await _userRepository.GetByEmailAsync(normalizedEmail, cancellationToken);
+
+        if (user is null)
+        {
+            throw new InvalidOperationException("Email o codigo invalido.");
+        }
+
+        if (user.ResetPasswordCode != code || user.ResetPasswordCodeExpiresAtUtc < DateTime.UtcNow)
+        {
+             _logger.LogWarning("Invalid or expired code attempt for {Email}: {Code}", normalizedEmail, code);
+            throw new InvalidOperationException("Email o codigo invalido.");
+        }
+
+        if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < 6)
+        {
+            throw new ArgumentException("La contrasena debe tener al menos 6 caracteres.");
+        }
+
+        user.PasswordHash = _passwordHasher.Hash(newPassword);
+        user.ResetPasswordCode = null;
+        user.ResetPasswordCodeExpiresAtUtc = null;
+
+        await _userRepository.UpdateAsync(user, cancellationToken);
+
+        return await CreateAuthResponseAsync(user, cancellationToken);
     }
 
     private async Task<AuthResponse> CreateAuthResponseAsync(

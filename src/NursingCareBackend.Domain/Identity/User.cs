@@ -15,6 +15,9 @@ public sealed class User
   public bool IsActive { get; set; }
   public DateTime CreatedAtUtc { get; set; }
 
+  public string? ResetPasswordCode { get; set; }
+  public DateTime? ResetPasswordCodeExpiresAtUtc { get; set; }
+
   public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
   public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
   public Nurse? NurseProfile { get; set; }

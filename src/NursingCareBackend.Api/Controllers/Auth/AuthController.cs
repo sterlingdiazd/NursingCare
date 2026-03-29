@@ -313,6 +313,47 @@ public sealed class AuthController : ControllerBase
         return Ok(new { message = "La cuenta se activo correctamente." });
     }
 
+    /// <summary>
+    /// Request a password reset code to be sent via email
+    /// </summary>
+    [HttpPost("forgot-password")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> ForgotPassword(
+        [FromBody] ForgotPasswordRequest request,
+        CancellationToken cancellationToken)
+    {
+        await _authenticationService.RequestPasswordResetAsync(request.Email, cancellationToken);
+        return Ok(new { message = "Si el correo esta registrado, se ha enviado un codigo de recuperacion." });
+    }
+
+    /// <summary>
+    /// Reset password using the code received via email
+    /// </summary>
+    [HttpPost("reset-password")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ResetPassword(
+        [FromBody] ResetPasswordRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var response = await _authenticationService.ResetPasswordAsync(
+                request.Email,
+                request.Code,
+                request.NewPassword,
+                cancellationToken);
+            return Ok(response);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
+        {
+            return this.ProblemResponse(
+                StatusCodes.Status400BadRequest,
+                "Error al restablecer contrasena",
+                ex.Message);
+        }
+    }
+
     private string BuildSuccessRedirect(AuthResponse response, string redirectTarget)
     {
         return BuildRedirect(new Dictionary<string, string?>
