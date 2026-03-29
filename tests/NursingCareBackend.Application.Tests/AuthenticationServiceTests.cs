@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using NursingCareBackend.Application.AdminPortal.Notifications;
 using NursingCareBackend.Application.Identity.Authentication;
 using NursingCareBackend.Application.Identity.Commands;
@@ -314,7 +316,8 @@ public sealed class AuthenticationServiceTests
         new GoogleOAuthUserInfo("default-google-subject", "default@example.com", "Default User", true)),
       adminBootstrapPolicy ?? new FakeAdminBootstrapPolicy(),
       new FakeNurseCatalogService(),
-      notifications ?? new FakeAdminNotificationPublisher());
+      notifications ?? new FakeAdminNotificationPublisher(),
+      NullLogger<AuthenticationService>.Instance);
   }
 
   private static User CreateUser(string email, Role role)
