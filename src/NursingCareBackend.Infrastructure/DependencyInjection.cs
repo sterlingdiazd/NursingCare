@@ -14,6 +14,7 @@ using NursingCareBackend.Application.Identity.Services;
 using NursingCareBackend.Application.AdminPortal.Reports;
 using NursingCareBackend.Application.AdminPortal.Catalog;
 using NursingCareBackend.Application.AdminPortal.Notifications;
+using NursingCareBackend.Application.AdminPortal.Settings;
 using NursingCareBackend.Application.Catalogs;
 using NursingCareBackend.Infrastructure.AdminPortal;
 using NursingCareBackend.Infrastructure.Catalogs;
@@ -103,6 +104,7 @@ public static class DependencyInjection
         services.AddScoped<INurseCatalogService, NurseCatalogService>();
         services.AddScoped<ICatalogOptionsService, CatalogOptionsService>();
         services.AddScoped<IAdminCatalogManagementService, AdminCatalogManagementService>();
+        services.AddScoped<IAdminSettingsManagementService, AdminSettingsManagementService>();
 
         return services;
     }

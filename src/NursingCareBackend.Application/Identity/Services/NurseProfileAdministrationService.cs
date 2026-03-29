@@ -1,5 +1,6 @@
 using System.Text.Json;
 using NursingCareBackend.Application.AdminPortal.Auditing;
+using NursingCareBackend.Application.AdminPortal.Notifications;
 using NursingCareBackend.Application.Catalogs;
 using NursingCareBackend.Application.Identity.Authentication;
 using NursingCareBackend.Application.Identity.Commands;
@@ -18,6 +19,7 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
     private readonly IPasswordHasher _passwordHasher;
     private readonly IAdminAuditService _adminAuditService;
     private readonly INurseCatalogService _nurseCatalog;
+    private readonly IAdminNotificationPublisher _notifications;
     private static readonly NurseWorkloadSummary EmptyWorkload = new(0, 0, 0, 0, 0, null);
 
     public NurseProfileAdministrationService(
@@ -25,13 +27,15 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
         IRoleRepository roleRepository,
         IPasswordHasher passwordHasher,
         IAdminAuditService adminAuditService,
-        INurseCatalogService nurseCatalog)
+        INurseCatalogService nurseCatalog,
+        IAdminNotificationPublisher notifications)
     {
         _userRepository = userRepository;
         _roleRepository = roleRepository;
         _passwordHasher = passwordHasher;
         _adminAuditService = adminAuditService;
         _nurseCatalog = nurseCatalog;
+        _notifications = notifications;
     }
 
     public async Task<IReadOnlyList<PendingNurseProfileResponse>> GetPendingNurseProfilesAsync(
@@ -177,6 +181,37 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
                 })),
             cancellationToken);
 
+        if (IsPendingReview(user))
+        {
+            await _notifications.PublishToAdminsAsync(
+                new AdminNotificationPublishRequest(
+                    Category: "nurse_profile_pending_completion",
+                    Severity: "Medium",
+                    Title: "Perfil de enfermeria pendiente de completar",
+                    Body: $"Se creo el perfil de la enfermera {user.Email} y requiere completar informacion administrativa.",
+                    EntityType: "NurseProfile",
+                    EntityId: user.Id.ToString(),
+                    DeepLinkPath: $"/admin/nurse-profiles/{user.Id}",
+                    Source: "Administracion",
+                    RequiresAction: true),
+                cancellationToken);
+        }
+        else
+        {
+            await _notifications.PublishToAdminsAsync(
+                new AdminNotificationPublishRequest(
+                    Category: "nurse_profile_completed",
+                    Severity: "Low",
+                    Title: "Perfil de enfermeria completado",
+                    Body: $"Se creo el perfil completo de la enfermera {user.Email} y esta listo para asignacion.",
+                    EntityType: "NurseProfile",
+                    EntityId: user.Id.ToString(),
+                    DeepLinkPath: $"/admin/nurse-profiles/{user.Id}",
+                    Source: "Administracion",
+                    RequiresAction: false),
+                cancellationToken);
+        }
+
         return await MapResponseAsync(user, cancellationToken);
     }
 
@@ -304,6 +339,19 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
                     before,
                     after = CreateAuditSnapshot(user)
                 })),
+            cancellationToken);
+
+        await _notifications.PublishToAdminsAsync(
+            new AdminNotificationPublishRequest(
+                Category: "nurse_profile_completed",
+                Severity: "Low",
+                Title: "Perfil de enfermeria completado",
+                Body: $"El perfil de la enfermera {user.Email} ha sido completado y esta listo para asignacion.",
+                EntityType: "NurseProfile",
+                EntityId: user.Id.ToString(),
+                DeepLinkPath: $"/admin/nurse-profiles/{user.Id}",
+                Source: "Administracion",
+                RequiresAction: false),
             cancellationToken);
 
         return await MapResponseAsync(user, cancellationToken);

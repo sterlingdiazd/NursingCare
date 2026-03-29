@@ -3,6 +3,7 @@ using NursingCareBackend.Domain.Admin;
 using NursingCareBackend.Domain.CareRequests;
 using NursingCareBackend.Domain.Catalogs;
 using NursingCareBackend.Domain.Identity;
+using NursingCareBackend.Domain.SystemSettings;
 
 namespace NursingCareBackend.Infrastructure.Persistence;
 
@@ -31,6 +32,7 @@ public sealed class NursingCareDbContext : DbContext
        public DbSet<VolumeDiscountRule> VolumeDiscountRules => Set<VolumeDiscountRule>();
        public DbSet<NurseSpecialtyCatalog> NurseSpecialtyCatalogs => Set<NurseSpecialtyCatalog>();
        public DbSet<NurseCategoryCatalog> NurseCategoryCatalogs => Set<NurseCategoryCatalog>();
+       public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
 
        protected override void OnModelCreating(ModelBuilder modelBuilder)
        {
@@ -510,6 +512,39 @@ public sealed class NursingCareDbContext : DbContext
 
                      builder.HasIndex(x => x.Code)
                   .IsUnique();
+              });
+
+              modelBuilder.Entity<SystemSetting>(builder =>
+              {
+                     builder.ToTable("SystemSettings");
+
+                     builder.HasKey(x => x.Key);
+
+                     builder.Property(x => x.Key)
+                  .IsRequired()
+                  .HasMaxLength(150);
+
+                     builder.Property(x => x.Value)
+                  .IsRequired()
+                  .HasMaxLength(2000);
+
+                     builder.Property(x => x.Description)
+                  .IsRequired()
+                  .HasMaxLength(1000);
+
+                     builder.Property(x => x.Category)
+                  .IsRequired()
+                  .HasMaxLength(100);
+
+                     builder.Property(x => x.ValueType)
+                  .IsRequired()
+                  .HasMaxLength(50);
+
+                     builder.Property(x => x.AllowedValuesJson)
+                  .HasMaxLength(2000);
+
+                     builder.Property(x => x.ModifiedAtUtc)
+                  .IsRequired();
               });
        }
 }

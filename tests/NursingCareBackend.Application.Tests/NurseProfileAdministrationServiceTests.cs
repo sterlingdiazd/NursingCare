@@ -1,4 +1,5 @@
 using NursingCareBackend.Application.AdminPortal.Auditing;
+using NursingCareBackend.Application.AdminPortal.Notifications;
 using NursingCareBackend.Application.Identity.Authentication;
 using NursingCareBackend.Application.Identity.Commands;
 using NursingCareBackend.Application.Identity.Models;
@@ -52,7 +53,8 @@ public sealed class NurseProfileAdministrationServiceTests
   {
     var repository = new FakeUserRepository();
     var auditService = new FakeAdminAuditService();
-    var service = CreateService(repository, auditService: auditService);
+    var notificationPublisher = new FakeAdminNotificationPublisher();
+    var service = CreateService(repository, auditService: auditService, notificationPublisher: notificationPublisher);
 
     var response = await service.CreateNurseProfileAsync(
       new AdminCreateNurseProfileRequest(
@@ -86,6 +88,11 @@ public sealed class NurseProfileAdministrationServiceTests
     Assert.Contains(stored.UserRoles, userRole => userRole.Role.Name == SystemRoles.Nurse);
     Assert.Single(auditService.Records);
     Assert.Equal(AdminAuditActions.NurseProfileCreatedByAdmin, auditService.Records[0].Action);
+    
+    // Check notification
+    var notification = Assert.Single(notificationPublisher.PublishedRequests);
+    Assert.Equal("nurse_profile_completed", notification.Category);
+    Assert.Equal("Low", notification.Severity);
   }
 
   [Fact]
@@ -95,7 +102,8 @@ public sealed class NurseProfileAdministrationServiceTests
     nurse.IsActive = true;
     var repository = new FakeUserRepository(nurse);
     var auditService = new FakeAdminAuditService();
-    var service = CreateService(repository, auditService: auditService);
+    var notificationPublisher = new FakeAdminNotificationPublisher();
+    var service = CreateService(repository, auditService: auditService, notificationPublisher: notificationPublisher);
 
     var response = await service.CompleteNurseProfileCreationAsync(
       nurse.Id,
@@ -124,6 +132,11 @@ public sealed class NurseProfileAdministrationServiceTests
     Assert.False(response.IsPendingReview);
     Assert.Single(auditService.Records);
     Assert.Equal(AdminAuditActions.NurseProfileCompleted, auditService.Records[0].Action);
+
+    // Check notification
+    var notification = Assert.Single(notificationPublisher.PublishedRequests);
+    Assert.Equal("nurse_profile_completed", notification.Category);
+    Assert.Equal("Low", notification.Severity);
   }
 
   [Fact]
@@ -220,14 +233,16 @@ public sealed class NurseProfileAdministrationServiceTests
     FakeUserRepository userRepository,
     FakeRoleRepository? roleRepository = null,
     FakePasswordHasher? passwordHasher = null,
-    FakeAdminAuditService? auditService = null)
+    FakeAdminAuditService? auditService = null,
+    FakeAdminNotificationPublisher? notificationPublisher = null)
   {
     return new NurseProfileAdministrationService(
       userRepository,
       roleRepository ?? new FakeRoleRepository(),
       passwordHasher ?? new FakePasswordHasher(),
       auditService ?? new FakeAdminAuditService(),
-      new FakeNurseCatalogService());
+      new FakeNurseCatalogService(),
+      notificationPublisher ?? new FakeAdminNotificationPublisher());
   }
 
   private static User CreateNurseUser(
