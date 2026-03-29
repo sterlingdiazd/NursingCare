@@ -65,7 +65,7 @@ Start from:
 Important local values:
 
 ```env
-PUBLIC_API_HOST=10.0.0.33
+PUBLIC_API_HOST=<LAN_IP>
 PUBLIC_API_PORT=5050
 API_INTERNAL_PORT=8080
 ASPNETCORE_ENVIRONMENT=Development
@@ -84,8 +84,8 @@ Start from:
 Example:
 
 ```env
-VITE_API_BASE_URL=https://10.0.0.33:5050/api
-VITE_API_PROXY_TARGET=https://10.0.0.33:5050
+VITE_API_BASE_URL=https://<LAN_IP>:5050/api
+VITE_API_PROXY_TARGET=https://<LAN_IP>:5050
 ```
 
 ### Mobile
@@ -101,7 +101,7 @@ Start from:
 Example:
 
 ```env
-EXPO_PUBLIC_API_BASE_URL=https://10.0.0.33:5050
+EXPO_PUBLIC_API_BASE_URL=https://<LAN_IP>:5050
 ```
 
 ## Current Local Automation

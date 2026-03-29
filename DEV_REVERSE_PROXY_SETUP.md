@@ -38,7 +38,7 @@ cp .env.example .env
 
 Update these values in `.env`:
 
-- `PUBLIC_API_HOST`: your Mac LAN IP, for example `10.0.0.33`
+- `PUBLIC_API_HOST`: your Mac LAN IP, for example `<LAN_IP>`
 - `PUBLIC_API_PORT`: usually `5050`
 - `API_INTERNAL_PORT`: usually `8080`
 - `DB_PASSWORD`
@@ -50,7 +50,7 @@ Generate a local root CA and server certificate:
 
 ```bash
 chmod +x ./scripts/generate-dev-cert.sh
-./scripts/generate-dev-cert.sh 10.0.0.33 5050
+./scripts/generate-dev-cert.sh <LAN_IP> 5050
 ```
 
 This creates:
@@ -85,8 +85,8 @@ docker compose --env-file .env up -d --build
 Then verify:
 
 ```bash
-curl https://10.0.0.33:5050/api/health
-curl https://10.0.0.33:5050/swagger/index.html
+curl https://<LAN_IP>:5050/api/health
+curl https://<LAN_IP>:5050/swagger/index.html
 ```
 
 ## 5. What The Proxy Does

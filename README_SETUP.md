@@ -24,24 +24,24 @@ Welcome! This guide will help you get started with the Nursing Care Backend API.
 This backend API provides:
 
 ### Authentication System
-- ✅ User registration with email validation
-- ✅ User login with password verification
-- ✅ JWT token generation and validation
-- ✅ Role-based access control (Admin, Nurse, User)
-- ✅ Secure password hashing (PBKDF2-SHA256)
+-  User registration with email validation
+-  User login with password verification
+-  JWT token generation and validation
+-  Role-based access control (Admin, Nurse, User)
+-  Secure password hashing (PBKDF2-SHA256)
 
 ### Care Request Management
-- ✅ Create care requests
-- ✅ View all care requests
-- ✅ View specific care request by ID
-- ✅ Role-based authorization (Nurses and Admins only)
+-  Create care requests
+-  View all care requests
+-  View specific care request by ID
+-  Role-based authorization (Nurses and Admins only)
 
 ### Developer Tools
-- ✅ Swagger/OpenAPI documentation
-- ✅ Environment variable configuration
-- ✅ Docker support for SQL Server
-- ✅ Comprehensive error handling
-- ✅ Automatic database migrations
+-  Swagger/OpenAPI documentation
+-  Environment variable configuration
+-  Docker support for SQL Server
+-  Comprehensive error handling
+-  Automatic database migrations
 
 ---
 
@@ -377,31 +377,31 @@ docker rm nursingcare-sql
 
 ## Key Features Implemented
 
-### ✅ Authentication
+###  Authentication
 - User registration with validation
 - Secure password hashing (PBKDF2-SHA256)
 - JWT token generation (1 hour expiration)
 - Login with email and password
 
-### ✅ Authorization
+###  Authorization
 - Role-based access control (RBAC)
 - Three roles: Admin, Nurse, User
 - Protected endpoints requiring "Nurse" or "Admin"
 - Token validation on protected routes
 
-### ✅ Care Requests
+###  Care Requests
 - Create new care requests
 - List all care requests
 - Retrieve specific care request
 - Timestamps for all requests
 
-### ✅ Database
+###  Database
 - SQL Server 2022 support
 - Automatic migrations on startup
 - Default roles seeded automatically
 - Entity relationships and constraints
 
-### ✅ API
+###  API
 - RESTful design
 - Swagger/OpenAPI documentation
 - Comprehensive error handling
@@ -477,7 +477,7 @@ docker stop nursingcare-sql
 
 ## Created: March 16, 2026
 
-**Status:** ✅ Ready for Development & Testing
+**Status:**  Ready for Development & Testing
 
 **Last Updated:** 2026-03-16
 

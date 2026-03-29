@@ -415,7 +415,7 @@ GET /swagger
 - **Last Updated:** March 16, 2026
 - **.NET SDK:** 10.x
 - **SQL Server:** 2022
-- **Status:** ✅ Ready for Development
+- **Status:**  Ready for Development
 
 ---
 

@@ -371,8 +371,8 @@ REGISTER=$(curl -s -X POST $BASE_URL/api/auth/register \
   }")
 
 TOKEN=$(echo $REGISTER | grep -o '"token":"[^"]*' | head -1 | cut -d'"' -f4)
-echo "✓ User registered: $EMAIL"
-echo "✓ Token: ${TOKEN:0:50}..."
+echo " User registered: $EMAIL"
+echo " Token: ${TOKEN:0:50}..."
 
 echo ""
 echo "Step 2: Create care request..."
@@ -385,17 +385,17 @@ CREATE=$(curl -s -X POST $BASE_URL/api/care-requests \
   }')
 
 REQUEST_ID=$(echo $CREATE | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
-echo "✓ Care request created: $REQUEST_ID"
+echo " Care request created: $REQUEST_ID"
 
 echo ""
 echo "Step 3: Get all care requests..."
 curl -s -H "Authorization: Bearer $TOKEN" \
   $BASE_URL/api/care-requests | head -100
 echo ""
-echo "✓ All care requests retrieved"
+echo " All care requests retrieved"
 
 echo ""
-echo "✓ All tests passed!"
+echo " All tests passed!"
 ```
 
 Run it:
@@ -685,12 +685,12 @@ dotnet build
 
 ## Security Notes
 
-✅ **Passwords:** PBKDF2-SHA256 hashing with salt (10,000 iterations)
-✅ **Tokens:** JWT with 1-hour expiration
-✅ **Comparison:** Fixed-time password comparison (prevents timing attacks)
-✅ **Authorization:** Role-based (Admin, Nurse, User)
-✅ **Secrets:** All in environment variables, none hardcoded
-✅ **Validation:** Input validation on all endpoints
+ **Passwords:** PBKDF2-SHA256 hashing with salt (10,000 iterations)
+ **Tokens:** JWT with 1-hour expiration
+ **Comparison:** Fixed-time password comparison (prevents timing attacks)
+ **Authorization:** Role-based (Admin, Nurse, User)
+ **Secrets:** All in environment variables, none hardcoded
+ **Validation:** Input validation on all endpoints
 
 ---
 
@@ -760,17 +760,17 @@ docker start nursingcare-sql
 ## Summary
 
 This single guide contains everything needed to:
-- ✅ Set up SQL Server in Docker
-- ✅ Configure environment variables
-- ✅ Run the API locally
-- ✅ Test all endpoints
-- ✅ Understand the API
-- ✅ Fix common problems
+-  Set up SQL Server in Docker
+-  Configure environment variables
+-  Run the API locally
+-  Test all endpoints
+-  Understand the API
+-  Fix common problems
 
 **Start with Step 1 and follow in order.**
 
 ---
 
 **Created:** March 16, 2026
-**Status:** ✅ Complete and ready to use
+**Status:**  Complete and ready to use
 **Build:** 0 Errors, 0 Warnings

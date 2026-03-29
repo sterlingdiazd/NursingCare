@@ -495,7 +495,7 @@ REGISTER_RESPONSE=$(curl -s -X POST $BASE_URL/api/auth/register \
   }")
 
 TOKEN=$(echo $REGISTER_RESPONSE | jq -r '.token')
-echo -e "${GREEN}✓ User registered${NC}"
+echo -e "${GREEN} User registered${NC}"
 echo "Email: $EMAIL"
 echo "Token: ${TOKEN:0:50}..."
 
@@ -510,7 +510,7 @@ CREATE_RESPONSE_1=$(curl -s -X POST $BASE_URL/api/care-requests \
   }')
 
 REQUEST_ID_1=$(echo $CREATE_RESPONSE_1 | jq -r '.id')
-echo -e "${GREEN}✓ Care request created${NC}"
+echo -e "${GREEN} Care request created${NC}"
 echo "ID: $REQUEST_ID_1"
 
 # Step 3: Create Care Request 2
@@ -524,7 +524,7 @@ CREATE_RESPONSE_2=$(curl -s -X POST $BASE_URL/api/care-requests \
   }')
 
 REQUEST_ID_2=$(echo $CREATE_RESPONSE_2 | jq -r '.id')
-echo -e "${GREEN}✓ Care request created${NC}"
+echo -e "${GREEN} Care request created${NC}"
 echo "ID: $REQUEST_ID_2"
 
 # Step 4: Get All Care Requests
@@ -533,7 +533,7 @@ LIST_RESPONSE=$(curl -s -H "Authorization: Bearer $TOKEN" \
   $BASE_URL/api/care-requests)
 
 COUNT=$(echo $LIST_RESPONSE | jq 'length')
-echo -e "${GREEN}✓ Retrieved $COUNT care requests${NC}"
+echo -e "${GREEN} Retrieved $COUNT care requests${NC}"
 
 # Step 5: Get Specific Care Request
 echo -e "\n${BLUE}5. Getting specific care request...${NC}"
@@ -541,13 +541,13 @@ GET_RESPONSE=$(curl -s -H "Authorization: Bearer $TOKEN" \
   $BASE_URL/api/care-requests/$REQUEST_ID_1)
 
 DESCRIPTION=$(echo $GET_RESPONSE | jq -r '.description')
-echo -e "${GREEN}✓ Retrieved care request${NC}"
+echo -e "${GREEN} Retrieved care request${NC}"
 echo "Description: $DESCRIPTION"
 
 # Step 6: Health Check
 echo -e "\n${BLUE}6. Checking API health...${NC}"
 HEALTH=$(curl -s $BASE_URL/health)
-echo -e "${GREEN}✓ API is healthy${NC}"
+echo -e "${GREEN} API is healthy${NC}"
 
 echo -e "\n${GREEN}=== Workflow Complete ===${NC}"
 ```
