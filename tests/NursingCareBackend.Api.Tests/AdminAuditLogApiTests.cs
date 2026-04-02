@@ -183,34 +183,12 @@ public sealed class AdminAuditLogApiTests
     CustomWebApplicationFactory factory,
     string scenario)
   {
-    var client = factory.CreateClient();
-    var response = await client.PostAsJsonAsync("/api/auth/setup-admin", new
-    {
-      adminEmail = $"{scenario}@nursingcare.local",
-      adminPassword = "Pass123!"
-    });
-
-    response.EnsureSuccessStatusCode();
-    var payload = await response.Content.ReadFromJsonAsync<SetupAdminEnvelopeDto>();
-
     var adminClient = factory.CreateClient();
     adminClient.DefaultRequestHeaders.Authorization =
-      new AuthenticationHeaderValue("Bearer", payload!.Data.Token);
+      new AuthenticationHeaderValue("Bearer", JwtTestTokens.CreateAdminToken(factory.Services));
 
-    return new BootstrapAdminSession(adminClient, payload.Data.UserId);
+    return new BootstrapAdminSession(adminClient, Guid.Parse("00000000-0000-0000-0000-000000000001"));
   }
 
   private sealed record BootstrapAdminSession(HttpClient Client, Guid UserId);
-
-  private sealed class SetupAdminEnvelopeDto
-  {
-    public string Message { get; set; } = string.Empty;
-    public AuthResponseDto Data { get; set; } = new();
-  }
-
-  private sealed class AuthResponseDto
-  {
-    public string Token { get; set; } = string.Empty;
-    public Guid UserId { get; set; }
-  }
 }

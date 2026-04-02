@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using NursingCareBackend.Api.Security;
+using NursingCareBackend.Application.Email;
 using NursingCareBackend.Application.Identity.OAuth;
 using NursingCareBackend.Domain.Identity;
 using NursingCareBackend.Infrastructure.Persistence;
@@ -14,8 +16,12 @@ namespace NursingCareBackend.Api.Tests;
 public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
   private readonly string _testConnectionString = TestSqlConnectionResolver.CreateUniqueDatabaseConnectionString();
+  private readonly MutableTimeProvider _timeProvider = new();
   private bool _databaseInitialized;
   private readonly object _lock = new();
+
+  public MutableTimeProvider TimeProvider => _timeProvider;
+  public TestEmailService EmailService => Services.GetRequiredService<TestEmailService>();
 
   protected override void ConfigureWebHost(IWebHostBuilder builder)
   {
@@ -37,6 +43,12 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
     {
       services.RemoveAll<IGoogleOAuthClient>();
       services.AddSingleton<IGoogleOAuthClient, FakeGoogleOAuthClient>();
+      services.RemoveAll<TimeProvider>();
+      services.AddSingleton<TimeProvider>(_timeProvider);
+      services.RemoveAll<TestEmailService>();
+      services.AddSingleton<TestEmailService>();
+      services.RemoveAll<IEmailService>();
+      services.AddSingleton<IEmailService>(serviceProvider => serviceProvider.GetRequiredService<TestEmailService>());
 
       var descriptor = services.Single(
         d => d.ServiceType == typeof(DbContextOptions<NursingCareDbContext>));
@@ -48,6 +60,29 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         options.UseSqlServer(_testConnectionString);
       });
     });
+  }
+
+  public new HttpClient CreateClient()
+  {
+    EnsureDatabaseInitialized();
+    ResetTransientState();
+    return base.CreateClient();
+  }
+
+  public new HttpClient CreateClient(WebApplicationFactoryClientOptions options)
+  {
+    EnsureDatabaseInitialized();
+    ResetTransientState();
+    return base.CreateClient(options);
+  }
+
+  private void ResetTransientState()
+  {
+    using var scope = Services.CreateScope();
+    if (scope.ServiceProvider.GetRequiredService<IAuthRateLimiter>() is AuthRateLimiter authRateLimiter)
+    {
+      authRateLimiter.Reset();
+    }
   }
 
   public void EnsureDatabaseInitialized()

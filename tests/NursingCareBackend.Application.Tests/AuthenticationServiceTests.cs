@@ -320,6 +320,7 @@ public sealed class AuthenticationServiceTests
       new FakeNurseCatalogService(),
       notifications ?? new FakeAdminNotificationPublisher(),
       emailService ?? new FakeEmailService(),
+      TimeProvider.System,
       NullLogger<AuthenticationService>.Instance);
   }
 

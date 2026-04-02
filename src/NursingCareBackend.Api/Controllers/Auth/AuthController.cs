@@ -4,11 +4,13 @@ using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
 using NursingCareBackend.Api.ErrorHandling;
 using NursingCareBackend.Api.Extensions;
+using NursingCareBackend.Api.Security;
 using NursingCareBackend.Application.Identity.Commands;
 using NursingCareBackend.Application.Identity.OAuth;
 using NursingCareBackend.Application.Identity.Services;
 using NursingCareBackend.Application.Identity.Responses;
 using NursingCareBackend.Infrastructure.Authentication;
+using System.Globalization;
 
 namespace NursingCareBackend.Api.Controllers.Auth;
 
@@ -16,18 +18,25 @@ namespace NursingCareBackend.Api.Controllers.Auth;
 [Route("api/auth")]
 public sealed class AuthController : ControllerBase
 {
+    private static readonly TimeSpan ForgotPasswordWindow = TimeSpan.FromMinutes(15);
+    private static readonly TimeSpan LoginWindow = TimeSpan.FromMinutes(15);
+    private static readonly TimeSpan ResetPasswordWindow = TimeSpan.FromMinutes(15);
+
     private readonly IAuthenticationService _authenticationService;
+    private readonly IAuthRateLimiter _authRateLimiter;
     private readonly IGoogleOAuthClient _googleOAuthClient;
     private readonly GoogleOAuthOptions _googleOAuthOptions;
     private readonly ILogger<AuthController> _logger;
 
     public AuthController(
         IAuthenticationService authenticationService,
+        IAuthRateLimiter authRateLimiter,
         IGoogleOAuthClient googleOAuthClient,
         IOptions<GoogleOAuthOptions> googleOAuthOptions,
         ILogger<AuthController> logger)
     {
         _authenticationService = authenticationService;
+        _authRateLimiter = authRateLimiter;
         _googleOAuthClient = googleOAuthClient;
         _googleOAuthOptions = googleOAuthOptions.Value;
         _logger = logger;
@@ -94,6 +103,14 @@ public sealed class AuthController : ControllerBase
         [FromBody] LoginRequest request,
         CancellationToken cancellationToken)
     {
+        var rateLimitDecision = _authRateLimiter.Check("login", ResolveClientIpAddress(), limit: 20, window: LoginWindow);
+        if (!rateLimitDecision.IsAllowed)
+        {
+            return CreateRateLimitResponse(
+                "Has excedido temporalmente los intentos de inicio de sesion. Intenta de nuevo en unos minutos.",
+                rateLimitDecision.RetryAfter);
+        }
+
         try
         {
             var response = await _authenticationService.LoginAsync(request, cancellationToken);
@@ -322,6 +339,14 @@ public sealed class AuthController : ControllerBase
         [FromBody] ForgotPasswordRequest request,
         CancellationToken cancellationToken)
     {
+        var rateLimitDecision = _authRateLimiter.Check("forgot-password", ResolveClientIpAddress(), limit: 10, window: ForgotPasswordWindow);
+        if (!rateLimitDecision.IsAllowed)
+        {
+            return CreateRateLimitResponse(
+                "Has excedido temporalmente las solicitudes de recuperacion. Intenta de nuevo mas tarde.",
+                rateLimitDecision.RetryAfter);
+        }
+
         await _authenticationService.RequestPasswordResetAsync(request.Email, cancellationToken);
         return Ok(new { message = "Si el correo esta registrado, se ha enviado un codigo de recuperacion." });
     }
@@ -336,6 +361,14 @@ public sealed class AuthController : ControllerBase
         [FromBody] ResetPasswordRequest request,
         CancellationToken cancellationToken)
     {
+        var rateLimitDecision = _authRateLimiter.Check("reset-password", ResolveClientIpAddress(), limit: 10, window: ResetPasswordWindow);
+        if (!rateLimitDecision.IsAllowed)
+        {
+            return CreateRateLimitResponse(
+                "Has excedido temporalmente los intentos de restablecimiento. Intenta de nuevo mas tarde.",
+                rateLimitDecision.RetryAfter);
+        }
+
         try
         {
             var response = await _authenticationService.ResetPasswordAsync(
@@ -456,5 +489,31 @@ public sealed class AuthController : ControllerBase
     {
         var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
         return Guid.TryParse(userIdClaim, out var userId) ? userId : null;
+    }
+
+    private ObjectResult CreateRateLimitResponse(string detail, TimeSpan retryAfter)
+    {
+        Response.Headers.RetryAfter = Math.Max(1, (int)Math.Ceiling(retryAfter.TotalSeconds)).ToString(CultureInfo.InvariantCulture);
+        return this.ProblemResponse(
+            StatusCodes.Status429TooManyRequests,
+            "Demasiadas solicitudes",
+            detail);
+    }
+
+    private string ResolveClientIpAddress()
+    {
+        if (Request.Headers.TryGetValue("X-Forwarded-For", out var forwardedForValues))
+        {
+            var forwardedFor = forwardedForValues.ToString()
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .FirstOrDefault();
+
+            if (!string.IsNullOrWhiteSpace(forwardedFor))
+            {
+                return forwardedFor;
+            }
+        }
+
+        return HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
     }
 }

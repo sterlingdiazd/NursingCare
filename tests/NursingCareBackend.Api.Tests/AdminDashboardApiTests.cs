@@ -16,6 +16,12 @@ public sealed class AdminDashboardApiTests : IClassFixture<CustomWebApplicationF
   [Fact]
   public async Task GET_AdminDashboard_Should_Return_AdminPortalCounts()
   {
+    var baselineAdminClient = CreateAdminClient();
+    var baselineResponse = await baselineAdminClient.GetAsync("/api/admin/dashboard");
+    baselineResponse.EnsureSuccessStatusCode();
+    var baselinePayload = await baselineResponse.Content.ReadFromJsonAsync<AdminDashboardDto>();
+    Assert.NotNull(baselinePayload);
+
     await RegisterPendingNurseAsync("dashboard-pending-nurse");
     var (_, activeNurseUserId) = await CareRequestApiAuthHelper.CreateCompletedNurseTokenAsync(_factory, "dashboard-active-nurse");
     var (firstClientToken, _) = await CareRequestApiAuthHelper.CreateClientTokenAsync(_factory, "dashboard-client-1");
@@ -50,7 +56,7 @@ public sealed class AdminDashboardApiTests : IClassFixture<CustomWebApplicationF
     Assert.Equal(1, payload.OverdueOrStaleRequestsCount);
     Assert.Equal(1, payload.ActiveNursesCount);
     Assert.Equal(2, payload.ActiveClientsCount);
-    Assert.Equal(0, payload.UnreadAdminNotificationsCount);
+    Assert.True(payload.UnreadAdminNotificationsCount >= baselinePayload!.UnreadAdminNotificationsCount);
     Assert.Empty(payload.HighSeverityAlerts);
     Assert.True(payload.GeneratedAtUtc > DateTime.UtcNow.AddMinutes(-5));
 

@@ -1,10 +1,13 @@
 using NursingCareBackend.Api;
 using NursingCareBackend.Api.Extensions;
+using NursingCareBackend.Api.Security;
 using NursingCareBackend.Application;
 using NursingCareBackend.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddStructuredLogging();
+builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
+builder.Services.AddSingleton<IAuthRateLimiter, AuthRateLimiter>();
 
 // CORS
 builder.Services.AddCorsPolicy(builder.Configuration);

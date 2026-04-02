@@ -14,5 +14,5 @@ public interface IAuthenticationService
     Task<AuthResponse> CreateAdminAsync(AdminSetupRequest request, CancellationToken cancellationToken = default);
     Task ActivateUserAsync(Guid userId, CancellationToken cancellationToken = default);
     Task RequestPasswordResetAsync(string email, CancellationToken cancellationToken = default);
-    Task<AuthResponse> ResetPasswordAsync(string email, string code, string newPassword, CancellationToken cancellationToken = default);
+    Task<PasswordResetResponse> ResetPasswordAsync(string email, string code, string newPassword, CancellationToken cancellationToken = default);
 }

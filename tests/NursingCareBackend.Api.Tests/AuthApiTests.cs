@@ -1,8 +1,14 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using NursingCareBackend.Api.Security;
+using NursingCareBackend.Domain.Identity;
+using NursingCareBackend.Infrastructure.Persistence;
 
 namespace NursingCareBackend.Api.Tests;
 
@@ -536,6 +542,291 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
     Assert.Equal(HttpStatusCode.Unauthorized, reusedRefreshResponse.StatusCode);
   }
 
+  [Fact]
+  public async Task POST_ForgotPassword_Should_Store_A_Hashed_Code_And_Return_A_Generic_Response()
+  {
+    ResetAuthTestState();
+    var client = _factory.CreateClient();
+    var email = $"forgot-{Guid.NewGuid():N}@nursingcare.local";
+
+    await client.PostAsJsonAsync("/api/auth/register", new
+    {
+      name = "Paola",
+      lastName = "Sanchez",
+      identificationNumber = "00166778890",
+      phone = "8095550106",
+      email,
+      password = "Pass123!",
+      confirmPassword = "Pass123!"
+    });
+
+    var response = await client.PostAsJsonAsync("/api/auth/forgot-password", new
+    {
+      email
+    });
+
+    response.EnsureSuccessStatusCode();
+
+    var payload = await response.Content.ReadFromJsonAsync<PasswordResetResponseDto>();
+    Assert.NotNull(payload);
+    Assert.Equal("Si el correo esta registrado, se ha enviado un codigo de recuperacion.", payload!.Message);
+
+    Assert.Single(_factory.EmailService.SentEmails);
+    var code = ExtractResetCode(_factory.EmailService.SentEmails[0].HtmlBody);
+    var user = await GetUserByEmailAsync(email);
+
+    Assert.False(string.IsNullOrWhiteSpace(user.ResetPasswordCodeHash));
+    Assert.NotEqual(code, user.ResetPasswordCodeHash);
+    Assert.NotNull(user.ResetPasswordCodeIssuedAtUtc);
+    Assert.NotNull(user.ResetPasswordCodeExpiresAtUtc);
+    Assert.NotNull(user.ResetPasswordResendAvailableAtUtc);
+    Assert.Equal(0, user.ResetPasswordFailedAttemptCount);
+  }
+
+  [Fact]
+  public async Task POST_ForgotPassword_Should_Suppress_Reissue_Within_Cooldown_And_Reissue_After_It_Expires()
+  {
+    ResetAuthTestState();
+    var client = _factory.CreateClient();
+    var email = $"forgot-resend-{Guid.NewGuid():N}@nursingcare.local";
+
+    await client.PostAsJsonAsync("/api/auth/register", new
+    {
+      name = "Rosa",
+      lastName = "Mendez",
+      identificationNumber = "00166778891",
+      phone = "8095550107",
+      email,
+      password = "Pass123!",
+      confirmPassword = "Pass123!"
+    });
+
+    var firstResponse = await client.PostAsJsonAsync("/api/auth/forgot-password", new { email });
+    firstResponse.EnsureSuccessStatusCode();
+    var firstCode = ExtractResetCode(_factory.EmailService.SentEmails[0].HtmlBody);
+
+    var secondResponse = await client.PostAsJsonAsync("/api/auth/forgot-password", new { email });
+    secondResponse.EnsureSuccessStatusCode();
+    Assert.Single(_factory.EmailService.SentEmails);
+
+    _factory.TimeProvider.Advance(TimeSpan.FromSeconds(61));
+
+    var thirdResponse = await client.PostAsJsonAsync("/api/auth/forgot-password", new { email });
+    thirdResponse.EnsureSuccessStatusCode();
+    Assert.Equal(2, _factory.EmailService.SentEmails.Count);
+
+    var secondCode = ExtractResetCode(_factory.EmailService.SentEmails[1].HtmlBody);
+    Assert.NotEqual(firstCode, secondCode);
+  }
+
+  [Fact]
+  public async Task POST_ResetPassword_Should_Return_A_Message_Revoke_RefreshTokens_And_Require_A_New_Login()
+  {
+    ResetAuthTestState();
+    var client = _factory.CreateClient();
+    var email = $"reset-success-{Guid.NewGuid():N}@nursingcare.local";
+
+    var registerResponse = await client.PostAsJsonAsync("/api/auth/register", new
+    {
+      name = "Teresa",
+      lastName = "Lopez",
+      identificationNumber = "00166778892",
+      phone = "8095550108",
+      email,
+      password = "Pass123!",
+      confirmPassword = "Pass123!"
+    });
+
+    registerResponse.EnsureSuccessStatusCode();
+    var registerPayload = await registerResponse.Content.ReadFromJsonAsync<AuthResponseDto>();
+
+    var forgotResponse = await client.PostAsJsonAsync("/api/auth/forgot-password", new { email });
+    forgotResponse.EnsureSuccessStatusCode();
+    var code = ExtractResetCode(_factory.EmailService.SentEmails[0].HtmlBody);
+
+    var resetResponse = await client.PostAsJsonAsync("/api/auth/reset-password", new
+    {
+      email,
+      code,
+      newPassword = "NewPass123!"
+    });
+
+    resetResponse.EnsureSuccessStatusCode();
+    var payload = await resetResponse.Content.ReadFromJsonAsync<PasswordResetResponseDto>();
+    Assert.NotNull(payload);
+    Assert.Equal("La contrasena se restablecio correctamente. Inicia sesion con tu nueva contrasena.", payload!.Message);
+
+    var body = await resetResponse.Content.ReadAsStringAsync();
+    Assert.DoesNotContain("token", body, StringComparison.OrdinalIgnoreCase);
+    Assert.DoesNotContain("refreshToken", body, StringComparison.OrdinalIgnoreCase);
+
+    var oldRefreshResponse = await client.PostAsJsonAsync("/api/auth/refresh", new
+    {
+      refreshToken = registerPayload!.RefreshToken
+    });
+    Assert.Equal(HttpStatusCode.Unauthorized, oldRefreshResponse.StatusCode);
+
+    var oldPasswordLoginResponse = await client.PostAsJsonAsync("/api/auth/login", new
+    {
+      email,
+      password = "Pass123!"
+    });
+    Assert.Equal(HttpStatusCode.Unauthorized, oldPasswordLoginResponse.StatusCode);
+
+    var newPasswordLoginResponse = await client.PostAsJsonAsync("/api/auth/login", new
+    {
+      email,
+      password = "NewPass123!"
+    });
+    newPasswordLoginResponse.EnsureSuccessStatusCode();
+  }
+
+  [Fact]
+  public async Task POST_ResetPassword_Should_Invalidate_The_Code_After_Five_Invalid_Attempts()
+  {
+    ResetAuthTestState();
+    var client = _factory.CreateClient();
+    var email = $"reset-attempts-{Guid.NewGuid():N}@nursingcare.local";
+
+    await client.PostAsJsonAsync("/api/auth/register", new
+    {
+      name = "Lucia",
+      lastName = "Ramirez",
+      identificationNumber = "00166778893",
+      phone = "8095550109",
+      email,
+      password = "Pass123!",
+      confirmPassword = "Pass123!"
+    });
+
+    var forgotResponse = await client.PostAsJsonAsync("/api/auth/forgot-password", new { email });
+    forgotResponse.EnsureSuccessStatusCode();
+    var code = ExtractResetCode(_factory.EmailService.SentEmails[0].HtmlBody);
+
+    for (var attempt = 0; attempt < 5; attempt += 1)
+    {
+      var invalidResponse = await client.PostAsJsonAsync("/api/auth/reset-password", new
+      {
+        email,
+        code = "000000",
+        newPassword = "NewPass123!"
+      });
+
+      Assert.Equal(HttpStatusCode.BadRequest, invalidResponse.StatusCode);
+    }
+
+    var validResponse = await client.PostAsJsonAsync("/api/auth/reset-password", new
+    {
+      email,
+      code,
+      newPassword = "NewPass123!"
+    });
+
+    Assert.Equal(HttpStatusCode.BadRequest, validResponse.StatusCode);
+
+    var user = await GetUserByEmailAsync(email);
+    Assert.Null(user.ResetPasswordCodeHash);
+    Assert.Null(user.ResetPasswordCodeExpiresAtUtc);
+    Assert.Equal(0, user.ResetPasswordFailedAttemptCount);
+  }
+
+  [Fact]
+  public async Task POST_Login_Should_Temporarily_Lock_Password_Login_After_Five_Invalid_Attempts()
+  {
+    ResetAuthTestState();
+    var client = _factory.CreateClient();
+    var email = $"lockout-{Guid.NewGuid():N}@nursingcare.local";
+
+    await client.PostAsJsonAsync("/api/auth/register", new
+    {
+      name = "Marcos",
+      lastName = "Gil",
+      identificationNumber = "00166778894",
+      phone = "8095550110",
+      email,
+      password = "Pass123!",
+      confirmPassword = "Pass123!"
+    });
+
+    for (var attempt = 0; attempt < 5; attempt += 1)
+    {
+      var invalidResponse = await client.PostAsJsonAsync("/api/auth/login", new
+      {
+        email,
+        password = "WrongPass123!"
+      });
+
+      Assert.Equal(HttpStatusCode.Unauthorized, invalidResponse.StatusCode);
+    }
+
+    var lockedResponse = await client.PostAsJsonAsync("/api/auth/login", new
+    {
+      email,
+      password = "Pass123!"
+    });
+    Assert.Equal(HttpStatusCode.Unauthorized, lockedResponse.StatusCode);
+
+    _factory.TimeProvider.Advance(TimeSpan.FromMinutes(16));
+
+    var recoveredResponse = await client.PostAsJsonAsync("/api/auth/login", new
+    {
+      email,
+      password = "Pass123!"
+    });
+    recoveredResponse.EnsureSuccessStatusCode();
+  }
+
+  [Fact]
+  public async Task POST_ForgotPassword_Should_Return_TooManyRequests_When_The_Ip_Limit_Is_Exceeded()
+  {
+    ResetAuthTestState();
+    var client = _factory.CreateClient();
+    client.DefaultRequestHeaders.Add("X-Forwarded-For", "203.0.113.10");
+
+    for (var attempt = 0; attempt < 10; attempt += 1)
+    {
+      var response = await client.PostAsJsonAsync("/api/auth/forgot-password", new
+      {
+        email = $"missing-{attempt}@nursingcare.local"
+      });
+
+      response.EnsureSuccessStatusCode();
+    }
+
+    var limitedResponse = await client.PostAsJsonAsync("/api/auth/forgot-password", new
+    {
+      email = "missing-final@nursingcare.local"
+    });
+
+    Assert.Equal(HttpStatusCode.TooManyRequests, limitedResponse.StatusCode);
+    Assert.True(limitedResponse.Headers.RetryAfter?.Delta is not null || limitedResponse.Headers.Contains("Retry-After"));
+  }
+
+  private void ResetAuthTestState()
+  {
+    _factory.TimeProvider.Reset();
+    _factory.EmailService.SentEmails.Clear();
+
+    using var scope = _factory.Services.CreateScope();
+    var authRateLimiter = scope.ServiceProvider.GetRequiredService<IAuthRateLimiter>() as AuthRateLimiter;
+    authRateLimiter?.Reset();
+  }
+
+  private async Task<User> GetUserByEmailAsync(string email)
+  {
+    using var scope = _factory.Services.CreateScope();
+    var dbContext = scope.ServiceProvider.GetRequiredService<NursingCareDbContext>();
+    var user = await dbContext.Users.SingleAsync(userRecord => userRecord.Email == email);
+    return user;
+  }
+
+  private static string ExtractResetCode(string htmlBody)
+  {
+    var match = Regex.Match(htmlBody, @"\b(\d{6})\b");
+    Assert.True(match.Success);
+    return match.Groups[1].Value;
+  }
+
   private sealed class AuthResponseDto
   {
     public string Token { get; set; } = string.Empty;
@@ -546,6 +837,11 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
     public string[] Roles { get; set; } = [];
     public bool RequiresProfileCompletion { get; set; }
     public bool RequiresAdminReview { get; set; }
+  }
+
+  private sealed class PasswordResetResponseDto
+  {
+    public string Message { get; set; } = string.Empty;
   }
 
   private sealed class ProblemDetailsDto

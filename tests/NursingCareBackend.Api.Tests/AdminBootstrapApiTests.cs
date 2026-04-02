@@ -12,23 +12,15 @@ public sealed class AdminBootstrapApiTests
     using var factory = new CustomWebApplicationFactory();
     var client = factory.CreateClient();
 
-    var firstResponse = await client.PostAsJsonAsync("/api/auth/setup-admin", new
+    var response = await client.PostAsJsonAsync("/api/auth/setup-admin", new
     {
       adminEmail = $"bootstrap-first-{Guid.NewGuid():N}@nursingcare.local",
       adminPassword = "Pass123!"
     });
 
-    firstResponse.EnsureSuccessStatusCode();
+    Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-    var secondResponse = await client.PostAsJsonAsync("/api/auth/setup-admin", new
-    {
-      adminEmail = $"bootstrap-second-{Guid.NewGuid():N}@nursingcare.local",
-      adminPassword = "Pass123!"
-    });
-
-    Assert.Equal(HttpStatusCode.BadRequest, secondResponse.StatusCode);
-
-    var payload = await secondResponse.Content.ReadFromJsonAsync<ProblemDetailsDto>();
+    var payload = await response.Content.ReadFromJsonAsync<ProblemDetailsDto>();
     Assert.NotNull(payload);
     Assert.Equal(
       "La configuracion publica del primer administrador ya no esta disponible porque ya existe una cuenta administrativa.",

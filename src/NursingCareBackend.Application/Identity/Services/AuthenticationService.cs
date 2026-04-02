@@ -11,11 +11,19 @@ using NursingCareBackend.Application.Identity.Validation;
 using NursingCareBackend.Application.AdminPortal.Notifications;
 using NursingCareBackend.Domain.Identity;
 using System.Security.Cryptography;
+using System.Text;
 
 namespace NursingCareBackend.Application.Identity.Services;
 
 public sealed class AuthenticationService : IAuthenticationService
 {
+    private const int PasswordResetCodeTtlMinutes = 15;
+    private const int PasswordResetResendCooldownSeconds = 60;
+    private const int PasswordResetMaxFailedAttempts = 5;
+    private const int LoginFailedAttemptLimit = 5;
+    private const int LoginFailedAttemptWindowMinutes = 15;
+    private const int LoginLockoutMinutes = 15;
+
     private readonly IUserRepository _userRepository;
     private readonly IRoleRepository _roleRepository;
     private readonly IRefreshTokenRepository _refreshTokenRepository;
@@ -26,6 +34,7 @@ public sealed class AuthenticationService : IAuthenticationService
     private readonly INurseCatalogService _nurseCatalog;
     private readonly IAdminNotificationPublisher _notifications;
     private readonly IEmailService _emailService;
+    private readonly TimeProvider _timeProvider;
     private readonly ILogger<AuthenticationService> _logger;
 
     public AuthenticationService(
@@ -39,6 +48,7 @@ public sealed class AuthenticationService : IAuthenticationService
         INurseCatalogService nurseCatalog,
         IAdminNotificationPublisher notifications,
         IEmailService emailService,
+        TimeProvider timeProvider,
         ILogger<AuthenticationService> logger)
     {
         _userRepository = userRepository;
@@ -51,6 +61,7 @@ public sealed class AuthenticationService : IAuthenticationService
         _nurseCatalog = nurseCatalog;
         _notifications = notifications;
         _emailService = emailService;
+        _timeProvider = timeProvider;
         _logger = logger;
     }
 
@@ -243,6 +254,8 @@ public sealed class AuthenticationService : IAuthenticationService
 
     public async Task<AuthResponse> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default)
     {
+        var now = GetUtcNow();
+
         // Validate input
         if (string.IsNullOrWhiteSpace(request.Email))
         {
@@ -261,10 +274,32 @@ public sealed class AuthenticationService : IAuthenticationService
             throw new InvalidOperationException("Invalid email or password.");
         }
 
+        if (user.LockedOutUntilUtc is not null)
+        {
+            if (user.LockedOutUntilUtc > now)
+            {
+                _logger.LogWarning(
+                    "Login rejected for locked user {Email}. LockedOutUntilUtc={LockedOutUntilUtc}",
+                    user.Email,
+                    user.LockedOutUntilUtc);
+                throw new InvalidOperationException("Invalid email or password.");
+            }
+
+            ResetLoginFailureState(user);
+            await _userRepository.UpdateAsync(user, cancellationToken);
+        }
+
         // Verify password
         if (!_passwordHasher.Verify(request.Password, user.PasswordHash))
         {
+            await RegisterFailedLoginAttemptAsync(user, now, cancellationToken);
             throw new InvalidOperationException("Invalid email or password.");
+        }
+
+        if (HasActiveLoginFailureState(user))
+        {
+            ResetLoginFailureState(user);
+            await _userRepository.UpdateAsync(user, cancellationToken);
         }
 
         // Check if user is active
@@ -512,6 +547,12 @@ public sealed class AuthenticationService : IAuthenticationService
 
     public async Task RequestPasswordResetAsync(string email, CancellationToken cancellationToken = default)
     {
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            throw new ArgumentException("Email is required.", nameof(email));
+        }
+
+        var now = GetUtcNow();
         var normalizedEmail = email.Trim().ToLowerInvariant();
         var user = await _userRepository.GetByEmailAsync(normalizedEmail, cancellationToken);
 
@@ -522,12 +563,37 @@ public sealed class AuthenticationService : IAuthenticationService
             return;
         }
 
-        // Generate a 6-digit code
+        var hasActiveResetCode =
+            !string.IsNullOrWhiteSpace(user.ResetPasswordCodeHash)
+            && user.ResetPasswordCodeExpiresAtUtc is not null
+            && user.ResetPasswordCodeExpiresAtUtc > now;
+
+        if (hasActiveResetCode
+            && user.ResetPasswordResendAvailableAtUtc is not null
+            && user.ResetPasswordResendAvailableAtUtc > now)
+        {
+            _logger.LogInformation(
+                "Password reset reissue suppressed for {Email}. Existing code remains active until {ExpiresAtUtc}. ResendAvailableAtUtc={ResendAvailableAtUtc}",
+                normalizedEmail,
+                user.ResetPasswordCodeExpiresAtUtc,
+                user.ResetPasswordResendAvailableAtUtc);
+            return;
+        }
+
         var code = RandomNumberGenerator.GetInt32(100000, 999999).ToString();
-        user.ResetPasswordCode = code;
-        user.ResetPasswordCodeExpiresAtUtc = DateTime.UtcNow.AddMinutes(15);
+        user.ResetPasswordCodeHash = HashResetCode(code);
+        user.ResetPasswordCodeIssuedAtUtc = now;
+        user.ResetPasswordCodeExpiresAtUtc = now.AddMinutes(PasswordResetCodeTtlMinutes);
+        user.ResetPasswordResendAvailableAtUtc = now.AddSeconds(PasswordResetResendCooldownSeconds);
+        user.ResetPasswordFailedAttemptCount = 0;
 
         await _userRepository.UpdateAsync(user, cancellationToken);
+
+        _logger.LogInformation(
+            "Password reset code issued for {Email}. ExpiresAtUtc={ExpiresAtUtc} ResendAvailableAtUtc={ResendAvailableAtUtc}",
+            normalizedEmail,
+            user.ResetPasswordCodeExpiresAtUtc,
+            user.ResetPasswordResendAvailableAtUtc);
 
         var htmlBody = $"""
             <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
@@ -550,11 +616,12 @@ public sealed class AuthenticationService : IAuthenticationService
             htmlBody,
             cancellationToken);
 
-        _logger.LogInformation("Password reset code sent to {Email}", normalizedEmail);
+        _logger.LogInformation("Password reset email delivery requested for {Email}", normalizedEmail);
     }
 
-    public async Task<AuthResponse> ResetPasswordAsync(string email, string code, string newPassword, CancellationToken cancellationToken = default)
+    public async Task<PasswordResetResponse> ResetPasswordAsync(string email, string code, string newPassword, CancellationToken cancellationToken = default)
     {
+        var now = GetUtcNow();
         var normalizedEmail = email.Trim().ToLowerInvariant();
         var user = await _userRepository.GetByEmailAsync(normalizedEmail, cancellationToken);
 
@@ -563,9 +630,40 @@ public sealed class AuthenticationService : IAuthenticationService
             throw new InvalidOperationException("Email o codigo invalido.");
         }
 
-        if (user.ResetPasswordCode != code || user.ResetPasswordCodeExpiresAtUtc < DateTime.UtcNow)
+        if (string.IsNullOrWhiteSpace(user.ResetPasswordCodeHash) || user.ResetPasswordCodeExpiresAtUtc is null)
         {
-             _logger.LogWarning("Invalid or expired code attempt for {Email}: {Code}", normalizedEmail, code);
+            throw new InvalidOperationException("Email o codigo invalido.");
+        }
+
+        if (user.ResetPasswordCodeExpiresAtUtc <= now)
+        {
+            ClearPasswordResetState(user);
+            await _userRepository.UpdateAsync(user, cancellationToken);
+            _logger.LogWarning("Expired password reset code used for {Email}", normalizedEmail);
+            throw new InvalidOperationException("Email o codigo invalido.");
+        }
+
+        if (!VerifyResetCode(user.ResetPasswordCodeHash, code.Trim()))
+        {
+            user.ResetPasswordFailedAttemptCount += 1;
+
+            if (user.ResetPasswordFailedAttemptCount >= PasswordResetMaxFailedAttempts)
+            {
+                ClearPasswordResetState(user);
+                _logger.LogWarning(
+                    "Password reset code invalidated after repeated failures for {Email}. AttemptCount={AttemptCount}",
+                    normalizedEmail,
+                    PasswordResetMaxFailedAttempts);
+            }
+            else
+            {
+                _logger.LogWarning(
+                    "Invalid password reset code attempt for {Email}. AttemptCount={AttemptCount}",
+                    normalizedEmail,
+                    user.ResetPasswordFailedAttemptCount);
+            }
+
+            await _userRepository.UpdateAsync(user, cancellationToken);
             throw new InvalidOperationException("Email o codigo invalido.");
         }
 
@@ -575,18 +673,22 @@ public sealed class AuthenticationService : IAuthenticationService
         }
 
         user.PasswordHash = _passwordHasher.Hash(newPassword);
-        user.ResetPasswordCode = null;
-        user.ResetPasswordCodeExpiresAtUtc = null;
+        ClearPasswordResetState(user);
+        ResetLoginFailureState(user);
 
         await _userRepository.UpdateAsync(user, cancellationToken);
+        await _refreshTokenRepository.RevokeActiveTokensForUserAsync(user.Id, cancellationToken);
 
-        return await CreateAuthResponseAsync(user, cancellationToken);
+        _logger.LogInformation("Password reset completed for {Email}", normalizedEmail);
+
+        return new PasswordResetResponse("La contrasena se restablecio correctamente. Inicia sesion con tu nueva contrasena.");
     }
 
     private async Task<AuthResponse> CreateAuthResponseAsync(
         User user,
         CancellationToken cancellationToken)
     {
+        var now = GetUtcNow();
         await _refreshTokenRepository.RevokeActiveTokensForUserAsync(user.Id, cancellationToken);
 
         var tokenResult = _tokenGenerator.GenerateToken(user);
@@ -595,8 +697,8 @@ public sealed class AuthenticationService : IAuthenticationService
             Id = Guid.NewGuid(),
             UserId = user.Id,
             Token = Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N"),
-            CreatedAtUtc = DateTime.UtcNow,
-            ExpiresAtUtc = DateTime.UtcNow.AddDays(14)
+            CreatedAtUtc = now,
+            ExpiresAtUtc = now.AddDays(14)
         };
 
         await _refreshTokenRepository.CreateAsync(refreshToken, cancellationToken);
@@ -680,4 +782,74 @@ public sealed class AuthenticationService : IAuthenticationService
 
     private static string? TrimOptional(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private DateTime GetUtcNow() => _timeProvider.GetUtcNow().UtcDateTime;
+
+    private static string HashResetCode(string code)
+        => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(code)));
+
+    private static bool VerifyResetCode(string storedHash, string providedCode)
+    {
+        if (string.IsNullOrWhiteSpace(storedHash) || string.IsNullOrWhiteSpace(providedCode))
+        {
+            return false;
+        }
+
+        var providedHash = SHA256.HashData(Encoding.UTF8.GetBytes(providedCode));
+        var storedHashBytes = Convert.FromHexString(storedHash);
+        return CryptographicOperations.FixedTimeEquals(storedHashBytes, providedHash);
+    }
+
+    private static bool HasActiveLoginFailureState(User user)
+        => user.FailedLoginAttemptCount > 0
+            || user.FailedLoginWindowStartedAtUtc is not null
+            || user.LockedOutUntilUtc is not null;
+
+    private static void ResetLoginFailureState(User user)
+    {
+        user.FailedLoginAttemptCount = 0;
+        user.FailedLoginWindowStartedAtUtc = null;
+        user.LockedOutUntilUtc = null;
+    }
+
+    private static void ClearPasswordResetState(User user)
+    {
+        user.ResetPasswordCodeHash = null;
+        user.ResetPasswordCodeIssuedAtUtc = null;
+        user.ResetPasswordCodeExpiresAtUtc = null;
+        user.ResetPasswordResendAvailableAtUtc = null;
+        user.ResetPasswordFailedAttemptCount = 0;
+    }
+
+    private async Task RegisterFailedLoginAttemptAsync(User user, DateTime now, CancellationToken cancellationToken)
+    {
+        if (user.FailedLoginWindowStartedAtUtc is null
+            || user.FailedLoginWindowStartedAtUtc <= now.AddMinutes(-LoginFailedAttemptWindowMinutes))
+        {
+            user.FailedLoginWindowStartedAtUtc = now;
+            user.FailedLoginAttemptCount = 0;
+            user.LockedOutUntilUtc = null;
+        }
+
+        user.FailedLoginAttemptCount += 1;
+
+        if (user.FailedLoginAttemptCount >= LoginFailedAttemptLimit)
+        {
+            user.LockedOutUntilUtc = now.AddMinutes(LoginLockoutMinutes);
+            _logger.LogWarning(
+                "User {Email} reached failed login lockout threshold. LockedOutUntilUtc={LockedOutUntilUtc}",
+                user.Email,
+                user.LockedOutUntilUtc);
+        }
+        else
+        {
+            _logger.LogWarning(
+                "Invalid login attempt recorded for {Email}. AttemptCount={AttemptCount} WindowStartedAtUtc={WindowStartedAtUtc}",
+                user.Email,
+                user.FailedLoginAttemptCount,
+                user.FailedLoginWindowStartedAtUtc);
+        }
+
+        await _userRepository.UpdateAsync(user, cancellationToken);
+    }
 }

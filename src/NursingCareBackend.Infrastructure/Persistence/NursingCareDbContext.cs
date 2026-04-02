@@ -165,10 +165,22 @@ public sealed class NursingCareDbContext : DbContext
                      builder.Property(x => x.CreatedAtUtc)
                       .IsRequired();
 
-                     builder.Property(x => x.ResetPasswordCode)
-                      .HasMaxLength(10);
+                     builder.Property(x => x.ResetPasswordCodeHash)
+                      .HasMaxLength(128);
 
+                     builder.Property(x => x.ResetPasswordCodeIssuedAtUtc);
                      builder.Property(x => x.ResetPasswordCodeExpiresAtUtc);
+                     builder.Property(x => x.ResetPasswordResendAvailableAtUtc);
+
+                     builder.Property(x => x.ResetPasswordFailedAttemptCount)
+                      .IsRequired();
+
+                     builder.Property(x => x.FailedLoginAttemptCount)
+                      .IsRequired();
+
+                     builder.Property(x => x.FailedLoginWindowStartedAtUtc);
+
+                     builder.Property(x => x.LockedOutUntilUtc);
 
                      builder.HasOne(x => x.NurseProfile)
                       .WithOne(x => x.User)

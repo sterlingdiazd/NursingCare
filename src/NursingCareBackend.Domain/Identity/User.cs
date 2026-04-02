@@ -15,8 +15,14 @@ public sealed class User
   public bool IsActive { get; set; }
   public DateTime CreatedAtUtc { get; set; }
 
-  public string? ResetPasswordCode { get; set; }
+  public string? ResetPasswordCodeHash { get; set; }
+  public DateTime? ResetPasswordCodeIssuedAtUtc { get; set; }
   public DateTime? ResetPasswordCodeExpiresAtUtc { get; set; }
+  public DateTime? ResetPasswordResendAvailableAtUtc { get; set; }
+  public int ResetPasswordFailedAttemptCount { get; set; }
+  public int FailedLoginAttemptCount { get; set; }
+  public DateTime? FailedLoginWindowStartedAtUtc { get; set; }
+  public DateTime? LockedOutUntilUtc { get; set; }
 
   public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
   public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
