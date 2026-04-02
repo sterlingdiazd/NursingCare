@@ -10,7 +10,7 @@ namespace NursingCareBackend.Infrastructure.Email;
 /// </summary>
 public sealed class AcsEmailService : IEmailService
 {
-    private readonly EmailClient _client;
+    private readonly Lazy<EmailClient?> _client;
     private readonly EmailOptions _options;
     private readonly ILogger<AcsEmailService> _logger;
 
@@ -20,7 +20,15 @@ public sealed class AcsEmailService : IEmailService
     {
         _options = options.Value;
         _logger = logger;
-        _client = new EmailClient(_options.ConnectionString);
+        _client = new Lazy<EmailClient?>(() =>
+        {
+            if (string.IsNullOrWhiteSpace(_options.ConnectionString))
+            {
+                return null;
+            }
+
+            return new EmailClient(_options.ConnectionString);
+        });
     }
 
     public async Task SendAsync(
@@ -31,7 +39,16 @@ public sealed class AcsEmailService : IEmailService
     {
         try
         {
-            var emailSendOperation = await _client.SendAsync(
+            var client = _client.Value;
+            if (client is null || string.IsNullOrWhiteSpace(_options.SenderAddress))
+            {
+                _logger.LogWarning(
+                    "Skipping email delivery to {Recipient} because ACS email configuration is incomplete.",
+                    recipientEmail);
+                return;
+            }
+
+            var emailSendOperation = await client.SendAsync(
                 Azure.WaitUntil.Started,
                 senderAddress: _options.SenderAddress,
                 recipientAddress: recipientEmail,
