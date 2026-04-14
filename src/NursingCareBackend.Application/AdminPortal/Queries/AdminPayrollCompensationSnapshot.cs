@@ -1,0 +1,25 @@
+namespace NursingCareBackend.Application.AdminPortal.Queries;
+
+public sealed record AdminPayrollCompensationSnapshot(
+    string EmploymentType,
+    string ServiceVariant,
+    DateTime ExecutedAtUtc,
+    DateOnly ServiceDate,
+    decimal BaseCompensation,
+    decimal TransportIncentive,
+    decimal ComplexityBonus,
+    decimal MedicalSuppliesCompensation,
+    decimal AdjustmentsTotal,
+    decimal DeductionsTotal,
+    decimal GrossCompensation,
+    decimal NetCompensation,
+    decimal RuleBaseCompensationPercent,
+    decimal RuleFixedAmountPerUnit,
+    decimal RuleTransportIncentivePercent,
+    decimal RuleComplexityBonusPercent,
+    decimal RuleMedicalSuppliesPercent,
+    decimal RuleVariantPercent,
+    decimal CareRequestSubtotalBeforeSupplies,
+    decimal CareRequestMedicalSuppliesCost,
+    decimal CareRequestTotal,
+    string? Notes);

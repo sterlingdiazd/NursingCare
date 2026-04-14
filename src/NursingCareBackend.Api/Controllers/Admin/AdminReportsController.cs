@@ -24,7 +24,8 @@ public sealed class AdminReportsController : ControllerBase
         "nurse-utilization",
         "care-request-completion",
         "price-usage-summary",
-        "notification-volume"
+        "notification-volume",
+        "payroll-summary"
     };
 
     public AdminReportsController(GetAdminReportHandler handler)
@@ -181,6 +182,23 @@ public sealed class AdminReportsController : ControllerBase
                 foreach (var kvp in r.NotificationsByCategory)
                 {
                     sb.AppendLine($"{EscapeCsv(kvp.Key)},{kvp.Value}");
+                }
+                break;
+
+            case PayrollSummaryReport r:
+                sb.AppendLine("Periodo,Fecha Inicio,Fecha Fin,Fecha Corte,Fecha Pago");
+                sb.AppendLine($"{EscapeCsv(r.PeriodLabel)},{r.StartDate:yyyy-MM-dd},{r.EndDate:yyyy-MM-dd},{r.CutoffDate:yyyy-MM-dd},{r.PaymentDate:yyyy-MM-dd}");
+                sb.AppendLine("");
+                sb.AppendLine("Enfermera,Servicios,Bruto,Transporte,Ajustes,Deducciones,Neto");
+                foreach (var row in r.Staff)
+                {
+                    sb.AppendLine($"{EscapeCsv(row.NurseName)},{row.ServiceCount},{row.GrossCompensation:F2},{row.TransportIncentives:F2},{row.AdjustmentsTotal:F2},{row.DeductionsTotal:F2},{row.NetCompensation:F2}");
+                }
+                sb.AppendLine("");
+                sb.AppendLine("Enfermera,Solicitud,Tipo,Categoria,Fecha Ejecucion,Empleo,Variante,Total Servicio,Base,Transporte,Complejidad,Insumos,Ajustes,Deducciones,Neto");
+                foreach (var row in r.Services)
+                {
+                    sb.AppendLine($"{EscapeCsv(row.NurseName)},{EscapeCsv(row.CareRequestId)},{EscapeCsv(row.CareRequestType)},{EscapeCsv(row.PricingCategoryCode)},{row.ExecutedAtUtc:yyyy-MM-dd},{EscapeCsv(row.EmploymentType)},{EscapeCsv(row.ServiceVariant)},{row.CareRequestTotal:F2},{row.BaseCompensation:F2},{row.TransportIncentive:F2},{row.ComplexityBonus:F2},{row.MedicalSuppliesCompensation:F2},{row.AdjustmentsTotal:F2},{row.DeductionsTotal:F2},{row.NetCompensation:F2}");
                 }
                 break;
                 

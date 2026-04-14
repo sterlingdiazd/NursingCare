@@ -314,4 +314,100 @@ public sealed class AdminReportsRepository : IAdminReportsRepository
             PendingActionItemsCount: pendingActions
         );
     }
+
+    public async Task<PayrollSummaryReport> GetPayrollSummaryReportAsync(DateOnly? from, DateOnly? to, CancellationToken cancellationToken)
+    {
+        var periodStart = from ?? ResolveDefaultPayrollStart(DateOnly.FromDateTime(DateTime.UtcNow));
+        var periodEnd = to ?? ResolveDefaultPayrollEnd(periodStart);
+
+        var payrollPeriod = await _dbContext.PayrollPeriods
+            .AsNoTracking()
+            .FirstOrDefaultAsync(period => period.StartDate == periodStart && period.EndDate == periodEnd, cancellationToken);
+
+        var executionQuery = _dbContext.ServiceExecutions
+            .AsNoTracking()
+            .Where(execution => execution.ServiceDate >= periodStart && execution.ServiceDate <= periodEnd);
+
+        var executions = await executionQuery
+            .OrderBy(execution => execution.ExecutedAtUtc)
+            .ToListAsync(cancellationToken);
+
+        var nurseIds = executions.Select(execution => execution.NurseUserId).Distinct().ToList();
+        var nurses = await _dbContext.Users
+            .AsNoTracking()
+            .Where(user => nurseIds.Contains(user.Id))
+            .Select(user => new
+            {
+                user.Id,
+                user.Name,
+                user.LastName,
+                user.Email,
+            })
+            .ToListAsync(cancellationToken);
+
+        var nurseLookup = nurses.ToDictionary(
+            item => item.Id,
+            item =>
+            {
+                var fullName = string.Join(" ", new[] { item.Name, item.LastName }.Where(value => !string.IsNullOrWhiteSpace(value)));
+                return string.IsNullOrWhiteSpace(fullName) ? item.Email : fullName;
+            });
+
+        var services = executions
+            .Select(execution => new PayrollServiceRow(
+                NurseId: execution.NurseUserId.ToString(),
+                NurseName: nurseLookup.GetValueOrDefault(execution.NurseUserId, execution.NurseUserId.ToString()),
+                CareRequestId: execution.CareRequestId.ToString(),
+                CareRequestType: execution.CareRequestType,
+                PricingCategoryCode: execution.PricingCategoryCode ?? "sin_categoria",
+                EmploymentType: execution.EmploymentType.ToString(),
+                ServiceVariant: execution.Variant.ToString(),
+                ExecutedAtUtc: execution.ExecutedAtUtc,
+                CareRequestTotal: execution.CareRequestTotal,
+                BaseCompensation: execution.BaseCompensation,
+                TransportIncentive: execution.TransportIncentive,
+                ComplexityBonus: execution.ComplexityBonus,
+                MedicalSuppliesCompensation: execution.MedicalSuppliesCompensation,
+                AdjustmentsTotal: execution.AdjustmentsTotal,
+                DeductionsTotal: execution.DeductionsTotal,
+                NetCompensation: execution.NetCompensation))
+            .ToList();
+
+        var staff = services
+            .GroupBy(row => new { row.NurseId, row.NurseName })
+            .Select(group => new PayrollSummaryStaffRow(
+                NurseId: group.Key.NurseId,
+                NurseName: group.Key.NurseName,
+                ServiceCount: group.Count(),
+                GrossCompensation: group.Sum(row => row.BaseCompensation + row.TransportIncentive + row.ComplexityBonus + row.MedicalSuppliesCompensation + row.AdjustmentsTotal),
+                TransportIncentives: group.Sum(row => row.TransportIncentive),
+                AdjustmentsTotal: group.Sum(row => row.AdjustmentsTotal),
+                DeductionsTotal: group.Sum(row => row.DeductionsTotal),
+                NetCompensation: group.Sum(row => row.NetCompensation)))
+            .OrderByDescending(row => row.NetCompensation)
+            .ToList();
+
+        var resolvedCutoffDate = payrollPeriod?.CutoffDate ?? periodEnd.AddDays(-2);
+        var resolvedPaymentDate = payrollPeriod?.PaymentDate ?? periodEnd;
+        var periodLabel = $"{periodStart:yyyy-MM-dd} al {periodEnd:yyyy-MM-dd}";
+
+        return new PayrollSummaryReport(
+            PeriodLabel: periodLabel,
+            StartDate: periodStart,
+            EndDate: periodEnd,
+            CutoffDate: resolvedCutoffDate,
+            PaymentDate: resolvedPaymentDate,
+            Staff: staff,
+            Services: services);
+    }
+
+    private static DateOnly ResolveDefaultPayrollStart(DateOnly today)
+        => today.Day <= 15
+            ? new DateOnly(today.Year, today.Month, 1)
+            : new DateOnly(today.Year, today.Month, 16);
+
+    private static DateOnly ResolveDefaultPayrollEnd(DateOnly periodStart)
+        => periodStart.Day == 1
+            ? new DateOnly(periodStart.Year, periodStart.Month, 15)
+            : new DateOnly(periodStart.Year, periodStart.Month, DateTime.DaysInMonth(periodStart.Year, periodStart.Month));
 }

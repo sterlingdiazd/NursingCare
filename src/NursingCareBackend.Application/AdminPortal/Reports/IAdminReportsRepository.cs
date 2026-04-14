@@ -21,4 +21,6 @@ public interface IAdminReportsRepository
     Task<PriceUsageSummaryReport> GetPriceUsageSummaryReportAsync(DateOnly? from, DateOnly? to, CancellationToken cancellationToken);
     
     Task<NotificationVolumeReport> GetNotificationVolumeReportAsync(DateOnly? from, DateOnly? to, CancellationToken cancellationToken);
+
+    Task<PayrollSummaryReport> GetPayrollSummaryReportAsync(DateOnly? from, DateOnly? to, CancellationToken cancellationToken);
 }

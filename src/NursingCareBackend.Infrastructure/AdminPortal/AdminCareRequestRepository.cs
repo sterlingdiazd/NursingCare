@@ -62,6 +62,9 @@ public sealed class AdminCareRequestRepository : IAdminCareRequestRepository
     var assignedNurse = careRequest.AssignedNurse.HasValue && users.TryGetValue(careRequest.AssignedNurse.Value, out var nurse)
       ? nurse
       : null;
+    var serviceExecution = await _dbContext.ServiceExecutions
+      .AsNoTracking()
+      .FirstOrDefaultAsync(item => item.CareRequestId == careRequest.Id, cancellationToken);
 
     return new AdminCareRequestDetail(
       Id: careRequest.Id,
@@ -92,6 +95,7 @@ public sealed class AdminCareRequestRepository : IAdminCareRequestRepository
       CompletedAtUtc: careRequest.CompletedAtUtc,
       IsOverdueOrStale: IsOverdueOrStale(careRequest, utcNow),
       PricingBreakdown: BuildPricingBreakdown(careRequest),
+      PayrollCompensation: serviceExecution is null ? null : BuildPayrollCompensation(serviceExecution),
       Timeline: BuildTimeline(careRequest));
   }
 
@@ -378,6 +382,33 @@ public sealed class AdminCareRequestRepository : IAdminCareRequestRepository
     }
 
     return careRequest.Status == CareRequestStatus.Pending && careRequest.UpdatedAtUtc <= staleCutoffUtc;
+  }
+
+  private static AdminPayrollCompensationSnapshot BuildPayrollCompensation(Domain.Payroll.ServiceExecution serviceExecution)
+  {
+    return new AdminPayrollCompensationSnapshot(
+      EmploymentType: serviceExecution.EmploymentType.ToString(),
+      ServiceVariant: serviceExecution.Variant.ToString(),
+      ExecutedAtUtc: serviceExecution.ExecutedAtUtc,
+      ServiceDate: serviceExecution.ServiceDate,
+      BaseCompensation: serviceExecution.BaseCompensation,
+      TransportIncentive: serviceExecution.TransportIncentive,
+      ComplexityBonus: serviceExecution.ComplexityBonus,
+      MedicalSuppliesCompensation: serviceExecution.MedicalSuppliesCompensation,
+      AdjustmentsTotal: serviceExecution.AdjustmentsTotal,
+      DeductionsTotal: serviceExecution.DeductionsTotal,
+      GrossCompensation: serviceExecution.GrossCompensation,
+      NetCompensation: serviceExecution.NetCompensation,
+      RuleBaseCompensationPercent: serviceExecution.RuleBaseCompensationPercent,
+      RuleFixedAmountPerUnit: serviceExecution.RuleFixedAmountPerUnit,
+      RuleTransportIncentivePercent: serviceExecution.RuleTransportIncentivePercent,
+      RuleComplexityBonusPercent: serviceExecution.RuleComplexityBonusPercent,
+      RuleMedicalSuppliesPercent: serviceExecution.RuleMedicalSuppliesPercent,
+      RuleVariantPercent: serviceExecution.RuleVariantPercent,
+      CareRequestSubtotalBeforeSupplies: serviceExecution.SubtotalBeforeSupplies,
+      CareRequestMedicalSuppliesCost: serviceExecution.MedicalSuppliesCost,
+      CareRequestTotal: serviceExecution.CareRequestTotal,
+      Notes: serviceExecution.Notes);
   }
 
   private static int GetStatusRank(string status)

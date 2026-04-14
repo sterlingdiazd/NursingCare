@@ -3,6 +3,7 @@ using NursingCareBackend.Domain.Admin;
 using NursingCareBackend.Domain.CareRequests;
 using NursingCareBackend.Domain.Catalogs;
 using NursingCareBackend.Domain.Identity;
+using NursingCareBackend.Domain.Payroll;
 using NursingCareBackend.Domain.SystemSettings;
 
 namespace NursingCareBackend.Infrastructure.Persistence;
@@ -33,6 +34,14 @@ public sealed class NursingCareDbContext : DbContext
        public DbSet<NurseSpecialtyCatalog> NurseSpecialtyCatalogs => Set<NurseSpecialtyCatalog>();
        public DbSet<NurseCategoryCatalog> NurseCategoryCatalogs => Set<NurseCategoryCatalog>();
        public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
+       public DbSet<ServiceExecution> ServiceExecutions => Set<ServiceExecution>();
+       public DbSet<ShiftRecord> ShiftRecords => Set<ShiftRecord>();
+       public DbSet<ShiftChange> ShiftChanges => Set<ShiftChange>();
+       public DbSet<PayrollPeriod> PayrollPeriods => Set<PayrollPeriod>();
+       public DbSet<PayrollLine> PayrollLines => Set<PayrollLine>();
+       public DbSet<CompensationRule> CompensationRules => Set<CompensationRule>();
+       public DbSet<CompensationAdjustment> CompensationAdjustments => Set<CompensationAdjustment>();
+       public DbSet<DeductionRecord> DeductionRecords => Set<DeductionRecord>();
 
        protected override void OnModelCreating(ModelBuilder modelBuilder)
        {
@@ -237,6 +246,184 @@ public sealed class NursingCareDbContext : DbContext
                      builder.ToTable("Clients");
 
                      builder.HasKey(x => x.UserId);
+              });
+
+              modelBuilder.Entity<ServiceExecution>(builder =>
+              {
+                     builder.ToTable("ServiceExecutions");
+
+                     builder.HasKey(x => x.Id);
+
+                     builder.HasIndex(x => x.CareRequestId)
+                      .IsUnique();
+
+                     builder.Property(x => x.CareRequestType)
+                      .IsRequired()
+                      .HasMaxLength(100);
+
+                     builder.Property(x => x.UnitType)
+                      .IsRequired()
+                      .HasMaxLength(50);
+
+                     builder.Property(x => x.PricingCategoryCode)
+                      .HasMaxLength(64);
+
+                     builder.Property(x => x.DistanceFactorCode)
+                      .HasMaxLength(64);
+
+                     builder.Property(x => x.ComplexityLevelCode)
+                      .HasMaxLength(64);
+
+                     builder.Property(x => x.EmploymentType)
+                      .HasConversion<string>()
+                      .HasMaxLength(32);
+
+                     builder.Property(x => x.Variant)
+                      .HasConversion<string>()
+                      .HasMaxLength(32);
+
+                     builder.Property(x => x.BasePrice).HasColumnType("decimal(10,2)");
+                     builder.Property(x => x.CareRequestTotal).HasColumnType("decimal(10,2)");
+                     builder.Property(x => x.ClientBasePrice).HasColumnType("decimal(10,2)");
+                     builder.Property(x => x.CategoryFactorSnapshot).HasColumnType("decimal(10,4)");
+                     builder.Property(x => x.DistanceMultiplierSnapshot).HasColumnType("decimal(10,4)");
+                     builder.Property(x => x.ComplexityMultiplierSnapshot).HasColumnType("decimal(10,4)");
+                     builder.Property(x => x.SubtotalBeforeSupplies).HasColumnType("decimal(10,2)");
+                     builder.Property(x => x.MedicalSuppliesCost).HasColumnType("decimal(10,2)");
+                     builder.Property(x => x.RuleBaseCompensationPercent).HasColumnType("decimal(10,4)");
+                     builder.Property(x => x.RuleFixedAmountPerUnit).HasColumnType("decimal(10,2)");
+                     builder.Property(x => x.RuleTransportIncentivePercent).HasColumnType("decimal(10,4)");
+                     builder.Property(x => x.RuleComplexityBonusPercent).HasColumnType("decimal(10,4)");
+                     builder.Property(x => x.RuleMedicalSuppliesPercent).HasColumnType("decimal(10,4)");
+                     builder.Property(x => x.RuleVariantPercent).HasColumnType("decimal(10,4)");
+                     builder.Property(x => x.BaseCompensation).HasColumnType("decimal(10,2)");
+                     builder.Property(x => x.TransportIncentive).HasColumnType("decimal(10,2)");
+                     builder.Property(x => x.ComplexityBonus).HasColumnType("decimal(10,2)");
+                     builder.Property(x => x.MedicalSuppliesCompensation).HasColumnType("decimal(10,2)");
+                     builder.Property(x => x.AdjustmentsTotal).HasColumnType("decimal(10,2)");
+                     builder.Property(x => x.DeductionsTotal).HasColumnType("decimal(10,2)");
+                     builder.Property(x => x.GrossCompensation).HasColumnType("decimal(10,2)");
+                     builder.Property(x => x.NetCompensation).HasColumnType("decimal(10,2)");
+                     builder.Property(x => x.ManualOverrideAmount).HasColumnType("decimal(10,2)");
+                     builder.Property(x => x.Notes).HasMaxLength(1000);
+              });
+
+              modelBuilder.Entity<ShiftRecord>(builder =>
+              {
+                     builder.ToTable("ShiftRecords");
+
+                     builder.HasKey(x => x.Id);
+
+                     builder.Property(x => x.Status)
+                      .HasConversion<string>()
+                      .HasMaxLength(32);
+              });
+
+              modelBuilder.Entity<ShiftChange>(builder =>
+              {
+                     builder.ToTable("ShiftChanges");
+
+                     builder.HasKey(x => x.Id);
+
+                     builder.Property(x => x.Reason)
+                      .IsRequired()
+                      .HasMaxLength(500);
+              });
+
+              modelBuilder.Entity<PayrollPeriod>(builder =>
+              {
+                     builder.ToTable("PayrollPeriods");
+
+                     builder.HasKey(x => x.Id);
+
+                     builder.Property(x => x.Status)
+                      .HasConversion<string>()
+                      .HasMaxLength(32);
+
+                     builder.HasIndex(x => new { x.StartDate, x.EndDate })
+                      .IsUnique();
+              });
+
+              modelBuilder.Entity<PayrollLine>(builder =>
+              {
+                     builder.ToTable("PayrollLines");
+
+                     builder.HasKey(x => x.Id);
+
+                     builder.HasIndex(x => x.ServiceExecutionId)
+                      .IsUnique()
+                      .HasFilter("[ServiceExecutionId] IS NOT NULL");
+
+                     builder.Property(x => x.Description)
+                      .IsRequired()
+                      .HasMaxLength(300);
+
+                     builder.Property(x => x.BaseCompensation).HasColumnType("decimal(10,2)");
+                     builder.Property(x => x.TransportIncentive).HasColumnType("decimal(10,2)");
+                     builder.Property(x => x.ComplexityBonus).HasColumnType("decimal(10,2)");
+                     builder.Property(x => x.MedicalSuppliesCompensation).HasColumnType("decimal(10,2)");
+                     builder.Property(x => x.AdjustmentsTotal).HasColumnType("decimal(10,2)");
+                     builder.Property(x => x.DeductionsTotal).HasColumnType("decimal(10,2)");
+                     builder.Property(x => x.NetCompensation).HasColumnType("decimal(10,2)");
+              });
+
+              modelBuilder.Entity<CompensationRule>(builder =>
+              {
+                     builder.ToTable("CompensationRules");
+
+                     builder.HasKey(x => x.Id);
+
+                     builder.Property(x => x.Name)
+                      .IsRequired()
+                      .HasMaxLength(150);
+
+                     builder.Property(x => x.EmploymentType)
+                      .HasConversion<string>()
+                      .HasMaxLength(32);
+
+                     builder.Property(x => x.CareRequestCategoryCode).HasMaxLength(64);
+                     builder.Property(x => x.UnitTypeCode).HasMaxLength(64);
+                     builder.Property(x => x.NurseCategoryCode).HasMaxLength(64);
+                     builder.Property(x => x.BaseCompensationPercent).HasColumnType("decimal(10,4)");
+                     builder.Property(x => x.FixedAmountPerUnit).HasColumnType("decimal(10,2)");
+                     builder.Property(x => x.TransportIncentivePercent).HasColumnType("decimal(10,4)");
+                     builder.Property(x => x.ComplexityBonusPercent).HasColumnType("decimal(10,4)");
+                     builder.Property(x => x.MedicalSuppliesPercent).HasColumnType("decimal(10,4)");
+                     builder.Property(x => x.PartialServicePercent).HasColumnType("decimal(10,4)");
+                     builder.Property(x => x.ExpressServicePercent).HasColumnType("decimal(10,4)");
+                     builder.Property(x => x.SuspendedServicePercent).HasColumnType("decimal(10,4)");
+              });
+
+              modelBuilder.Entity<CompensationAdjustment>(builder =>
+              {
+                     builder.ToTable("CompensationAdjustments");
+
+                     builder.HasKey(x => x.Id);
+
+                     builder.Property(x => x.Label)
+                      .IsRequired()
+                      .HasMaxLength(150);
+
+                     builder.Property(x => x.Amount).HasColumnType("decimal(10,2)");
+                     builder.Property(x => x.Notes).HasMaxLength(1000);
+              });
+
+              modelBuilder.Entity<DeductionRecord>(builder =>
+              {
+                     builder.ToTable("DeductionRecords");
+
+                     builder.HasKey(x => x.Id);
+
+                     builder.Property(x => x.DeductionType)
+                      .HasConversion<string>()
+                      .HasMaxLength(32);
+
+                     builder.Property(x => x.Label)
+                      .IsRequired()
+                      .HasMaxLength(150);
+
+                     builder.Property(x => x.Amount).HasColumnType("decimal(10,2)");
+                     builder.Property(x => x.Notes).HasMaxLength(1000);
               });
 
               modelBuilder.Entity<Role>(builder =>

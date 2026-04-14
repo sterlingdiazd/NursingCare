@@ -66,6 +66,29 @@ public sealed class AdminReportsApiTests : IClassFixture<CustomWebApplicationFac
         Assert.Contains("Pendiente", csvContent);
     }
 
+    [Fact]
+    public async Task GET_Report_PayrollSummary_Should_Return_Completed_Service_With_Compensation()
+    {
+        var scenario = $"payroll-report-{Guid.NewGuid():N}";
+        var (clientToken, _) = await CareRequestApiAuthHelper.CreateClientTokenAsync(_factory, $"{scenario}-client");
+        var (nurseToken, nurseUserId) = await CareRequestApiAuthHelper.CreateCompletedNurseTokenAsync(_factory, $"{scenario}-nurse");
+
+        var careRequestId = await CreateCareRequestAsClientAsync(clientToken, $"{scenario}-service");
+        await AssignCareRequestAsync(careRequestId, nurseUserId);
+        await ApproveCareRequestAsync(careRequestId);
+        await CompleteCareRequestAsNurseAsync(careRequestId, nurseToken);
+
+        var adminClient = CreateAdminClient();
+        var response = await adminClient.GetAsync("/api/admin/reports/payroll-summary");
+
+        response.EnsureSuccessStatusCode();
+        var report = await response.Content.ReadFromJsonAsync<PayrollSummaryReport>();
+
+        Assert.NotNull(report);
+        Assert.Contains(report!.Services, row => row.CareRequestId == careRequestId.ToString() && row.NetCompensation > 0);
+        Assert.Contains(report.Staff, row => row.NurseId == nurseUserId.ToString() && row.ServiceCount >= 1);
+    }
+
     private HttpClient CreateAdminClient()
     {
         var client = _factory.CreateClient();
@@ -108,6 +131,14 @@ public sealed class AdminReportsApiTests : IClassFixture<CustomWebApplicationFac
     {
         var adminClient = CreateAdminClient();
         var response = await adminClient.PostAsync($"/api/care-requests/{careRequestId}/approve", null);
+        response.EnsureSuccessStatusCode();
+    }
+
+    private async Task CompleteCareRequestAsNurseAsync(Guid careRequestId, string nurseToken)
+    {
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", nurseToken);
+        var response = await client.PostAsync($"/api/care-requests/{careRequestId}/complete", null);
         response.EnsureSuccessStatusCode();
     }
 

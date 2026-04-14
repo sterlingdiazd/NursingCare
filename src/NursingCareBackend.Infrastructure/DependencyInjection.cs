@@ -24,6 +24,8 @@ using NursingCareBackend.Infrastructure.Email;
 using NursingCareBackend.Infrastructure.CareRequests;
 using NursingCareBackend.Infrastructure.Identity;
 using NursingCareBackend.Infrastructure.Persistence;
+using NursingCareBackend.Infrastructure.Payroll;
+using NursingCareBackend.Application.Payroll;
 
 namespace NursingCareBackend.Infrastructure;
 
@@ -122,6 +124,7 @@ public static class DependencyInjection
         services.AddScoped<ICatalogOptionsService, CatalogOptionsService>();
         services.AddScoped<IAdminCatalogManagementService, AdminCatalogManagementService>();
         services.AddScoped<IAdminSettingsManagementService, AdminSettingsManagementService>();
+        services.AddScoped<IPayrollCompensationService, PayrollCompensationService>();
 
         return services;
     }

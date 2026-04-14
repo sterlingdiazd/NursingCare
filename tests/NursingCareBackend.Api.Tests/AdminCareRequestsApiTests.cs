@@ -99,7 +99,7 @@ public sealed class AdminCareRequestsApiTests : IClassFixture<CustomWebApplicati
     var scenario = $"admin-detail-{Guid.NewGuid():N}";
     var today = DateOnly.FromDateTime(DateTime.UtcNow);
     var (clientToken, _) = await CareRequestApiAuthHelper.CreateClientTokenAsync(_factory, $"{scenario}-client");
-    var (_, nurseUserId) = await CareRequestApiAuthHelper.CreateCompletedNurseTokenAsync(_factory, $"{scenario}-nurse");
+    var (nurseToken, nurseUserId) = await CareRequestApiAuthHelper.CreateCompletedNurseTokenAsync(_factory, $"{scenario}-nurse");
     var careRequestId = await CreateCareRequestAsClientAsync(
       clientToken,
       $"{scenario}-detalle",
@@ -126,6 +126,19 @@ public sealed class AdminCareRequestsApiTests : IClassFixture<CustomWebApplicati
     Assert.NotNull(payload.AssignedNurseDisplayName);
     Assert.Contains(payload.Timeline, item => item.Title == "Solicitud creada");
     Assert.Contains(payload.Timeline, item => item.Title == "Solicitud aprobada");
+
+    var nurseClient = _factory.CreateClient();
+    nurseClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", nurseToken);
+    var completeResponse = await nurseClient.PostAsync($"/api/care-requests/{careRequestId}/complete", null);
+    completeResponse.EnsureSuccessStatusCode();
+
+    var completedDetailResponse = await adminClient.GetAsync($"/api/admin/care-requests/{careRequestId}");
+    completedDetailResponse.EnsureSuccessStatusCode();
+    var completedPayload = await completedDetailResponse.Content.ReadFromJsonAsync<AdminCareRequestDetailDto>();
+
+    Assert.NotNull(completedPayload);
+    Assert.NotNull(completedPayload!.PayrollCompensation);
+    Assert.True(completedPayload.PayrollCompensation!.NetCompensation > 0);
   }
 
   [Fact]
@@ -308,7 +321,13 @@ public sealed class AdminCareRequestsApiTests : IClassFixture<CustomWebApplicati
     public string? AssignedNurseDisplayName { get; set; }
     public string Status { get; set; } = string.Empty;
     public AdminCareRequestPricingBreakdownDto PricingBreakdown { get; set; } = new();
+    public AdminPayrollCompensationDto? PayrollCompensation { get; set; }
     public List<AdminCareRequestTimelineEventDto> Timeline { get; set; } = [];
+  }
+
+  private sealed class AdminPayrollCompensationDto
+  {
+    public decimal NetCompensation { get; set; }
   }
 
   private sealed class AdminCareRequestPricingBreakdownDto

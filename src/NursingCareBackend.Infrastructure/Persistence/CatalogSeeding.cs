@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using NursingCareBackend.Domain.Catalogs;
+using NursingCareBackend.Domain.Payroll;
 
 namespace NursingCareBackend.Infrastructure.Persistence;
 
@@ -136,6 +137,59 @@ public static class CatalogSeeding
             NurseCat("80000000-0000-0000-0000-000000000002", "Semisenior", "Semisenior", "Semi Senior", 2),
             NurseCat("80000000-0000-0000-0000-000000000003", "Senior", "Senior", null, 3),
             NurseCat("80000000-0000-0000-0000-000000000004", "Lider", "Lider", "Lead", 4));
+
+        db.CompensationRules.AddRange(
+            CompensationRule.Create(
+                name: "Pago por servicio hogar",
+                employmentType: CompensationEmploymentType.PerService,
+                careRequestCategoryCode: "hogar",
+                unitTypeCode: null,
+                nurseCategoryCode: null,
+                baseCompensationPercent: 52m,
+                fixedAmountPerUnit: 0m,
+                transportIncentivePercent: 0m,
+                complexityBonusPercent: 20m,
+                medicalSuppliesPercent: 0m,
+                partialServicePercent: 65m,
+                expressServicePercent: 120m,
+                suspendedServicePercent: 40m,
+                isActive: true,
+                priority: 10,
+                createdAtUtc: DateTime.UtcNow),
+            CompensationRule.Create(
+                name: "Pago por servicio domicilio",
+                employmentType: CompensationEmploymentType.PerService,
+                careRequestCategoryCode: "domicilio",
+                unitTypeCode: null,
+                nurseCategoryCode: null,
+                baseCompensationPercent: 55m,
+                fixedAmountPerUnit: 0m,
+                transportIncentivePercent: 15m,
+                complexityBonusPercent: 18m,
+                medicalSuppliesPercent: 0m,
+                partialServicePercent: 65m,
+                expressServicePercent: 125m,
+                suspendedServicePercent: 40m,
+                isActive: true,
+                priority: 20,
+                createdAtUtc: DateTime.UtcNow),
+            CompensationRule.Create(
+                name: "Pago por servicio medicos",
+                employmentType: CompensationEmploymentType.PerService,
+                careRequestCategoryCode: "medicos",
+                unitTypeCode: null,
+                nurseCategoryCode: null,
+                baseCompensationPercent: 50m,
+                fixedAmountPerUnit: 0m,
+                transportIncentivePercent: 0m,
+                complexityBonusPercent: 10m,
+                medicalSuppliesPercent: 25m,
+                partialServicePercent: 70m,
+                expressServicePercent: 120m,
+                suspendedServicePercent: 40m,
+                isActive: true,
+                priority: 30,
+                createdAtUtc: DateTime.UtcNow));
 
         await db.SaveChangesAsync(cancellationToken);
     }

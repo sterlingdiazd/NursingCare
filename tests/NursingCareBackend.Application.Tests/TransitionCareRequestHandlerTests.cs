@@ -2,6 +2,7 @@ using NursingCareBackend.Application.CareRequests;
 using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
 using NursingCareBackend.Application.CareRequests.Commands.TransitionCareRequest;
 using NursingCareBackend.Domain.CareRequests;
+using NursingCareBackend.Application.Payroll;
 
 namespace NursingCareBackend.Application.Tests;
 
@@ -43,7 +44,7 @@ public sealed class TransitionCareRequestHandlerTests
   {
     var careRequest = CreateDomicilioSample(Guid.NewGuid(), "Approve me");
     var repository = new FakeCareRequestRepository(careRequest);
-    var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher());
+    var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher(), new FakePayrollCompensationService());
 
     var result = await handler.Handle(
       new TransitionCareRequestCommand(careRequest.Id, CareRequestTransitionAction.Approve),
@@ -59,7 +60,7 @@ public sealed class TransitionCareRequestHandlerTests
   {
     var careRequest = CreateDomicilioSample(Guid.NewGuid(), "Reject me");
     var repository = new FakeCareRequestRepository(careRequest);
-    var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher());
+    var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher(), new FakePayrollCompensationService());
 
     var result = await handler.Handle(
       new TransitionCareRequestCommand(careRequest.Id, CareRequestTransitionAction.Reject),
@@ -77,7 +78,8 @@ public sealed class TransitionCareRequestHandlerTests
     careRequest.Approve(DateTime.UtcNow.AddMinutes(-5));
 
     var repository = new FakeCareRequestRepository(careRequest);
-    var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher());
+    var payrollService = new FakePayrollCompensationService();
+    var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher(), payrollService);
 
     var result = await handler.Handle(
       new TransitionCareRequestCommand(careRequest.Id, CareRequestTransitionAction.Complete, AssignedNurseId),
@@ -86,6 +88,7 @@ public sealed class TransitionCareRequestHandlerTests
     Assert.Equal(CareRequestStatus.Completed, result.Status);
     Assert.NotNull(result.CompletedAtUtc);
     Assert.Same(careRequest, repository.UpdatedCareRequest);
+    Assert.Equal(careRequest.Id, payrollService.LastRecordedCareRequestId);
   }
 
   [Fact]
@@ -98,7 +101,7 @@ public sealed class TransitionCareRequestHandlerTests
     careRequest.Approve(DateTime.UtcNow.AddMinutes(-5));
 
     var repository = new FakeCareRequestRepository(careRequest);
-    var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher());
+    var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher(), new FakePayrollCompensationService());
 
     var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => handler.Handle(
       new TransitionCareRequestCommand(careRequest.Id, CareRequestTransitionAction.Complete, AssignedNurseId),
@@ -111,7 +114,7 @@ public sealed class TransitionCareRequestHandlerTests
   public async Task Handle_Should_Throw_When_Request_Does_Not_Exist()
   {
     var repository = new FakeCareRequestRepository();
-    var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher());
+    var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher(), new FakePayrollCompensationService());
 
     var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() => handler.Handle(
       new TransitionCareRequestCommand(Guid.NewGuid(), CareRequestTransitionAction.Approve),
@@ -184,5 +187,16 @@ public sealed class TransitionCareRequestHandlerTests
       string unitType,
       CancellationToken cancellationToken)
       => Task.FromResult(0);
+  }
+
+  private sealed class FakePayrollCompensationService : IPayrollCompensationService
+  {
+    public Guid? LastRecordedCareRequestId { get; private set; }
+
+    public Task RecordExecutionForCompletedCareRequestAsync(CareRequest careRequest, CancellationToken cancellationToken)
+    {
+      LastRecordedCareRequestId = careRequest.Id;
+      return Task.CompletedTask;
+    }
   }
 }

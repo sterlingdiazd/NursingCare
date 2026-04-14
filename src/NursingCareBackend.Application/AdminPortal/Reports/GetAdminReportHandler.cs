@@ -25,6 +25,7 @@ public class GetAdminReportHandler
             "care-request-completion" => HandleTypedAsync(() => _repository.GetCareRequestCompletionReportAsync(from, to, cancellationToken)),
             "price-usage-summary" => HandleTypedAsync(() => _repository.GetPriceUsageSummaryReportAsync(from, to, cancellationToken)),
             "notification-volume" => HandleTypedAsync(() => _repository.GetNotificationVolumeReportAsync(from, to, cancellationToken)),
+            "payroll-summary" => HandleTypedAsync(() => _repository.GetPayrollSummaryReportAsync(from, to, cancellationToken)),
             _ => throw new ArgumentException($"Unknown report key: {reportKey}", nameof(reportKey))
         };
     }

@@ -29,4 +29,5 @@ public sealed record AdminCareRequestDetail(
   DateTime? CompletedAtUtc,
   bool IsOverdueOrStale,
   AdminCareRequestPricingBreakdown PricingBreakdown,
+  AdminPayrollCompensationSnapshot? PayrollCompensation,
   IReadOnlyList<AdminCareRequestTimelineEvent> Timeline);

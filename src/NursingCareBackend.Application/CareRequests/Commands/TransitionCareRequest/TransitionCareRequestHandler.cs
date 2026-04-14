@@ -2,6 +2,7 @@ using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
 using NursingCareBackend.Application.CareRequests;
 using NursingCareBackend.Application.AdminPortal.Notifications;
 using NursingCareBackend.Domain.CareRequests;
+using NursingCareBackend.Application.Payroll;
 
 namespace NursingCareBackend.Application.CareRequests.Commands.TransitionCareRequest;
 
@@ -9,13 +10,16 @@ public sealed class TransitionCareRequestHandler
 {
   private readonly ICareRequestRepository _repository;
   private readonly IAdminNotificationPublisher _notifications;
+  private readonly IPayrollCompensationService _payrollCompensationService;
 
   public TransitionCareRequestHandler(
     ICareRequestRepository repository,
-    IAdminNotificationPublisher notifications)
+    IAdminNotificationPublisher notifications,
+    IPayrollCompensationService payrollCompensationService)
   {
     _repository = repository;
     _notifications = notifications;
+    _payrollCompensationService = payrollCompensationService;
   }
 
   public async Task<CareRequest> Handle(
@@ -55,6 +59,11 @@ public sealed class TransitionCareRequestHandler
     }
 
     await _repository.UpdateAsync(careRequest, cancellationToken);
+
+    if (command.Action == CareRequestTransitionAction.Complete)
+    {
+      await _payrollCompensationService.RecordExecutionForCompletedCareRequestAsync(careRequest, cancellationToken);
+    }
 
     if (command.Action == CareRequestTransitionAction.Reject)
     {
