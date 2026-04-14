@@ -6,6 +6,7 @@ using NursingCareBackend.Application.AdminPortal.Auditing;
 using NursingCareBackend.Application.AdminPortal.Clients;
 using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
 using NursingCareBackend.Application.AdminPortal.Queries;
+using NursingCareBackend.Application.AdminPortal.Shifts;
 using NursingCareBackend.Application.AdminPortal.Users;
 using NursingCareBackend.Application.Identity.Authentication;
 using NursingCareBackend.Application.Identity.OAuth;
@@ -91,6 +92,7 @@ public static class DependencyInjection
         services.AddScoped<IAdminDashboardRepository, AdminDashboardRepository>();
         services.AddScoped<IAdminActionQueueRepository, AdminActionQueueRepository>();
         services.AddScoped<IAdminCareRequestRepository, AdminCareRequestRepository>();
+        services.AddScoped<IShiftRecordAdminRepository, ShiftRecordAdminRepository>();
         services.AddScoped<IAdminClientManagementRepository, AdminClientManagementRepository>();
         services.AddScoped<IAdminUserManagementRepository, AdminUserManagementRepository>();
         services.AddScoped<IAdminAuditService, AdminAuditService>();

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using NursingCareBackend.Application.AdminPortal.Clients;
 using NursingCareBackend.Application.AdminPortal.Queries;
+using NursingCareBackend.Application.AdminPortal.Shifts;
 using NursingCareBackend.Application.AdminPortal.Users;
 using NursingCareBackend.Application.CareRequests.Commands.AssignCareRequestNurse;
 using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
@@ -23,6 +24,8 @@ public static class DependencyInjection
     services.AddScoped<GetAdminCareRequestsHandler>();
     services.AddScoped<GetAdminCareRequestDetailHandler>();
     services.AddScoped<GetAdminCareRequestClientOptionsHandler>();
+    services.AddScoped<RegisterCareRequestShiftHandler>();
+    services.AddScoped<RecordCareRequestShiftChangeHandler>();
     services.AddScoped<GetAdminClientsHandler>();
     services.AddScoped<GetAdminClientDetailHandler>();
     services.AddScoped<GetAdminUsersHandler>();

@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using NursingCareBackend.Application.AdminPortal.Queries;
+using NursingCareBackend.Application.AdminPortal.Shifts;
 using NursingCareBackend.Domain.CareRequests;
+using NursingCareBackend.Domain.Payroll;
 using NursingCareBackend.Domain.Identity;
 using NursingCareBackend.Infrastructure.Persistence;
 
@@ -57,7 +59,49 @@ public sealed class AdminCareRequestRepository : IAdminCareRequestRepository
       return null;
     }
 
-    var users = await LoadUserLookupAsync(new[] { careRequest }, cancellationToken);
+    var shiftEntities = await _dbContext.ShiftRecords
+      .AsNoTracking()
+      .Where(shift => shift.CareRequestId == careRequest.Id)
+      .OrderBy(shift => shift.CreatedAtUtc)
+      .ToListAsync(cancellationToken);
+
+    var shiftIds = shiftEntities.Select(shift => shift.Id).ToList();
+    var shiftChangeEntities = shiftIds.Count == 0
+      ? new List<ShiftChange>()
+      : await _dbContext.ShiftChanges
+          .AsNoTracking()
+          .Where(change => shiftIds.Contains(change.ShiftRecordId))
+          .OrderBy(change => change.CreatedAtUtc)
+          .ToListAsync(cancellationToken);
+
+    var userIds = new HashSet<Guid> { careRequest.UserID };
+    if (careRequest.AssignedNurse.HasValue)
+    {
+      userIds.Add(careRequest.AssignedNurse.Value);
+    }
+
+    foreach (var shift in shiftEntities)
+    {
+      if (shift.NurseUserId.HasValue)
+      {
+        userIds.Add(shift.NurseUserId.Value);
+      }
+    }
+
+    foreach (var change in shiftChangeEntities)
+    {
+      if (change.PreviousNurseUserId.HasValue)
+      {
+        userIds.Add(change.PreviousNurseUserId.Value);
+      }
+
+      if (change.NewNurseUserId.HasValue)
+      {
+        userIds.Add(change.NewNurseUserId.Value);
+      }
+    }
+
+    var users = await LoadUserLookupByIdsAsync(userIds, cancellationToken);
     var client = users[careRequest.UserID];
     var assignedNurse = careRequest.AssignedNurse.HasValue && users.TryGetValue(careRequest.AssignedNurse.Value, out var nurse)
       ? nurse
@@ -65,6 +109,8 @@ public sealed class AdminCareRequestRepository : IAdminCareRequestRepository
     var serviceExecution = await _dbContext.ServiceExecutions
       .AsNoTracking()
       .FirstOrDefaultAsync(item => item.CareRequestId == careRequest.Id, cancellationToken);
+
+    var shiftSummaries = BuildShiftSummaries(shiftEntities, shiftChangeEntities, users);
 
     return new AdminCareRequestDetail(
       Id: careRequest.Id,
@@ -96,6 +142,7 @@ public sealed class AdminCareRequestRepository : IAdminCareRequestRepository
       IsOverdueOrStale: IsOverdueOrStale(careRequest, utcNow),
       PricingBreakdown: BuildPricingBreakdown(careRequest),
       PayrollCompensation: serviceExecution is null ? null : BuildPayrollCompensation(serviceExecution),
+      Shifts: shiftSummaries,
       Timeline: BuildTimeline(careRequest));
   }
 
@@ -152,7 +199,19 @@ public sealed class AdminCareRequestRepository : IAdminCareRequestRepository
       .Select(item => item.UserID)
       .Concat(careRequests.Where(item => item.AssignedNurse.HasValue).Select(item => item.AssignedNurse!.Value))
       .Distinct()
-      .ToList();
+      .ToHashSet();
+
+    return await LoadUserLookupByIdsAsync(userIds, cancellationToken);
+  }
+
+  private async Task<IReadOnlyDictionary<Guid, UserLookup>> LoadUserLookupByIdsAsync(
+    IReadOnlyCollection<Guid> userIds,
+    CancellationToken cancellationToken)
+  {
+    if (userIds.Count == 0)
+    {
+      return new Dictionary<Guid, UserLookup>();
+    }
 
     return await _dbContext.Users
       .AsNoTracking()
@@ -164,6 +223,75 @@ public sealed class AdminCareRequestRepository : IAdminCareRequestRepository
         user.LastName,
         user.IdentificationNumber))
       .ToDictionaryAsync(user => user.UserId, cancellationToken);
+  }
+
+  private static IReadOnlyList<AdminShiftRecordSummary> BuildShiftSummaries(
+    IReadOnlyList<ShiftRecord> shifts,
+    IReadOnlyList<ShiftChange> changes,
+    IReadOnlyDictionary<Guid, UserLookup> users)
+  {
+    var changesByShift = changes
+      .GroupBy(change => change.ShiftRecordId)
+      .ToDictionary(group => group.Key, group => group.OrderBy(change => change.CreatedAtUtc).ToList());
+
+    return shifts
+      .Select(shift =>
+      {
+        var shiftChanges = changesByShift.TryGetValue(shift.Id, out var list)
+          ? list
+          : new List<ShiftChange>();
+
+        var changeSummaries = shiftChanges
+          .Select(change => new AdminShiftChangeSummary(
+            change.Id,
+            change.PreviousNurseUserId,
+            ResolveNurseDisplayName(users, change.PreviousNurseUserId),
+            ResolveNurseEmail(users, change.PreviousNurseUserId),
+            change.NewNurseUserId,
+            ResolveNurseDisplayName(users, change.NewNurseUserId),
+            ResolveNurseEmail(users, change.NewNurseUserId),
+            change.Reason,
+            change.EffectiveAtUtc,
+            change.CreatedAtUtc))
+          .ToList()
+          .AsReadOnly();
+
+        return new AdminShiftRecordSummary(
+          shift.Id,
+          shift.NurseUserId,
+          ResolveNurseDisplayName(users, shift.NurseUserId),
+          ResolveNurseEmail(users, shift.NurseUserId),
+          shift.ScheduledStartUtc,
+          shift.ScheduledEndUtc,
+          shift.ActualStartUtc,
+          shift.ActualEndUtc,
+          shift.Status.ToString(),
+          shift.CreatedAtUtc,
+          shift.UpdatedAtUtc,
+          changeSummaries);
+      })
+      .ToList()
+      .AsReadOnly();
+  }
+
+  private static string? ResolveNurseDisplayName(IReadOnlyDictionary<Guid, UserLookup> users, Guid? nurseUserId)
+  {
+    if (!nurseUserId.HasValue || !users.TryGetValue(nurseUserId.Value, out var user))
+    {
+      return null;
+    }
+
+    return ResolveDisplayName(user);
+  }
+
+  private static string? ResolveNurseEmail(IReadOnlyDictionary<Guid, UserLookup> users, Guid? nurseUserId)
+  {
+    if (!nurseUserId.HasValue || !users.TryGetValue(nurseUserId.Value, out var user))
+    {
+      return null;
+    }
+
+    return user.Email;
   }
 
   private static AdminCareRequestListItem ToListItem(

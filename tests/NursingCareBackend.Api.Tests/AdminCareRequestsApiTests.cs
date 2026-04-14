@@ -142,6 +142,82 @@ public sealed class AdminCareRequestsApiTests : IClassFixture<CustomWebApplicati
   }
 
   [Fact]
+  public async Task POST_AdminCareRequest_Shifts_And_Changes_Should_Persist()
+  {
+    var scenario = $"admin-shifts-{Guid.NewGuid():N}";
+    var today = DateOnly.FromDateTime(DateTime.UtcNow);
+    var (clientToken, _) = await CareRequestApiAuthHelper.CreateClientTokenAsync(_factory, $"{scenario}-client");
+    var (_, nurseA) = await CareRequestApiAuthHelper.CreateCompletedNurseTokenAsync(_factory, $"{scenario}-nurse-a");
+    var (_, nurseB) = await CareRequestApiAuthHelper.CreateCompletedNurseTokenAsync(_factory, $"{scenario}-nurse-b");
+
+    var careRequestId = await CreateCareRequestAsClientAsync(
+      clientToken,
+      $"{scenario}-turnos",
+      "domicilio_24h",
+      today);
+
+    await AssignCareRequestAsync(careRequestId, nurseA);
+
+    var adminClient = CreateAdminClient();
+    var scheduledStart = DateTime.UtcNow.AddHours(1);
+    var scheduledEnd = DateTime.UtcNow.AddHours(3);
+
+    var registerResponse = await adminClient.PostAsJsonAsync(
+      $"/api/admin/care-requests/{careRequestId}/shifts",
+      new
+      {
+        nurseUserId = nurseA,
+        scheduledStartUtc = scheduledStart,
+        scheduledEndUtc = scheduledEnd,
+      });
+
+    Assert.Equal(HttpStatusCode.Created, registerResponse.StatusCode);
+    var registerPayload = await registerResponse.Content.ReadFromJsonAsync<RegisterShiftResponse>();
+    Assert.NotNull(registerPayload);
+    var shiftId = registerPayload!.ShiftId;
+
+    var detailResponse = await adminClient.GetAsync($"/api/admin/care-requests/{careRequestId}");
+    detailResponse.EnsureSuccessStatusCode();
+    var detailPayload = await detailResponse.Content.ReadFromJsonAsync<AdminCareRequestDetailDto>();
+    Assert.NotNull(detailPayload);
+    Assert.Single(detailPayload!.Shifts);
+    Assert.Equal("Planned", detailPayload.Shifts[0].Status);
+    Assert.Equal(shiftId, detailPayload.Shifts[0].Id);
+    Assert.Empty(detailPayload.Shifts[0].Changes);
+
+    var changeResponse = await adminClient.PostAsJsonAsync(
+      $"/api/admin/care-requests/{careRequestId}/shifts/{shiftId}/changes",
+      new
+      {
+        newNurseUserId = nurseB,
+        reason = "Cambio operativo de guardia",
+      });
+
+    Assert.Equal(HttpStatusCode.NoContent, changeResponse.StatusCode);
+
+    var afterChangeResponse = await adminClient.GetAsync($"/api/admin/care-requests/{careRequestId}");
+    afterChangeResponse.EnsureSuccessStatusCode();
+    var afterChangePayload = await afterChangeResponse.Content.ReadFromJsonAsync<AdminCareRequestDetailDto>();
+    Assert.NotNull(afterChangePayload);
+    Assert.Single(afterChangePayload!.Shifts);
+    Assert.Equal("Changed", afterChangePayload.Shifts[0].Status);
+    Assert.Single(afterChangePayload.Shifts[0].Changes);
+  }
+
+  [Fact]
+  public async Task POST_AdminCareRequest_Shifts_Should_Return_NotFound_For_Unknown_Request()
+  {
+    var adminClient = CreateAdminClient();
+    var unknownId = Guid.NewGuid();
+
+    var response = await adminClient.PostAsJsonAsync(
+      $"/api/admin/care-requests/{unknownId}/shifts",
+      new { nurseUserId = (Guid?)null });
+
+    Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+  }
+
+  [Fact]
   public async Task GET_AdminCareRequests_Export_Should_Return_Csv_For_Filtered_Results()
   {
     var scenario = $"admin-export-{Guid.NewGuid():N}";
@@ -322,7 +398,27 @@ public sealed class AdminCareRequestsApiTests : IClassFixture<CustomWebApplicati
     public string Status { get; set; } = string.Empty;
     public AdminCareRequestPricingBreakdownDto PricingBreakdown { get; set; } = new();
     public AdminPayrollCompensationDto? PayrollCompensation { get; set; }
+    public List<AdminShiftRecordDto> Shifts { get; set; } = [];
     public List<AdminCareRequestTimelineEventDto> Timeline { get; set; } = [];
+  }
+
+  private sealed class AdminShiftRecordDto
+  {
+    public Guid Id { get; set; }
+
+    public string Status { get; set; } = string.Empty;
+
+    public List<AdminShiftChangeDto> Changes { get; set; } = [];
+  }
+
+  private sealed class AdminShiftChangeDto
+  {
+    public Guid Id { get; set; }
+  }
+
+  private sealed class RegisterShiftResponse
+  {
+    public Guid ShiftId { get; set; }
   }
 
   private sealed class AdminPayrollCompensationDto

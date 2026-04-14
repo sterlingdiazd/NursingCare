@@ -1,3 +1,5 @@
+using NursingCareBackend.Application.AdminPortal.Shifts;
+
 namespace NursingCareBackend.Application.AdminPortal.Queries;
 
 public sealed record AdminCareRequestDetail(
@@ -30,4 +32,5 @@ public sealed record AdminCareRequestDetail(
   bool IsOverdueOrStale,
   AdminCareRequestPricingBreakdown PricingBreakdown,
   AdminPayrollCompensationSnapshot? PayrollCompensation,
+  IReadOnlyList<AdminShiftRecordSummary> Shifts,
   IReadOnlyList<AdminCareRequestTimelineEvent> Timeline);

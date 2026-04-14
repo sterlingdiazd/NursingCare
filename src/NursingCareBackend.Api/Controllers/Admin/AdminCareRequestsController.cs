@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NursingCareBackend.Api.Extensions;
 using NursingCareBackend.Application.AdminPortal.Queries;
+using NursingCareBackend.Application.AdminPortal.Shifts;
 using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
 using NursingCareBackend.Application.Identity.Repositories;
 using NursingCareBackend.Domain.Identity;
@@ -19,19 +20,25 @@ public sealed class AdminCareRequestsController : ControllerBase
   private readonly GetAdminCareRequestClientOptionsHandler _getClientOptionsHandler;
   private readonly CreateCareRequestHandler _createHandler;
   private readonly IUserRepository _userRepository;
+  private readonly RegisterCareRequestShiftHandler _registerShiftHandler;
+  private readonly RecordCareRequestShiftChangeHandler _recordShiftChangeHandler;
 
   public AdminCareRequestsController(
     GetAdminCareRequestsHandler getListHandler,
     GetAdminCareRequestDetailHandler getDetailHandler,
     GetAdminCareRequestClientOptionsHandler getClientOptionsHandler,
     CreateCareRequestHandler createHandler,
-    IUserRepository userRepository)
+    IUserRepository userRepository,
+    RegisterCareRequestShiftHandler registerShiftHandler,
+    RecordCareRequestShiftChangeHandler recordShiftChangeHandler)
   {
     _getListHandler = getListHandler;
     _getDetailHandler = getDetailHandler;
     _getClientOptionsHandler = getClientOptionsHandler;
     _createHandler = createHandler;
     _userRepository = userRepository;
+    _registerShiftHandler = registerShiftHandler;
+    _recordShiftChangeHandler = recordShiftChangeHandler;
   }
 
   [HttpGet]
@@ -166,6 +173,48 @@ public sealed class AdminCareRequestsController : ControllerBase
     return CreatedAtAction(nameof(GetById), new { id }, new { id });
   }
 
+  [HttpPost("{id:guid}/shifts")]
+  [ProducesResponseType(StatusCodes.Status201Created)]
+  [ProducesResponseType(StatusCodes.Status400BadRequest)]
+  [ProducesResponseType(StatusCodes.Status404NotFound)]
+  public async Task<IActionResult> RegisterShift(
+    Guid id,
+    [FromBody] RegisterAdminCareRequestShiftRequest request,
+    CancellationToken cancellationToken)
+  {
+    var shiftId = await _registerShiftHandler.Handle(
+      new RegisterCareRequestShiftCommand(
+        id,
+        request.NurseUserId,
+        request.ScheduledStartUtc,
+        request.ScheduledEndUtc),
+      cancellationToken);
+
+    return CreatedAtAction(nameof(GetById), new { id }, new { shiftId });
+  }
+
+  [HttpPost("{id:guid}/shifts/{shiftId:guid}/changes")]
+  [ProducesResponseType(StatusCodes.Status204NoContent)]
+  [ProducesResponseType(StatusCodes.Status400BadRequest)]
+  [ProducesResponseType(StatusCodes.Status404NotFound)]
+  public async Task<IActionResult> RecordShiftChange(
+    Guid id,
+    Guid shiftId,
+    [FromBody] RecordAdminCareRequestShiftChangeRequest request,
+    CancellationToken cancellationToken)
+  {
+    await _recordShiftChangeHandler.Handle(
+      new RecordCareRequestShiftChangeCommand(
+        id,
+        shiftId,
+        request.NewNurseUserId,
+        request.Reason ?? string.Empty,
+        request.EffectiveAtUtc),
+      cancellationToken);
+
+    return NoContent();
+  }
+
   private static string EscapeCsv(object? value)
   {
     if (value is null)
@@ -176,4 +225,22 @@ public sealed class AdminCareRequestsController : ControllerBase
     var text = value.ToString() ?? string.Empty;
     return $"\"{text.Replace("\"", "\"\"")}\"";
   }
+}
+
+public sealed class RegisterAdminCareRequestShiftRequest
+{
+  public Guid? NurseUserId { get; set; }
+
+  public DateTime? ScheduledStartUtc { get; set; }
+
+  public DateTime? ScheduledEndUtc { get; set; }
+}
+
+public sealed class RecordAdminCareRequestShiftChangeRequest
+{
+  public Guid? NewNurseUserId { get; set; }
+
+  public string? Reason { get; set; }
+
+  public DateTime? EffectiveAtUtc { get; set; }
 }
