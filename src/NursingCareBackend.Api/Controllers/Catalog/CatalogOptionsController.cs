@@ -47,11 +47,10 @@ public sealed class CatalogOptionsController : ControllerBase
     public async Task<ActionResult<IReadOnlyList<AvailableNurseOptionResponse>>> GetAvailableNurses(
         CancellationToken cancellationToken)
     {
-        var nurses = await _nurseProfileAdministration.GetActiveNurseProfilesAsync(cancellationToken);
-        var users = await _nurseProfileAdministration.GetActiveNurseProfilesAsync(cancellationToken);
-        
+        var activeNurses = await _nurseProfileAdministration.GetActiveNurseProfilesAsync(cancellationToken);
+
         var response = new List<AvailableNurseOptionResponse>();
-        foreach (var summary in users.Where(n => n.IsAssignmentReady))
+        foreach (var summary in activeNurses.Where(n => n.IsAssignmentReady))
         {
             var displayName = BuildDisplayName(summary.Name, summary.LastName, summary.Email);
             response.Add(new AvailableNurseOptionResponse(

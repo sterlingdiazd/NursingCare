@@ -68,12 +68,16 @@ public static class CatalogSeeding
             await SeedCatalogsAsync(db, cancellationToken);
         }
 
-        // Always ensure test nurses exist - delete old ones and recreate
+        // Always ensure test nurses exist with correct roles
+        var nurseRole = await db.Roles.SingleAsync(r => r.Name == SystemRoles.Nurse, cancellationToken);
         var totalNurseCount = await db.Users
             .Where(x => x.ProfileType == UserProfileType.NURSE)
             .CountAsync(cancellationToken);
+        var nursesWithRole = await db.UserRoles
+            .Where(ur => ur.RoleId == nurseRole.Id)
+            .CountAsync(cancellationToken);
 
-        if (totalNurseCount != NurseIds.Count)
+        if (totalNurseCount != NurseIds.Count || nursesWithRole < NurseIds.Count)
         {
             await SeedUsersAndNursesAsync(db, cancellationToken);
         }
