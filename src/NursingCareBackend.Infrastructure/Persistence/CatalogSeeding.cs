@@ -455,6 +455,10 @@ public static class CatalogSeeding
             await db.SaveChangesAsync(cancellationToken);
         }
 
+        // Get system roles
+        var clientRole = await db.Roles.SingleAsync(r => r.Name == SystemRoles.Client, cancellationToken);
+        var nurseRole = await db.Roles.SingleAsync(r => r.Name == SystemRoles.Nurse, cancellationToken);
+
         // Create test client user
         var clientUser = new User
         {
@@ -468,6 +472,13 @@ public static class CatalogSeeding
             IsActive = true,
             CreatedAtUtc = DateTime.UtcNow
         };
+
+        clientUser.UserRoles.Add(new UserRole
+        {
+            UserId = clientUser.Id,
+            RoleId = clientRole.Id,
+            Role = clientRole
+        });
 
         db.Users.Add(clientUser);
         db.Clients.Add(new Client { UserId = TestClientId });
@@ -502,6 +513,13 @@ public static class CatalogSeeding
                 IsActive = true,
                 CreatedAtUtc = DateTime.UtcNow
             };
+
+            nurseUser.UserRoles.Add(new UserRole
+            {
+                UserId = nurseId,
+                RoleId = nurseRole.Id,
+                Role = nurseRole
+            });
 
             db.Users.Add(nurseUser);
 
