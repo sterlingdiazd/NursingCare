@@ -8,12 +8,12 @@
       "launchUrl": "swagger",
       "applicationUrl": "http://localhost:8080",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_ENVIRONMENT": "Production",
         "DB_SERVER": "localhost,1433",
         "DB_NAME": "NursingCareDb",
         "DB_USER": "sa",
         "DB_PASSWORD": "YourStrong!Passw0rd",
-        "JWT_KEY": "DevelopmentOnlyJwtSigningKey12345678901234567890"
+        "JWT_KEY": "NursingCareBackendSecretKey12345678901234567890"
       }
     },
     "https": {
@@ -23,12 +23,12 @@
       "launchUrl": "swagger",
       "applicationUrl": "https://localhost:8443;http://localhost:8080",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_ENVIRONMENT": "Production",
         "DB_SERVER": "localhost,1433",
         "DB_NAME": "NursingCareDb",
         "DB_USER": "sa",
         "DB_PASSWORD": "YourStrong!Passw0rd",
-        "JWT_KEY": "DevelopmentOnlyJwtSigningKey12345678901234567890"
+        "JWT_KEY": "NursingCareBackendSecretKey12345678901234567890"
       }
     }
   }
