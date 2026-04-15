@@ -68,16 +68,22 @@ public static class CatalogSeeding
             await SeedCatalogsAsync(db, cancellationToken);
         }
 
-        // Always ensure test nurses exist with correct roles
+        // Always ensure seeded test users exist with correct roles
         var nurseRole = await db.Roles.SingleAsync(r => r.Name == SystemRoles.Nurse, cancellationToken);
-        var totalNurseCount = await db.Users
-            .Where(x => x.ProfileType == UserProfileType.NURSE)
+        var clientRole = await db.Roles.SingleAsync(r => r.Name == SystemRoles.Client, cancellationToken);
+        var seededNurseIds = NurseIds.Values.ToHashSet();
+        var seededNurseCount = await db.Users
+            .Where(x => seededNurseIds.Contains(x.Id) && x.ProfileType == UserProfileType.NURSE)
             .CountAsync(cancellationToken);
         var nursesWithRole = await db.UserRoles
-            .Where(ur => ur.RoleId == nurseRole.Id)
+            .Where(ur => seededNurseIds.Contains(ur.UserId) && ur.RoleId == nurseRole.Id)
             .CountAsync(cancellationToken);
+        var testClientExists = await db.Users
+            .AnyAsync(u => u.Id == TestClientId && u.ProfileType == UserProfileType.CLIENT, cancellationToken);
+        var testClientHasRole = await db.UserRoles
+            .AnyAsync(ur => ur.UserId == TestClientId && ur.RoleId == clientRole.Id, cancellationToken);
 
-        if (totalNurseCount != NurseIds.Count || nursesWithRole < NurseIds.Count)
+        if (seededNurseCount != NurseIds.Count || nursesWithRole != NurseIds.Count || !testClientExists || !testClientHasRole)
         {
             await SeedUsersAndNursesAsync(db, cancellationToken);
         }
@@ -443,19 +449,24 @@ public static class CatalogSeeding
 
     private static async Task SeedUsersAndNursesAsync(NursingCareDbContext db, CancellationToken cancellationToken = default)
     {
-        // Delete all existing test nurses and clients to ensure clean seeding
-        var allNurses = await db.Users.Where(u => u.ProfileType == UserProfileType.NURSE).ToListAsync(cancellationToken);
-        var allClients = await db.Users.Where(u => u.ProfileType == UserProfileType.CLIENT).ToListAsync(cancellationToken);
+        // Delete only seeded test users to avoid touching non-test production users.
+        var seededNurseIds = NurseIds.Values.ToHashSet();
+        var seededNurses = await db.Users
+            .Where(u => seededNurseIds.Contains(u.Id))
+            .ToListAsync(cancellationToken);
+        var testClient = await db.Users
+            .Where(u => u.Id == TestClientId)
+            .ToListAsync(cancellationToken);
 
-        if (allNurses.Any())
+        if (seededNurses.Any())
         {
-            db.Users.RemoveRange(allNurses);
+            db.Users.RemoveRange(seededNurses);
             await db.SaveChangesAsync(cancellationToken);
         }
 
-        if (allClients.Any())
+        if (testClient.Any())
         {
-            db.Users.RemoveRange(allClients);
+            db.Users.RemoveRange(testClient);
             await db.SaveChangesAsync(cancellationToken);
         }
 

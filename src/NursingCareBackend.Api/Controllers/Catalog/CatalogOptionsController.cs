@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NursingCareBackend.Application.Catalogs;
-using NursingCareBackend.Application.Identity.Services;
+using NursingCareBackend.Application.Identity.Repositories;
 
 namespace NursingCareBackend.Api.Controllers.Catalog;
 
@@ -10,14 +10,14 @@ namespace NursingCareBackend.Api.Controllers.Catalog;
 public sealed class CatalogOptionsController : ControllerBase
 {
     private readonly ICatalogOptionsService _catalogOptions;
-    private readonly INurseProfileAdministrationService _nurseProfileAdministration;
+    private readonly IUserRepository _userRepository;
 
     public CatalogOptionsController(
         ICatalogOptionsService catalogOptions,
-        INurseProfileAdministrationService nurseProfileAdministration)
+        IUserRepository userRepository)
     {
         _catalogOptions = catalogOptions;
-        _nurseProfileAdministration = nurseProfileAdministration;
+        _userRepository = userRepository;
     }
 
     [HttpGet("care-request-options")]
@@ -47,17 +47,17 @@ public sealed class CatalogOptionsController : ControllerBase
     public async Task<ActionResult<IReadOnlyList<AvailableNurseOptionResponse>>> GetAvailableNurses(
         CancellationToken cancellationToken)
     {
-        var activeNurses = await _nurseProfileAdministration.GetActiveNurseProfilesAsync(cancellationToken);
+        var activeNurses = await _userRepository.GetActiveNurseProfilesAsync(cancellationToken);
 
         var response = new List<AvailableNurseOptionResponse>();
-        foreach (var summary in activeNurses.Where(n => n.IsAssignmentReady))
+        foreach (var nurse in activeNurses)
         {
-            var displayName = BuildDisplayName(summary.Name, summary.LastName, summary.Email);
+            var displayName = BuildDisplayName(nurse.Name, nurse.LastName, nurse.Email);
             response.Add(new AvailableNurseOptionResponse(
-                summary.UserId,
+                nurse.Id,
                 displayName,
-                summary.Specialty ?? string.Empty,
-                summary.Category ?? string.Empty));
+                nurse.NurseProfile?.Specialty ?? string.Empty,
+                nurse.NurseProfile?.Category ?? string.Empty));
         }
 
         return Ok(response.OrderBy(n => n.DisplayName).ToArray());
