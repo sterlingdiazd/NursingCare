@@ -48,23 +48,35 @@ public sealed class CatalogOptionsController : ControllerBase
         CancellationToken cancellationToken)
     {
         var nurses = await _nurseProfileAdministration.GetActiveNurseProfilesAsync(cancellationToken);
-        var response = nurses
-            .Where(nurse => nurse.IsAssignmentReady)
-            .Select(nurse => new AvailableNurseOptionResponse(
-                nurse.UserId,
-                BuildDisplayName(nurse.Name, nurse.LastName, nurse.Email),
-                nurse.Specialty ?? string.Empty,
-                nurse.Category ?? string.Empty))
-            .OrderBy(nurse => nurse.DisplayName)
-            .ToArray();
+        var users = await _nurseProfileAdministration.GetActiveNurseProfilesAsync(cancellationToken);
+        
+        var response = new List<AvailableNurseOptionResponse>();
+        foreach (var summary in users.Where(n => n.IsAssignmentReady))
+        {
+            var displayName = BuildDisplayName(summary.Name, summary.LastName, summary.Email);
+            response.Add(new AvailableNurseOptionResponse(
+                summary.UserId,
+                displayName,
+                summary.Specialty ?? string.Empty,
+                summary.Category ?? string.Empty));
+        }
 
-        return Ok(response);
+        return Ok(response.OrderBy(n => n.DisplayName).ToArray());
     }
 
     private static string BuildDisplayName(string? name, string? lastName, string email)
     {
-        var fullName = $"{name ?? string.Empty} {lastName ?? string.Empty}".Trim();
-        return string.IsNullOrWhiteSpace(fullName) ? email : fullName;
+        if (!string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(lastName))
+        {
+            return $"{name.Trim()} {lastName.Trim()}";
+        }
+        
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            return name.Trim();
+        }
+        
+        return email;
     }
 
     public sealed record AvailableNurseOptionResponse(
