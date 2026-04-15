@@ -102,7 +102,7 @@ public sealed class AdminCareRequestRepository : IAdminCareRequestRepository
     }
 
     var users = await LoadUserLookupByIdsAsync(userIds, cancellationToken);
-    var client = users[careRequest.UserID];
+    var client = users.TryGetValue(careRequest.UserID, out var c) ? c : null;
     var assignedNurse = careRequest.AssignedNurse.HasValue && users.TryGetValue(careRequest.AssignedNurse.Value, out var nurse)
       ? nurse
       : null;
@@ -115,9 +115,9 @@ public sealed class AdminCareRequestRepository : IAdminCareRequestRepository
     return new AdminCareRequestDetail(
       Id: careRequest.Id,
       ClientUserId: careRequest.UserID,
-      ClientDisplayName: ResolveDisplayName(client),
-      ClientEmail: client.Email,
-      ClientIdentificationNumber: client.IdentificationNumber,
+      ClientDisplayName: client is null ? "Usuario Desconocido" : ResolveDisplayName(client),
+      ClientEmail: client?.Email ?? "Sin correo",
+      ClientIdentificationNumber: client?.IdentificationNumber,
       AssignedNurseUserId: careRequest.AssignedNurse,
       AssignedNurseDisplayName: assignedNurse is null ? null : ResolveDisplayName(assignedNurse),
       AssignedNurseEmail: assignedNurse?.Email,
@@ -299,7 +299,7 @@ public sealed class AdminCareRequestRepository : IAdminCareRequestRepository
     IReadOnlyDictionary<Guid, UserLookup> users,
     DateTime utcNow)
   {
-    var client = users[careRequest.UserID];
+    var client = users.TryGetValue(careRequest.UserID, out var c) ? c : null;
     var assignedNurse = careRequest.AssignedNurse.HasValue && users.TryGetValue(careRequest.AssignedNurse.Value, out var nurse)
       ? nurse
       : null;
@@ -307,8 +307,8 @@ public sealed class AdminCareRequestRepository : IAdminCareRequestRepository
     return new AdminCareRequestListItem(
       Id: careRequest.Id,
       ClientUserId: careRequest.UserID,
-      ClientDisplayName: ResolveDisplayName(client),
-      ClientEmail: client.Email,
+      ClientDisplayName: client is null ? "Usuario Desconocido" : ResolveDisplayName(client),
+      ClientEmail: client?.Email ?? "Sin correo",
       AssignedNurseUserId: careRequest.AssignedNurse,
       AssignedNurseDisplayName: assignedNurse is null ? null : ResolveDisplayName(assignedNurse),
       AssignedNurseEmail: assignedNurse?.Email,
