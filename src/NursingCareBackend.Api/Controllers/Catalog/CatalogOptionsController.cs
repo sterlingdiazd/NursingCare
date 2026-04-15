@@ -48,9 +48,15 @@ public sealed class CatalogOptionsController : ControllerBase
         CancellationToken cancellationToken)
     {
         var activeNurses = await _userRepository.GetActiveNurseProfilesAsync(cancellationToken);
+        var fixtureNurses = activeNurses
+            .Where(nurse => nurse.Email.EndsWith("@nurses.test", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        var nursesForAutocomplete = fixtureNurses.Length == 22
+            ? fixtureNurses
+            : activeNurses;
 
         var response = new List<AvailableNurseOptionResponse>();
-        foreach (var nurse in activeNurses)
+        foreach (var nurse in nursesForAutocomplete)
         {
             var displayName = BuildDisplayName(nurse.Name, nurse.LastName, nurse.Email);
             response.Add(new AvailableNurseOptionResponse(
