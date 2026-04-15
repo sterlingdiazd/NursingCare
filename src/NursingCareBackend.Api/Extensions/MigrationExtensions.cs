@@ -54,6 +54,10 @@ namespace NursingCareBackend.Api.Extensions
         }
         EnsureSystemRoles(db);
         EnsureSystemSettings(db);
+        CatalogSeeding
+          .EnsureSeededAsync(db)
+          .GetAwaiter()
+          .GetResult();
         logger.LogInformation("Database migrations applied successfully.");
       }
       catch (Exception ex)
