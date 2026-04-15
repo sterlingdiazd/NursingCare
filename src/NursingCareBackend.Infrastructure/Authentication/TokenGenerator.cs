@@ -57,7 +57,9 @@ public sealed class TokenGenerator : ITokenGenerator
         // Add roles as claims
         foreach (var userRole in user.UserRoles)
         {
-            claims.Add(new Claim(ClaimTypes.Role, userRole.Role.Name));
+            // Normalize role claim casing to keep authorization checks consistent
+            // even when historical data stored role names using mixed casing.
+            claims.Add(new Claim(ClaimTypes.Role, userRole.Role.Name.ToUpperInvariant()));
         }
 
         var token = new JwtSecurityToken(
