@@ -11,6 +11,8 @@ using NursingCareBackend.Application.Identity.Services;
 using NursingCareBackend.Application.Identity.Responses;
 using NursingCareBackend.Infrastructure.Authentication;
 using System.Globalization;
+using System.Text;
+using System.Text.Json;
 
 namespace NursingCareBackend.Api.Controllers.Auth;
 
@@ -131,12 +133,13 @@ public sealed class AuthController : ControllerBase
     [HttpGet("google/start")]
     [ProducesResponseType(StatusCodes.Status302Found)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public IActionResult StartGoogleLogin([FromQuery] string? target)
+    public IActionResult StartGoogleLogin([FromQuery] string? target, [FromQuery] string? mobileRedirectUrl)
     {
         try
         {
             var redirectTarget = NormalizeRedirectTarget(target);
-            return Redirect(_googleOAuthClient.BuildAuthorizationUrl(redirectTarget));
+            var state = BuildGoogleState(redirectTarget, mobileRedirectUrl);
+            return Redirect(_googleOAuthClient.BuildAuthorizationUrl(state));
         }
         catch (InvalidOperationException ex)
         {
@@ -158,7 +161,8 @@ public sealed class AuthController : ControllerBase
         [FromQuery] string? state,
         CancellationToken cancellationToken)
     {
-        var redirectTarget = NormalizeRedirectTarget(state);
+        var googleState = ParseGoogleState(state);
+        var redirectTarget = googleState.Target;
         var correlationId = HttpContext.GetCorrelationId();
 
         if (!string.IsNullOrWhiteSpace(error))
@@ -170,7 +174,8 @@ public sealed class AuthController : ControllerBase
             return Redirect(BuildFailureRedirect(
                 "Error al iniciar sesión con Google. Por favor intenta de nuevo.",
                 redirectTarget,
-                correlationId));
+                correlationId,
+                googleState.MobileRedirectUrl));
         }
 
         if (string.IsNullOrWhiteSpace(code))
@@ -181,13 +186,14 @@ public sealed class AuthController : ControllerBase
             return Redirect(BuildFailureRedirect(
                 "Error al iniciar sesión con Google. Por favor intenta de nuevo.",
                 redirectTarget,
-                correlationId));
+                correlationId,
+                googleState.MobileRedirectUrl));
         }
 
         try
         {
             var response = await _authenticationService.LoginWithGoogleAsync(code, cancellationToken);
-            return Redirect(BuildSuccessRedirect(response, redirectTarget));
+            return Redirect(BuildSuccessRedirect(response, redirectTarget, googleState.MobileRedirectUrl));
         }
         catch (InvalidOperationException ex)
         {
@@ -198,7 +204,8 @@ public sealed class AuthController : ControllerBase
             return Redirect(BuildFailureRedirect(
                 MapGoogleSignInErrorMessage(ex),
                 redirectTarget,
-                correlationId));
+                correlationId,
+                googleState.MobileRedirectUrl));
         }
         catch (Exception ex)
         {
@@ -209,7 +216,8 @@ public sealed class AuthController : ControllerBase
             return Redirect(BuildFailureRedirect(
                 "Error al iniciar sesión con Google. Por favor intenta de nuevo.",
                 redirectTarget,
-                correlationId));
+                correlationId,
+                googleState.MobileRedirectUrl));
         }
     }
 
@@ -387,7 +395,7 @@ public sealed class AuthController : ControllerBase
         }
     }
 
-    private string BuildSuccessRedirect(AuthResponse response, string redirectTarget)
+    private string BuildSuccessRedirect(AuthResponse response, string redirectTarget, string? mobileRedirectUrl)
     {
         return BuildRedirect(new Dictionary<string, string?>
         {
@@ -400,25 +408,26 @@ public sealed class AuthController : ControllerBase
             ["roles"] = string.Join(",", response.Roles),
             ["requiresProfileCompletion"] = response.RequiresProfileCompletion.ToString().ToLowerInvariant(),
             ["requiresAdminReview"] = response.RequiresAdminReview.ToString().ToLowerInvariant()
-        }, redirectTarget);
+        }, redirectTarget, mobileRedirectUrl);
     }
 
-    private string BuildFailureRedirect(string message, string redirectTarget, string correlationId)
+    private string BuildFailureRedirect(string message, string redirectTarget, string correlationId, string? mobileRedirectUrl)
     {
         return BuildRedirect(new Dictionary<string, string?>
         {
             ["oauth"] = "error",
             ["message"] = message,
             ["correlationId"] = correlationId
-        }, redirectTarget);
+        }, redirectTarget, mobileRedirectUrl);
     }
 
     private string BuildRedirect(
         IReadOnlyDictionary<string, string?> parameters,
-        string redirectTarget)
+        string redirectTarget,
+        string? mobileRedirectUrl)
     {
         return string.Equals(redirectTarget, "mobile", StringComparison.OrdinalIgnoreCase)
-            ? BuildMobileRedirect(parameters)
+            ? BuildMobileRedirect(parameters, mobileRedirectUrl)
             : BuildWebRedirect(parameters);
     }
 
@@ -437,9 +446,13 @@ public sealed class AuthController : ControllerBase
         return $"{baseUri}#{fragment}";
     }
 
-    private string BuildMobileRedirect(IReadOnlyDictionary<string, string?> queryParameters)
+    private string BuildMobileRedirect(
+        IReadOnlyDictionary<string, string?> queryParameters,
+        string? mobileRedirectUrl)
     {
-        if (string.IsNullOrWhiteSpace(_googleOAuthOptions.MobileRedirectUrl))
+        var resolvedRedirectUrl = ResolveMobileRedirectUrl(mobileRedirectUrl);
+
+        if (string.IsNullOrWhiteSpace(resolvedRedirectUrl))
         {
             throw new InvalidOperationException(
                 "Google OAuth mobile redirect is not configured. Set GOOGLE_OAUTH_MOBILE_REDIRECT_URL.");
@@ -454,18 +467,88 @@ public sealed class AuthController : ControllerBase
 
         if (string.IsNullOrEmpty(query))
         {
-            return _googleOAuthOptions.MobileRedirectUrl;
+            return resolvedRedirectUrl;
         }
 
-        var separator = _googleOAuthOptions.MobileRedirectUrl.Contains('?', StringComparison.Ordinal)
+        var separator = resolvedRedirectUrl.Contains('?', StringComparison.Ordinal)
             ? "&"
             : "?";
 
-        return $"{_googleOAuthOptions.MobileRedirectUrl}{separator}{query}";
+        return $"{resolvedRedirectUrl}{separator}{query}";
     }
 
     private static string NormalizeRedirectTarget(string? target)
         => string.Equals(target, "mobile", StringComparison.OrdinalIgnoreCase) ? "mobile" : "web";
+
+    private string BuildGoogleState(string redirectTarget, string? mobileRedirectUrl)
+    {
+        var payload = new GoogleOAuthState(
+            redirectTarget,
+            SanitizeMobileRedirectUrl(mobileRedirectUrl));
+
+        var json = JsonSerializer.Serialize(payload);
+        return WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(json));
+    }
+
+    private static GoogleOAuthState ParseGoogleState(string? state)
+    {
+        var fallbackTarget = NormalizeRedirectTarget(state);
+
+        if (string.IsNullOrWhiteSpace(state))
+        {
+            return new GoogleOAuthState(fallbackTarget, null);
+        }
+
+        try
+        {
+            var bytes = WebEncoders.Base64UrlDecode(state);
+            var payload = JsonSerializer.Deserialize<GoogleOAuthState>(bytes);
+
+            if (payload is null)
+            {
+                return new GoogleOAuthState(fallbackTarget, null);
+            }
+
+            return new GoogleOAuthState(
+                NormalizeRedirectTarget(payload.Target),
+                SanitizeMobileRedirectUrl(payload.MobileRedirectUrl));
+        }
+        catch (FormatException)
+        {
+            return new GoogleOAuthState(fallbackTarget, null);
+        }
+        catch (JsonException)
+        {
+            return new GoogleOAuthState(fallbackTarget, null);
+        }
+    }
+
+    private string? ResolveMobileRedirectUrl(string? mobileRedirectUrl)
+    {
+        var sanitizedOverride = SanitizeMobileRedirectUrl(mobileRedirectUrl);
+        if (!string.IsNullOrWhiteSpace(sanitizedOverride))
+        {
+            return sanitizedOverride;
+        }
+
+        return _googleOAuthOptions.MobileRedirectUrl;
+    }
+
+    private static string? SanitizeMobileRedirectUrl(string? mobileRedirectUrl)
+    {
+        if (string.IsNullOrWhiteSpace(mobileRedirectUrl)
+            || !Uri.TryCreate(mobileRedirectUrl, UriKind.Absolute, out var uri))
+        {
+            return null;
+        }
+
+        if (uri.Scheme is "nursingcaremobile" or "exp" or "exps")
+        {
+            return uri.ToString();
+        }
+
+        return null;
+    }
 
     private static string MapGoogleSignInErrorMessage(InvalidOperationException ex)
     {
@@ -516,4 +599,6 @@ public sealed class AuthController : ControllerBase
 
         return HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
     }
+
+    private sealed record GoogleOAuthState(string Target, string? MobileRedirectUrl);
 }
