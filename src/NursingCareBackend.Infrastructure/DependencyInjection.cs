@@ -16,6 +16,7 @@ using NursingCareBackend.Application.AdminPortal.Reports;
 using NursingCareBackend.Application.AdminPortal.Catalog;
 using NursingCareBackend.Application.AdminPortal.Notifications;
 using NursingCareBackend.Application.AdminPortal.Settings;
+using NursingCareBackend.Application.AdminPortal.Payroll;
 using NursingCareBackend.Application.Email;
 using NursingCareBackend.Application.Catalogs;
 using NursingCareBackend.Infrastructure.AdminPortal;
@@ -100,6 +101,7 @@ public static class DependencyInjection
         services.AddScoped<IAdminNotificationService, AdminNotificationService>();
         services.AddScoped<IAdminNotificationPublisher, AdminNotificationPublisher>();
         services.AddScoped<IAdminReportsRepository, AdminReportsRepository>();
+        services.AddScoped<IAdminPayrollRepository, AdminPayrollRepository>();
         services.AddScoped<GetAdminReportHandler>();
 
         // Identity Repositories
