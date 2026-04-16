@@ -72,4 +72,30 @@ public sealed class CompensationRule
 
     private static decimal Clamp(decimal value)
         => decimal.Round(Math.Max(0m, value), 4, MidpointRounding.AwayFromZero);
+
+    public void Update(
+        string name,
+        decimal baseCompensationPercent,
+        decimal transportIncentivePercent,
+        decimal complexityBonusPercent,
+        decimal medicalSuppliesPercent,
+        DateTime updatedAtUtc)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("Rule name is required.", nameof(name));
+        }
+
+        Name = name.Trim();
+        BaseCompensationPercent = Clamp(baseCompensationPercent);
+        TransportIncentivePercent = Clamp(transportIncentivePercent);
+        ComplexityBonusPercent = Clamp(complexityBonusPercent);
+        MedicalSuppliesPercent = Clamp(medicalSuppliesPercent);
+        // Note: No UpdatedAtUtc in entity, perhaps add if needed, but for now skip
+    }
+
+    public void Deactivate(DateTime deactivatedAtUtc)
+    {
+        IsActive = false;
+    }
 }

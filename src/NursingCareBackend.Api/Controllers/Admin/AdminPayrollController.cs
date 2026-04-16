@@ -158,6 +158,101 @@ public sealed class AdminPayrollController : ControllerBase
         return File(bytes, "text/csv; charset=utf-8", $"nomina-periodo-{id:N}-{DateTime.UtcNow:yyyyMMdd}.csv");
     }
 
+    // GET /api/admin/payroll/deductions
+    [HttpGet("deductions")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult<AdminDeductionListResult>> GetDeductions(
+        [FromQuery] Guid? nurseId,
+        [FromQuery] Guid? periodId,
+        CancellationToken cancellationToken)
+    {
+        var result = await _repository.GetDeductionsAsync(nurseId, periodId, cancellationToken);
+        return Ok(result);
+    }
+
+    // POST /api/admin/payroll/deductions
+    [HttpPost("deductions")]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> CreateDeduction([FromBody] CreateDeductionRequest request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var id = await _repository.CreateDeductionAsync(request, cancellationToken);
+            return CreatedAtAction(nameof(GetDeductions), new { }, new { id });
+        }
+        catch (ArgumentException ex)
+        {
+            return this.ProblemResponse(StatusCodes.Status400BadRequest, "Datos invalidos", ex.Message);
+        }
+    }
+
+    // DELETE /api/admin/payroll/deductions/{id}
+    [HttpDelete("deductions/{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteDeduction(Guid id, CancellationToken cancellationToken)
+    {
+        var found = await _repository.DeleteDeductionAsync(id, cancellationToken);
+
+        if (!found)
+        {
+            return this.ProblemResponse(
+                StatusCodes.Status404NotFound,
+                "Deduccion no encontrada",
+                $"No se encontro la deduccion con id '{id}'.");
+        }
+
+        return NoContent();
+    }
+
+    // GET /api/admin/payroll/adjustments
+    [HttpGet("adjustments")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult<AdminCompensationAdjustmentListResult>> GetAdjustments(
+        [FromQuery] Guid? executionId,
+        CancellationToken cancellationToken)
+    {
+        var result = await _repository.GetAdjustmentsAsync(executionId, cancellationToken);
+        return Ok(result);
+    }
+
+    // POST /api/admin/payroll/adjustments
+    [HttpPost("adjustments")]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> CreateAdjustment([FromBody] CreateCompensationAdjustmentRequest request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var id = await _repository.CreateAdjustmentAsync(request, cancellationToken);
+            return CreatedAtAction(nameof(GetAdjustments), new { }, new { id });
+        }
+        catch (ArgumentException ex)
+        {
+            return this.ProblemResponse(StatusCodes.Status400BadRequest, "Datos invalidos", ex.Message);
+        }
+    }
+
+    // DELETE /api/admin/payroll/adjustments/{id}
+    [HttpDelete("adjustments/{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteAdjustment(Guid id, CancellationToken cancellationToken)
+    {
+        var found = await _repository.DeleteAdjustmentAsync(id, cancellationToken);
+
+        if (!found)
+        {
+            return this.ProblemResponse(
+                StatusCodes.Status404NotFound,
+                "Ajuste no encontrado",
+                $"No se encontro el ajuste de compensacion con id '{id}'.");
+        }
+
+        return NoContent();
+    }
+
     private static string EscapeCsv(object? value)
     {
         if (value is null) return "\"\"";
