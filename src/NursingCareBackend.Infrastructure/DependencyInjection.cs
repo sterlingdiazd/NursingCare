@@ -103,6 +103,7 @@ public static class DependencyInjection
         services.AddScoped<IAdminReportsRepository, AdminReportsRepository>();
         services.AddScoped<IAdminPayrollRepository, AdminPayrollRepository>();
         services.AddScoped<IAdminCompensationRulesRepository, AdminCompensationRulesRepository>();
+        services.AddScoped<IAdminShiftRepository, AdminShiftRepository>();
         services.AddScoped<GetAdminReportHandler>();
 
         // Identity Repositories

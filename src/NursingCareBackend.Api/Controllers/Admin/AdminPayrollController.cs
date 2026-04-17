@@ -253,6 +253,52 @@ public sealed class AdminPayrollController : ControllerBase
         return NoContent();
     }
 
+    // GET /api/admin/payroll/mobile-summary
+    [HttpGet("mobile-summary")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult<object>> GetMobileSummary(CancellationToken cancellationToken)
+    {
+        var openPeriods = await _repository.GetPeriodsAsync(
+            new AdminPayrollPeriodListFilter(1, 1, "Open"),
+            cancellationToken);
+        
+        var closedPeriods = await _repository.GetPeriodsAsync(
+            new AdminPayrollPeriodListFilter(1, 5, "Closed"),
+            cancellationToken);
+
+        decimal currentTotal = 0;
+        var allNurseIds = new List<Guid>();
+        
+        if (openPeriods.Items.FirstOrDefault() is var openPeriod && openPeriod != null)
+        {
+            var lines = await _repository.GetPeriodLinesAsync(openPeriod.Id, cancellationToken);
+            currentTotal = lines.Sum(l => l.NetCompensation);
+            allNurseIds.AddRange(lines.Select(l => l.NurseUserId).Distinct());
+        }
+
+        foreach (var period in closedPeriods.Items)
+        {
+            var lines = await _repository.GetPeriodLinesAsync(period.Id, cancellationToken);
+            allNurseIds.AddRange(lines.Select(l => l.NurseUserId).Distinct());
+        }
+
+        return Ok(new
+        {
+            OpenPeriodsCount = openPeriods.TotalCount,
+            ClosedPeriodsCount = closedPeriods.TotalCount,
+            TotalCompensationCurrentPeriod = currentTotal,
+            ActiveNursesCount = allNurseIds.Distinct().Count(),
+            RecentPeriods = closedPeriods.Items.Select(p => new
+            {
+                p.Id,
+                p.StartDate,
+                p.EndDate,
+                p.Status,
+                p.LineCount
+            })
+        });
+    }
+
     private static string EscapeCsv(object? value)
     {
         if (value is null) return "\"\"";

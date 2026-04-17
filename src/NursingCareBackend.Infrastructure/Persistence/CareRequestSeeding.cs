@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using NursingCareBackend.Domain.CareRequests;
+using NursingCareBackend.Domain.Payroll;
 
 namespace NursingCareBackend.Infrastructure.Persistence;
 
@@ -15,77 +16,79 @@ public static class CareRequestSeeding
             return;
         }
 
-        // Define care request configurations with target totals for each nurse
+        var now = DateTime.UtcNow;
+        var seedPeriodStart = new DateOnly(now.Year, now.Month, 1);
+        var seedPeriodEnd = new DateOnly(now.Year, now.Month, 15);
+        var createdAtUtc = now.AddDays(-5);
+
+        var payrollPeriod = PayrollPeriod.Create(
+            startDate: seedPeriodStart,
+            endDate: seedPeriodEnd,
+            cutoffDate: seedPeriodEnd.AddDays(-2),
+            paymentDate: seedPeriodEnd,
+            createdAtUtc: createdAtUtc);
+        db.PayrollPeriods.Add(payrollPeriod);
+        await db.SaveChangesAsync(cancellationToken);
+
         var careRequests = new[]
         {
-            // Lorea - $12,200
-            CreateCareRequest(CatalogSeeding.NurseIds["Lorea"], CatalogSeeding.TestClientId, 12200m, "hogar_diario", "dia_completo", 5, "local", "estandar"),
-
-            // Charleny - $12,200
-            CreateCareRequest(CatalogSeeding.NurseIds["Charleny"], CatalogSeeding.TestClientId, 12200m, "hogar_diario", "dia_completo", 5, "local", "estandar"),
-
-            // Valentin - $13,000
-            CreateCareRequest(CatalogSeeding.NurseIds["Valentin"], CatalogSeeding.TestClientId, 13000m, "hogar_diario", "dia_completo", 5, "media", "estandar"),
-
-            // Marel - $12,000
-            CreateCareRequest(CatalogSeeding.NurseIds["Marel"], CatalogSeeding.TestClientId, 12000m, "hogar_diario", "dia_completo", 5, "cercana", "estandar"),
-
-            // Liliana - $15,000
-            CreateCareRequest(CatalogSeeding.NurseIds["Liliana"], CatalogSeeding.TestClientId, 15000m, "hogar_diario", "dia_completo", 6, "local", "estandar"),
-
-            // Clari - $15,000
-            CreateCareRequest(CatalogSeeding.NurseIds["Clari"], CatalogSeeding.TestClientId, 15000m, "hogar_diario", "dia_completo", 6, "local", "estandar"),
-
-            // Solano - $15,000
-            CreateCareRequest(CatalogSeeding.NurseIds["Solano"], CatalogSeeding.TestClientId, 15000m, "hogar_diario", "dia_completo", 6, "local", "estandar"),
-
-            // Angela Maria - $13,000
-            CreateCareRequest(CatalogSeeding.NurseIds["Angela Maria"], CatalogSeeding.TestClientId, 13000m, "hogar_diario", "dia_completo", 5, "media", "estandar"),
-
-            // Karen - $15,500
-            CreateCareRequest(CatalogSeeding.NurseIds["Karen"], CatalogSeeding.TestClientId, 15500m, "hogar_diario", "dia_completo", 6, "cercana", "estandar"),
-
-            // Cristina - $15,500
-            CreateCareRequest(CatalogSeeding.NurseIds["Cristina"], CatalogSeeding.TestClientId, 15500m, "hogar_diario", "dia_completo", 6, "cercana", "estandar"),
-
-            // Figueredo - $23,000
-            CreateCareRequest(CatalogSeeding.NurseIds["Figueredo"], CatalogSeeding.TestClientId, 23000m, "domicilio_24h", "dia_completo", 7, "media", "moderada"),
-
-            // Annie - $23,000
-            CreateCareRequest(CatalogSeeding.NurseIds["Annie"], CatalogSeeding.TestClientId, 23000m, "domicilio_24h", "dia_completo", 7, "media", "moderada"),
-
-            // Zoila - $12,500
-            CreateCareRequest(CatalogSeeding.NurseIds["Zoila"], CatalogSeeding.TestClientId, 12500m, "hogar_diario", "dia_completo", 5, "local", "moderada"),
-
-            // Maria Isabel - $12,500
-            CreateCareRequest(CatalogSeeding.NurseIds["Maria Isabel"], CatalogSeeding.TestClientId, 12500m, "hogar_diario", "dia_completo", 5, "local", "moderada"),
-
-            // Emilina - $15,000
-            CreateCareRequest(CatalogSeeding.NurseIds["Emilina"], CatalogSeeding.TestClientId, 15000m, "hogar_diario", "dia_completo", 6, "local", "estandar"),
-
-            // Cindy - $15,000
-            CreateCareRequest(CatalogSeeding.NurseIds["Cindy"], CatalogSeeding.TestClientId, 15000m, "hogar_diario", "dia_completo", 6, "local", "estandar"),
-
-            // Agustina - $15,000
-            CreateCareRequest(CatalogSeeding.NurseIds["Agustina"], CatalogSeeding.TestClientId, 15000m, "hogar_diario", "dia_completo", 6, "local", "estandar"),
-
-            // Johanna - $15,000
-            CreateCareRequest(CatalogSeeding.NurseIds["Johanna"], CatalogSeeding.TestClientId, 15000m, "hogar_diario", "dia_completo", 6, "local", "estandar"),
-
-            // Miranda - $13,200
-            CreateCareRequest(CatalogSeeding.NurseIds["Miranda"], CatalogSeeding.TestClientId, 13200m, "hogar_diario", "dia_completo", 5, "cercana", "moderada"),
-
-            // Miguelina - $13,000
-            CreateCareRequest(CatalogSeeding.NurseIds["Miguelina"], CatalogSeeding.TestClientId, 13000m, "hogar_diario", "dia_completo", 5, "media", "estandar"),
-
-            // Celai - $12,500
-            CreateCareRequest(CatalogSeeding.NurseIds["Celai"], CatalogSeeding.TestClientId, 12500m, "hogar_diario", "dia_completo", 5, "local", "moderada"),
-
-            // De Los Santos - $12,500
-            CreateCareRequest(CatalogSeeding.NurseIds["De Los Santos"], CatalogSeeding.TestClientId, 12500m, "hogar_diario", "dia_completo", 5, "local", "moderada"),
+            CreateCareRequest(CatalogSeeding.NurseIds["Lorea"], CatalogSeeding.TestClientId, 12200m, "hogar_diario", "dia_completo", 5, "local", "estandar", payrollPeriod.Id, createdAtUtc),
+            CreateCareRequest(CatalogSeeding.NurseIds["Charleny"], CatalogSeeding.TestClientId, 12200m, "hogar_diario", "dia_completo", 5, "local", "estandar", payrollPeriod.Id, createdAtUtc),
+            CreateCareRequest(CatalogSeeding.NurseIds["Valentin"], CatalogSeeding.TestClientId, 13000m, "hogar_diario", "dia_completo", 5, "media", "estandar", payrollPeriod.Id, createdAtUtc),
+            CreateCareRequest(CatalogSeeding.NurseIds["Marel"], CatalogSeeding.TestClientId, 12000m, "hogar_diario", "dia_completo", 5, "cercana", "estandar", payrollPeriod.Id, createdAtUtc),
+            CreateCareRequest(CatalogSeeding.NurseIds["Liliana"], CatalogSeeding.TestClientId, 15000m, "hogar_diario", "dia_completo", 6, "local", "estandar", payrollPeriod.Id, createdAtUtc),
+            CreateCareRequest(CatalogSeeding.NurseIds["Clari"], CatalogSeeding.TestClientId, 15000m, "hogar_diario", "dia_completo", 6, "local", "estandar", payrollPeriod.Id, createdAtUtc),
+            CreateCareRequest(CatalogSeeding.NurseIds["Solano"], CatalogSeeding.TestClientId, 15000m, "hogar_diario", "dia_completo", 6, "local", "estandar", payrollPeriod.Id, createdAtUtc),
+            CreateCareRequest(CatalogSeeding.NurseIds["Angela Maria"], CatalogSeeding.TestClientId, 13000m, "hogar_diario", "dia_completo", 5, "media", "estandar", payrollPeriod.Id, createdAtUtc),
+            CreateCareRequest(CatalogSeeding.NurseIds["Karen"], CatalogSeeding.TestClientId, 15500m, "hogar_diario", "dia_completo", 6, "cercana", "estandar", payrollPeriod.Id, createdAtUtc),
+            CreateCareRequest(CatalogSeeding.NurseIds["Cristina"], CatalogSeeding.TestClientId, 15500m, "hogar_diario", "dia_completo", 6, "cercana", "estandar", payrollPeriod.Id, createdAtUtc),
+            CreateCareRequest(CatalogSeeding.NurseIds["Figueredo"], CatalogSeeding.TestClientId, 23000m, "domicilio_24h", "dia_completo", 7, "media", "moderada", payrollPeriod.Id, createdAtUtc),
+            CreateCareRequest(CatalogSeeding.NurseIds["Annie"], CatalogSeeding.TestClientId, 23000m, "domicilio_24h", "dia_completo", 7, "media", "moderada", payrollPeriod.Id, createdAtUtc),
+            CreateCareRequest(CatalogSeeding.NurseIds["Zoila"], CatalogSeeding.TestClientId, 12500m, "hogar_diario", "dia_completo", 5, "local", "moderada", payrollPeriod.Id, createdAtUtc),
+            CreateCareRequest(CatalogSeeding.NurseIds["Maria Isabel"], CatalogSeeding.TestClientId, 12500m, "hogar_diario", "dia_completo", 5, "local", "moderada", payrollPeriod.Id, createdAtUtc),
+            CreateCareRequest(CatalogSeeding.NurseIds["Emilina"], CatalogSeeding.TestClientId, 15000m, "hogar_diario", "dia_completo", 6, "local", "estandar", payrollPeriod.Id, createdAtUtc),
+            CreateCareRequest(CatalogSeeding.NurseIds["Cindy"], CatalogSeeding.TestClientId, 15000m, "hogar_diario", "dia_completo", 6, "local", "estandar", payrollPeriod.Id, createdAtUtc),
+            CreateCareRequest(CatalogSeeding.NurseIds["Agustina"], CatalogSeeding.TestClientId, 15000m, "hogar_diario", "dia_completo", 6, "local", "estandar", payrollPeriod.Id, createdAtUtc),
+            CreateCareRequest(CatalogSeeding.NurseIds["Johanna"], CatalogSeeding.TestClientId, 15000m, "hogar_diario", "dia_completo", 6, "local", "estandar", payrollPeriod.Id, createdAtUtc),
+            CreateCareRequest(CatalogSeeding.NurseIds["Miranda"], CatalogSeeding.TestClientId, 13200m, "hogar_diario", "dia_completo", 5, "cercana", "moderada", payrollPeriod.Id, createdAtUtc),
+            CreateCareRequest(CatalogSeeding.NurseIds["Miguelina"], CatalogSeeding.TestClientId, 13000m, "hogar_diario", "dia_completo", 5, "media", "estandar", payrollPeriod.Id, createdAtUtc),
+            CreateCareRequest(CatalogSeeding.NurseIds["Celai"], CatalogSeeding.TestClientId, 12500m, "hogar_diario", "dia_completo", 5, "local", "moderada", payrollPeriod.Id, createdAtUtc),
+            CreateCareRequest(CatalogSeeding.NurseIds["De Los Santos"], CatalogSeeding.TestClientId, 12500m, "hogar_diario", "dia_completo", 5, "local", "moderada", payrollPeriod.Id, createdAtUtc),
         };
 
         db.CareRequests.AddRange(careRequests);
+        await db.SaveChangesAsync(cancellationToken);
+
+        var rules = await db.CompensationRules.AsNoTracking().ToListAsync(cancellationToken);
+        var ruleLookup = rules.ToDictionary(r => r.CareRequestCategoryCode ?? "");
+
+        var payrollLines = new List<PayrollLine>();
+        foreach (var cr in careRequests)
+        {
+            var rule = ruleLookup.GetValueOrDefault(cr.PricingCategoryCode ?? "") ?? rules.First();
+            var executedAt = cr.CompletedAtUtc!.Value;
+
+            var subtotalBeforeSupplies = Math.Max(0m, cr.Total - (cr.MedicalSuppliesCost ?? 0m));
+            var baseComp = decimal.Round(subtotalBeforeSupplies * (rule.BaseCompensationPercent / 100m), 2, MidpointRounding.AwayFromZero);
+            var transport = decimal.Round(subtotalBeforeSupplies * Math.Max(0m, (cr.DistanceFactorMultiplierSnapshot ?? 1m) - 1m) * (rule.TransportIncentivePercent / 100m), 2, MidpointRounding.AwayFromZero);
+            var complexity = decimal.Round(subtotalBeforeSupplies * Math.Max(0m, (cr.ComplexityMultiplierSnapshot ?? 1m) - 1m) * (rule.ComplexityBonusPercent / 100m), 2, MidpointRounding.AwayFromZero);
+            var supplies = decimal.Round((cr.MedicalSuppliesCost ?? 0m) * (rule.MedicalSuppliesPercent / 100m), 2, MidpointRounding.AwayFromZero);
+
+            payrollLines.Add(PayrollLine.Create(
+                payrollPeriodId: payrollPeriod.Id,
+                nurseUserId: cr.AssignedNurse!.Value,
+                serviceExecutionId: null,
+                description: $"Servicio {cr.CareRequestType}",
+                baseCompensation: baseComp,
+                transportIncentive: transport,
+                complexityBonus: complexity,
+                medicalSuppliesCompensation: supplies,
+                adjustmentsTotal: 0m,
+                deductionsTotal: 0m,
+                createdAtUtc: executedAt));
+        }
+
+        db.PayrollLines.AddRange(payrollLines);
         await db.SaveChangesAsync(cancellationToken);
     }
 
@@ -97,7 +100,9 @@ public static class CareRequestSeeding
         string unitTypeCode,
         int units,
         string distanceFactorCode,
-        string complexityLevelCode)
+        string complexityLevelCode,
+        Guid payrollPeriodId,
+        DateTime createdAtUtc)
     {
         // Mapping of care request type codes to base prices
         var basePrices = new Dictionary<string, decimal>
@@ -166,6 +171,9 @@ public static class CareRequestSeeding
             calculatedTotal = decimal.Round(effectivePrice * calculatedUnits, 2, MidpointRounding.AwayFromZero);
         }
 
+        var executedAtUtc = createdAtUtc.AddHours(12);
+        var period = new DateOnly(createdAtUtc.Year, createdAtUtc.Month, createdAtUtc.Day);
+
         var careRequest = CareRequest.Create(
             userID: clientId,
             description: $"Care service for {careRequestTypeCode}",
@@ -181,16 +189,17 @@ public static class CareRequestSeeding
             distanceFactor: distanceFactorCode,
             complexityLevel: complexityLevelCode,
             medicalSuppliesCost: null,
-            careRequestDate: DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)),
+            careRequestDate: period,
             pricingCategoryCode: pricingCategory,
             categoryFactorSnapshot: categoryFactor,
             distanceFactorMultiplierSnapshot: distanceMultiplier,
             complexityMultiplierSnapshot: complexityMultiplier,
             volumeDiscountPercentSnapshot: 0,
-            createdAtUtc: DateTime.UtcNow);
+            createdAtUtc: createdAtUtc);
 
-        // Approve the care request so it's ready for completion
-        careRequest.Approve(DateTime.UtcNow);
+        careRequest.Approve(createdAtUtc);
+
+        careRequest.Complete(executedAtUtc, nurseId);
 
         return careRequest;
     }
