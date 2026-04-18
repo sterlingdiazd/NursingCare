@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NursingCareBackend.Api.Extensions;
 using NursingCareBackend.Application.AdminPortal.Payroll;
+using NursingCareBackend.Application.Exceptions;
 using NursingCareBackend.Application.Payroll;
 using NursingCareBackend.Domain.Identity;
 
@@ -129,12 +130,12 @@ public sealed class NursePayrollController : ControllerBase
             HttpContext.Response.Headers.Append("Access-Control-Expose-Headers", "Content-Disposition");
             return File(pdfBytes, "application/pdf", fileName);
         }
-        catch (InvalidOperationException)
+        catch (VoucherNotFoundException)
         {
             return this.ProblemResponse(
                 StatusCodes.Status404NotFound,
                 "Periodo no encontrado",
-                $"No se encontraron datos de nomina para el periodo '{periodId}'.");
+                "No se encontraron datos de nomina para el periodo especificado.");
         }
     }
 
