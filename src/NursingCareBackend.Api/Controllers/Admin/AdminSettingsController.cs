@@ -12,10 +12,12 @@ namespace NursingCareBackend.Api.Controllers.Admin;
 public sealed class AdminSettingsController : ControllerBase
 {
     private readonly IAdminSettingsManagementService _settings;
+    private readonly ILogger<AdminSettingsController> _logger;
 
-    public AdminSettingsController(IAdminSettingsManagementService settings)
+    public AdminSettingsController(IAdminSettingsManagementService settings, ILogger<AdminSettingsController> logger)
     {
         _settings = settings;
+        _logger = logger;
     }
 
     [HttpGet]
@@ -35,7 +37,8 @@ public sealed class AdminSettingsController : ControllerBase
         }
         catch (KeyNotFoundException ex)
         {
-            return NotFound(new ProblemDetails { Detail = ex.Message });
+            _logger.LogWarning(ex, "Setting not found: {Key}", key);
+            return NotFound(new ProblemDetails { Detail = "La configuración solicitada no fue encontrada." });
         }
     }
 
@@ -55,11 +58,13 @@ public sealed class AdminSettingsController : ControllerBase
         }
         catch (KeyNotFoundException ex)
         {
-            return NotFound(new ProblemDetails { Detail = ex.Message });
+            _logger.LogWarning(ex, "Setting not found for update: {Key}", key);
+            return NotFound(new ProblemDetails { Detail = "La configuración solicitada no fue encontrada." });
         }
         catch (UnauthorizedAccessException ex)
         {
-            return Unauthorized(new ProblemDetails { Detail = ex.Message });
+            _logger.LogWarning(ex, "Unauthorized setting update attempt: {Key}", key);
+            return Unauthorized(new ProblemDetails { Detail = "No tiene permisos para modificar esta configuración." });
         }
     }
 }

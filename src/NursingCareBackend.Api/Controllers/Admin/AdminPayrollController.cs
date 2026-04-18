@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NursingCareBackend.Api.Extensions;
 using NursingCareBackend.Application.AdminPortal.Payroll;
+using NursingCareBackend.Application.Exceptions;
 using NursingCareBackend.Application.Payroll;
 using NursingCareBackend.Domain.Identity;
 
@@ -396,17 +397,21 @@ public sealed class AdminPayrollController : ControllerBase
         try
         {
             var pdfBytes = await _voucherService.GenerateVoucherAsync(periodId, nurseId, cancellationToken);
-            var fileName = $"voucher-{nurseId:N}-{periodId:N}.pdf";
+
+            var period = await _repository.GetPeriodByIdAsync(periodId, cancellationToken);
+            var fileName = period is not null
+                ? $"voucher-{period.StartDate:yyyyMMdd}-{period.EndDate:yyyyMMdd}.pdf"
+                : "voucher-de-pago.pdf";
 
             HttpContext.Response.Headers.Append("Access-Control-Expose-Headers", "Content-Disposition");
             return File(pdfBytes, "application/pdf", fileName);
         }
-        catch (InvalidOperationException)
+        catch (VoucherNotFoundException)
         {
             return this.ProblemResponse(
                 StatusCodes.Status404NotFound,
                 "Periodo o enfermera no encontrado",
-                $"No se encontraron datos de nomina para el periodo '{periodId}' y la enfermera '{nurseId}'.");
+                "No se encontraron datos de nomina para el periodo y la enfermera especificados.");
         }
     }
 
@@ -426,17 +431,17 @@ public sealed class AdminPayrollController : ControllerBase
             var period = await _repository.GetPeriodByIdAsync(periodId, cancellationToken);
             var fileName = period is not null
                 ? $"vouchers-{period.StartDate:yyyyMMdd}-{period.EndDate:yyyyMMdd}.zip"
-                : $"vouchers-{periodId:N}.zip";
+                : "vouchers.zip";
 
             HttpContext.Response.Headers.Append("Access-Control-Expose-Headers", "Content-Disposition");
             return File(zipBytes, "application/zip", fileName);
         }
-        catch (InvalidOperationException)
+        catch (VoucherNotFoundException)
         {
             return this.ProblemResponse(
                 StatusCodes.Status404NotFound,
                 "Periodo no encontrado",
-                $"No se encontraron datos de nomina para el periodo '{periodId}'.");
+                "No se encontraron datos de nomina para el periodo especificado.");
         }
     }
 

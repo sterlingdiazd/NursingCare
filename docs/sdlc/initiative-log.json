@@ -1,24 +1,32 @@
 {
-  "initiative_id": "20260417-care-request-lifecycle",
-  "started_at": "2026-04-17T20:00:00Z",
-  "user_request_summary": "Care request lifecycle transitions - approve, reject, complete, cancel with role-based permissions, audit trail, web and mobile UI, and tests",
-  "approved_scope": [],
+  "initiative_id": "2026-04-17T2330-bug-fixes",
+  "started_at": "2026-04-17T23:30:00Z",
+  "user_request_summary": "Fix 7 bugs (BUG-002 through BUG-008) covering missing authorization, information exposure, exception handling, code organization, and logging across backend and frontend",
+  "approved_scope": ["02-implementation", "03-code-review-qa"],
   "current_step": {
-    "phase": "planning",
-    "mode": "plan",
-    "delegation_requested_at": "2026-04-17T20:00:00Z",
+    "phase": "02-implementation",
+    "mode": "execute",
+    "delegation_requested_at": "2026-04-17T23:36:00Z",
     "delegation_returned_at": null
   },
-  "rework_iterations": {},
+  "rework_iterations": {
+    "02-implementation_03-code-review-qa": 0
+  },
   "phase_completions": [],
   "orchestrator_metrics": [
     {
       "mode": "plan",
       "invocation": 1,
-      "duration_ms": 15000,
-      "tool_calls_total": 5
+      "duration_ms": 12000,
+      "tool_calls_total": 8
+    },
+    {
+      "mode": "execute",
+      "invocation": 1,
+      "duration_ms": 0,
+      "tool_calls_total": 0
     }
   ],
   "escalations": [],
-  "status": "proposed"
+  "status": "in-progress"
 }
