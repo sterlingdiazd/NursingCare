@@ -181,31 +181,33 @@ public static class CareRequestSeeding
         var executedAtUtc = createdAtUtc.AddHours(12);
         var period = new DateOnly(createdAtUtc.Year, createdAtUtc.Month, createdAtUtc.Day);
 
-        var careRequest = CareRequest.Create(
-            userID: clientId,
-            description: $"Care service for {careRequestTypeCode}",
-            careRequestReason: $"Care request requiring {careRequestTypeCode} service",
-            careRequestType: careRequestTypeCode,
-            unitType: unitTypeCode,
-            suggestedNurse: null,
-            assignedNurse: nurseId,
-            unit: units,
-            price: basePrice,
-            total: calculatedTotal,
-            clientBasePrice: null,
-            distanceFactor: distanceFactorCode,
-            complexityLevel: complexityLevelCode,
-            medicalSuppliesCost: null,
-            careRequestDate: period,
-            pricingCategoryCode: pricingCategory,
-            categoryFactorSnapshot: categoryFactor,
-            distanceFactorMultiplierSnapshot: distanceMultiplier,
-            complexityMultiplierSnapshot: complexityMultiplier,
-            volumeDiscountPercentSnapshot: 0,
-            lineBeforeVolumeDiscount: null,
-            unitPriceAfterVolumeDiscount: null,
-            subtotalBeforeSupplies: null,
-            createdAtUtc: createdAtUtc);
+        var careRequest = CareRequest.Create(new CareRequestCreateParams
+        {
+            UserID = clientId,
+            Description = $"Care service for {careRequestTypeCode}",
+            CareRequestReason = $"Care request requiring {careRequestTypeCode} service",
+            CareRequestType = careRequestTypeCode,
+            UnitType = unitTypeCode,
+            SuggestedNurse = null,
+            AssignedNurse = nurseId,
+            Unit = units,
+            Price = basePrice,
+            Total = calculatedTotal,
+            ClientBasePrice = null,
+            DistanceFactor = distanceFactorCode,
+            ComplexityLevel = complexityLevelCode,
+            MedicalSuppliesCost = null,
+            CareRequestDate = period,
+            PricingCategoryCode = pricingCategory,
+            CategoryFactorSnapshot = categoryFactor,
+            DistanceFactorMultiplierSnapshot = distanceMultiplier,
+            ComplexityMultiplierSnapshot = complexityMultiplier,
+            VolumeDiscountPercentSnapshot = 0,
+            LineBeforeVolumeDiscount = null,
+            UnitPriceAfterVolumeDiscount = null,
+            SubtotalBeforeSupplies = null,
+            CreatedAtUtc = createdAtUtc,
+        });
 
         careRequest.Approve(createdAtUtc);
 
