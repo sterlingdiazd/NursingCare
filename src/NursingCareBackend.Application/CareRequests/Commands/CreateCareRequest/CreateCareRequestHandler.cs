@@ -51,6 +51,9 @@ public sealed class CreateCareRequestHandler
             distanceFactorMultiplierSnapshot: pricing.DistanceFactorMultiplierSnapshot,
             complexityMultiplierSnapshot: pricing.ComplexityMultiplierSnapshot,
             volumeDiscountPercentSnapshot: pricing.VolumeDiscountPercentSnapshot,
+            lineBeforeVolumeDiscount: pricing.LineBeforeVolumeDiscount,
+            unitPriceAfterVolumeDiscount: pricing.UnitPriceAfterVolumeDiscount,
+            subtotalBeforeSupplies: pricing.SubtotalBeforeSupplies,
             createdAtUtc: DateTime.UtcNow);
 
         await _repository.AddAsync(careRequest, cancellationToken);

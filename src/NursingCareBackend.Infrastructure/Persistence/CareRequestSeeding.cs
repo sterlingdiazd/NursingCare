@@ -202,6 +202,9 @@ public static class CareRequestSeeding
             distanceFactorMultiplierSnapshot: distanceMultiplier,
             complexityMultiplierSnapshot: complexityMultiplier,
             volumeDiscountPercentSnapshot: 0,
+            lineBeforeVolumeDiscount: null,
+            unitPriceAfterVolumeDiscount: null,
+            subtotalBeforeSupplies: null,
             createdAtUtc: createdAtUtc);
 
         careRequest.Approve(createdAtUtc);

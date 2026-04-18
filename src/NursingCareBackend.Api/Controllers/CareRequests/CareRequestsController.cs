@@ -20,19 +20,22 @@ public sealed class CareRequestsController : ControllerBase
     private readonly TransitionCareRequestHandler _transitionHandler;
     private readonly GetCareRequestsHandler _getAllHandler;
     private readonly GetCareRequestByIdHandler _getByIdHandler;
+    private readonly VerifyPricingHandler _verifyPricingHandler;
 
     public CareRequestsController(
         AssignCareRequestNurseHandler assignNurseHandler,
         CreateCareRequestHandler createHandler,
         TransitionCareRequestHandler transitionHandler,
         GetCareRequestsHandler getAllHandler,
-        GetCareRequestByIdHandler getByIdHandler)
+        GetCareRequestByIdHandler getByIdHandler,
+        VerifyPricingHandler verifyPricingHandler)
     {
         _assignNurseHandler = assignNurseHandler;
         _createHandler = createHandler;
         _transitionHandler = transitionHandler;
         _getAllHandler = getAllHandler;
         _getByIdHandler = getByIdHandler;
+        _verifyPricingHandler = verifyPricingHandler;
     }
 
     [HttpPost]
@@ -143,6 +146,33 @@ public sealed class CareRequestsController : ControllerBase
     [Authorize(Policy = "CareRequestCanceller")]
     public Task<ActionResult<CareRequestResponse>> Cancel(Guid id, CancellationToken cancellationToken)
       => Transition(id, CareRequestTransitionAction.Cancel, cancellationToken);
+
+    [HttpGet("{id:guid}/verify-pricing")]
+    [Authorize(Roles = SystemRoles.Admin)]
+    public async Task<ActionResult<PricingVerificationResponse>> VerifyPricing(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var result = await _verifyPricingHandler.HandleAsync(id, cancellationToken);
+
+        if (result is null)
+        {
+            return this.ProblemResponse(
+                StatusCodes.Status404NotFound,
+                "Solicitud no encontrada",
+                "No se encontro la solicitud de cuidado.");
+        }
+
+        if (result.FieldComparisons.Count == 0 && !result.Matches)
+        {
+            return this.ProblemResponse(
+                StatusCodes.Status422UnprocessableEntity,
+                "Snapshots no disponibles",
+                "Este registro no contiene snapshots de precios intermedios. La verificacion no esta disponible para registros anteriores a la migracion.");
+        }
+
+        return Ok(PricingVerificationResponse.FromResult(result));
+    }
 
     [HttpPut("{id:guid}/assignment")]
     [Authorize(Roles = SystemRoles.Admin)]

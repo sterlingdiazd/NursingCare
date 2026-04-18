@@ -141,6 +141,9 @@ public class CareRequestTests
             distanceFactorMultiplierSnapshot: 1.0m,
             complexityMultiplierSnapshot: 1.0m,
             volumeDiscountPercentSnapshot: 0,
+            lineBeforeVolumeDiscount: null,
+            unitPriceAfterVolumeDiscount: null,
+            subtotalBeforeSupplies: null,
             createdAtUtc: DateTime.UtcNow);
     }
 }
