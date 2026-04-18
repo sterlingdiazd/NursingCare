@@ -8,6 +8,7 @@ using NursingCareBackend.Api.Security;
 using NursingCareBackend.Application.Email;
 using NursingCareBackend.Application.Identity.OAuth;
 using NursingCareBackend.Domain.Identity;
+using NursingCareBackend.Infrastructure;
 using NursingCareBackend.Infrastructure.Persistence;
 using NursingCareBackend.Tests.Infrastructure;
 
@@ -41,6 +42,11 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
     builder.ConfigureServices(services =>
     {
+      // Override ResolvedConnectionString so HealthController's raw SqlConnection
+      // uses the same test database as the EF DbContext.
+      services.RemoveAll<ResolvedConnectionString>();
+      services.AddSingleton(new ResolvedConnectionString(_testConnectionString));
+
       services.RemoveAll<IGoogleOAuthClient>();
       services.AddSingleton<IGoogleOAuthClient, FakeGoogleOAuthClient>();
       services.RemoveAll<TimeProvider>();
@@ -105,6 +111,7 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
       dbContext.Database.Migrate();
       EnsureSystemRoles(dbContext);
       EnsureTestAdminUser(dbContext);
+      EnsureTestNurseUser(dbContext);
       
       _databaseInitialized = true;
     }
@@ -171,6 +178,43 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
     };
 
     db.UserRoles.Add(userRole);
+    db.SaveChanges();
+  }
+
+  private static void EnsureTestNurseUser(NursingCareDbContext db)
+  {
+    var nurseRoleId = SystemRoles.Defaults.First(r => r.Name == SystemRoles.Nurse).Id;
+    var testNurseUserId = Guid.Parse("00000000-0000-0000-0000-000000000002");
+    var testNurseEmail = "test.nurse@nursingcare.local";
+
+    if (db.Users.Any(u => u.Id == testNurseUserId))
+      return;
+
+    var testNurseUser = new User
+    {
+      Id = testNurseUserId,
+      Email = testNurseEmail,
+      PasswordHash = "test-hash-not-used-in-tests",
+      ProfileType = UserProfileType.NURSE,
+      IsActive = true,
+      CreatedAtUtc = DateTime.UtcNow
+    };
+
+    var testNurseProfile = new Nurse
+    {
+      UserId = testNurseUser.Id,
+      IsActive = true
+    };
+
+    db.Users.Add(testNurseUser);
+    db.Nurses.Add(testNurseProfile);
+
+    db.UserRoles.Add(new UserRole
+    {
+      UserId = testNurseUser.Id,
+      RoleId = nurseRoleId
+    });
+
     db.SaveChanges();
   }
 

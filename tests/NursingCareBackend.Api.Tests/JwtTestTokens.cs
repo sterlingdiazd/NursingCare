@@ -10,8 +10,13 @@ namespace NursingCareBackend.Api.Tests;
 
 internal static class JwtTestTokens
 {
+  public static readonly Guid TestNurseUserId = Guid.Parse("00000000-0000-0000-0000-000000000002");
+
   public static string CreateWriterToken(IServiceProvider services)
     => CreateToken(services, userId: null, includeUserId: true, "NURSE");
+
+  public static string CreateNurseToken(IServiceProvider services)
+    => CreateToken(services, userId: TestNurseUserId, includeUserId: true, "NURSE");
 
   public static string CreateAdminToken(IServiceProvider services)
     => CreateToken(services, userId: Guid.Parse("00000000-0000-0000-0000-000000000001"), includeUserId: true, "ADMIN");
