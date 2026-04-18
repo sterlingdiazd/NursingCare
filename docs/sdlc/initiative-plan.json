@@ -1,0 +1,58 @@
+{
+  "initiative_id": "20260417-care-request-lifecycle",
+  "user_request_summary": "Care request lifecycle transitions - approve, reject, complete, cancel with role-based permissions, audit trail, web and mobile UI, and tests",
+  "analysis": {
+    "already_implemented": [
+      "Backend: CareRequest domain entity has Approve(), Reject(), Complete() methods with full state-machine validation",
+      "Backend: CareRequestStatus enum (Pending, Approved, Rejected, Completed)",
+      "Backend: TransitionCareRequestHandler with approve/reject/complete logic, notifications, payroll integration",
+      "Backend: CareRequestsController with POST {id}/approve, POST {id}/reject, POST {id}/complete endpoints",
+      "Backend: Authorization policies (CareRequestApprover for approve/reject, CareRequestCompleter for complete)",
+      "Backend: Nurse assignment endpoint (PUT {id}/assignment, Admin-only)",
+      "Backend: AuditLog entity exists for audit trail",
+      "Backend: Admin notifications on reject and complete",
+      "Backend: Integration tests (CareRequestTransitionsApiTests.cs) and domain tests (CareRequestTests.cs) and handler tests (TransitionCareRequestHandlerTests.cs)",
+      "Web: transitionCareRequest() API function in careRequests.ts",
+      "Web: AdminCareRequestDetailPage with approve/reject buttons and transition logic",
+      "Web: Full admin care request list, detail, export functionality",
+      "Mobile: transitionCareRequest() service function in careRequestService.ts",
+      "Mobile: CareRequestTransitionAction type defined"
+    ],
+    "not_implemented": [
+      "Cancel action - no Cancel status in enum, no Cancel() method on domain entity, no cancel endpoint",
+      "Mobile UI screen for nurse to mark requests as complete (service layer exists, but no screen/button)",
+      "Rejection reason field - Reject() method has no reason parameter, no RejectionReason property on CareRequest",
+      "Audit trail logging for transitions - AuditLog entity exists but TransitionCareRequestHandler does not write AuditLog entries"
+    ],
+    "partially_implemented": [
+      "Audit trail: Admin notifications are sent on reject/complete, but no formal AuditLog record is created for transitions"
+    ]
+  },
+  "proposed_scope": {
+    "included": [],
+    "excluded": [
+      "01-architecture",
+      "02-implementation",
+      "03-code-review-qa",
+      "04-devops-security",
+      "05-documentation"
+    ],
+    "rationale": "The vast majority of the requested features are already fully implemented across backend, web, and mobile. The initiative as described is essentially complete. Only 3-4 incremental gaps remain (Cancel action, rejection reason, mobile completion screen, audit log writes). These are small enough to be individual tasks rather than a full pipeline initiative."
+  },
+  "unresolved_decisions": [
+    {
+      "id": "scope-001",
+      "question": "Most of the care request lifecycle (approve, reject, complete) is already fully implemented with endpoints, validation, authorization, web UI, and tests. Only these gaps remain: (1) Cancel action not implemented, (2) no rejection reason field, (3) no mobile screen for nurse to complete requests (service layer exists), (4) transition handler does not write AuditLog records. Do you want to proceed with a pipeline initiative for just these gaps, or handle them as individual tasks outside the pipeline?",
+      "category": "scoping",
+      "options": [
+        "Run pipeline for the 4 gaps (Cancel, rejection reason, mobile complete screen, audit log writes)",
+        "Handle gaps as individual tasks outside the pipeline",
+        "Skip - the current implementation is sufficient for now",
+        "Expand scope - tell me what additional features to include"
+      ],
+      "recommended": 1,
+      "rationale": "The gaps are small, well-defined tasks. A full 5-phase pipeline would be overhead for changes this size. Individual tasks with targeted implementation would be more efficient."
+    }
+  ],
+  "status": "proposed"
+}
