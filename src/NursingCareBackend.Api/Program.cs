@@ -3,6 +3,9 @@ using NursingCareBackend.Api.Extensions;
 using NursingCareBackend.Api.Security;
 using NursingCareBackend.Application;
 using NursingCareBackend.Infrastructure;
+using QuestPDF.Infrastructure;
+
+QuestPDF.Settings.License = LicenseType.Community;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddStructuredLogging();

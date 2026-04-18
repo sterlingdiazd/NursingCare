@@ -101,7 +101,9 @@ public static class DependencyInjection
         services.AddScoped<IAdminNotificationService, AdminNotificationService>();
         services.AddScoped<IAdminNotificationPublisher, AdminNotificationPublisher>();
         services.AddScoped<IAdminReportsRepository, AdminReportsRepository>();
-        services.AddScoped<IAdminPayrollRepository, AdminPayrollRepository>();
+        services.AddScoped<AdminPayrollRepository>();
+        services.AddScoped<IAdminPayrollRepository>(sp => sp.GetRequiredService<AdminPayrollRepository>());
+        services.AddScoped<INursePayrollRepository>(sp => sp.GetRequiredService<AdminPayrollRepository>());
         services.AddScoped<IAdminCompensationRulesRepository, AdminCompensationRulesRepository>();
         services.AddScoped<IAdminShiftRepository, AdminShiftRepository>();
         services.AddScoped<GetAdminReportHandler>();
@@ -131,6 +133,16 @@ public static class DependencyInjection
         services.AddScoped<IAdminCatalogManagementService, AdminCatalogManagementService>();
         services.AddScoped<IAdminSettingsManagementService, AdminSettingsManagementService>();
         services.AddScoped<IPayrollCompensationService, PayrollCompensationService>();
+        services.AddScoped<IPayrollRecalculationService, PayrollRecalculationService>();
+        services.AddScoped<IAdminPayrollOverrideRepository, AdminPayrollOverrideRepository>();
+        services.AddScoped<IPayrollVoucherService, PayrollVoucherService>();
+
+        services.Configure<CompanyInfoOptions>(options =>
+        {
+            var section = configuration.GetSection(CompanyInfoOptions.SectionName);
+            options.Name = section["Name"] ?? "NursingCare";
+            options.Rnc = section["Rnc"];
+        });
 
         return services;
     }

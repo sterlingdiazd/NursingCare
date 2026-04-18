@@ -1,8 +1,10 @@
+using System.Security.Claims;
 using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NursingCareBackend.Api.Extensions;
 using NursingCareBackend.Application.AdminPortal.Payroll;
+using NursingCareBackend.Application.Payroll;
 using NursingCareBackend.Domain.Identity;
 
 namespace NursingCareBackend.Api.Controllers.Admin;
@@ -13,10 +15,26 @@ namespace NursingCareBackend.Api.Controllers.Admin;
 public sealed class AdminPayrollController : ControllerBase
 {
     private readonly IAdminPayrollRepository _repository;
+    private readonly IPayrollRecalculationService _recalculationService;
+    private readonly IAdminPayrollOverrideRepository _overrideRepository;
+    private readonly IPayrollVoucherService _voucherService;
 
-    public AdminPayrollController(IAdminPayrollRepository repository)
+    public AdminPayrollController(
+        IAdminPayrollRepository repository,
+        IPayrollRecalculationService recalculationService,
+        IAdminPayrollOverrideRepository overrideRepository,
+        IPayrollVoucherService voucherService)
     {
         _repository = repository;
+        _recalculationService = recalculationService;
+        _overrideRepository = overrideRepository;
+        _voucherService = voucherService;
+    }
+
+    private Guid GetAdminUserId()
+    {
+        var claim = User.FindFirst(ClaimTypes.NameIdentifier);
+        return claim != null ? Guid.Parse(claim.Value) : Guid.Empty;
     }
 
     // GET /api/admin/payroll/periods
@@ -297,6 +315,129 @@ public sealed class AdminPayrollController : ControllerBase
                 p.LineCount
             })
         });
+    }
+
+    // POST /api/admin/payroll/recalculate
+    [HttpPost("recalculate")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> RecalculatePayroll(
+        [FromBody] RecalculatePayrollRequest request,
+        CancellationToken cancellationToken)
+    {
+        var adminId = GetAdminUserId();
+        if (adminId == Guid.Empty)
+            return this.ProblemResponse(StatusCodes.Status400BadRequest, "Sin identidad", "No se pudo determinar el usuario administrador.");
+
+        var result = await _recalculationService.RecalculateAsync(adminId, request, cancellationToken);
+        return Ok(result);
+    }
+
+    // POST /api/admin/payroll/lines/{lineId}/override
+    [HttpPost("lines/{lineId:guid}/override")]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> SubmitOverride(
+        Guid lineId,
+        [FromBody] SubmitOverrideRequest request,
+        CancellationToken cancellationToken)
+    {
+        var adminId = GetAdminUserId();
+        if (adminId == Guid.Empty)
+            return this.ProblemResponse(StatusCodes.Status400BadRequest, "Sin identidad", "No se pudo determinar el usuario administrador.");
+
+        var requestWithLineId = request with { LineId = lineId };
+
+        try
+        {
+            var overrideId = await _overrideRepository.SubmitOverrideAsync(requestWithLineId, adminId, DateTime.UtcNow, cancellationToken);
+            return Created($"/api/admin/payroll/lines/{lineId}/override", new { overrideId });
+        }
+        catch (ArgumentException ex)
+        {
+            return this.ProblemResponse(StatusCodes.Status400BadRequest, "Datos invalidos", ex.Message);
+        }
+    }
+
+    // POST /api/admin/payroll/lines/{lineId}/override/approve
+    [HttpPost("lines/{lineId:guid}/override/approve")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ApproveOverride(
+        Guid lineId,
+        CancellationToken cancellationToken)
+    {
+        var adminId = GetAdminUserId();
+        if (adminId == Guid.Empty)
+            return this.ProblemResponse(StatusCodes.Status400BadRequest, "Sin identidad", "No se pudo determinar el usuario administrador.");
+
+        var (found, error) = await _overrideRepository.ApproveOverrideAsync(lineId, adminId, DateTime.UtcNow, cancellationToken);
+
+        if (!found)
+            return this.ProblemResponse(StatusCodes.Status404NotFound, "Override no encontrado", $"No hay una solicitud de compensacion pendiente para la linea '{lineId}'.");
+
+        if (error is not null)
+            return this.ProblemResponse(StatusCodes.Status403Forbidden, "No autorizado", "Not authorized to approve this override.");
+
+        return NoContent();
+    }
+
+    // GET /api/admin/payroll/periods/{periodId}/voucher/{nurseId}
+    [HttpGet("periods/{periodId:guid}/voucher/{nurseId:guid}")]
+    [Produces("application/pdf")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetNurseVoucher(
+        Guid periodId,
+        Guid nurseId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var pdfBytes = await _voucherService.GenerateVoucherAsync(periodId, nurseId, cancellationToken);
+            var fileName = $"voucher-{nurseId:N}-{periodId:N}.pdf";
+
+            HttpContext.Response.Headers.Append("Access-Control-Expose-Headers", "Content-Disposition");
+            return File(pdfBytes, "application/pdf", fileName);
+        }
+        catch (InvalidOperationException)
+        {
+            return this.ProblemResponse(
+                StatusCodes.Status404NotFound,
+                "Periodo o enfermera no encontrado",
+                $"No se encontraron datos de nomina para el periodo '{periodId}' y la enfermera '{nurseId}'.");
+        }
+    }
+
+    // GET /api/admin/payroll/periods/{periodId}/vouchers/zip
+    [HttpGet("periods/{periodId:guid}/vouchers/zip")]
+    [Produces("application/zip")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetBulkVouchersZip(
+        Guid periodId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var zipBytes = await _voucherService.GenerateBulkVouchersZipAsync(periodId, cancellationToken);
+
+            var period = await _repository.GetPeriodByIdAsync(periodId, cancellationToken);
+            var fileName = period is not null
+                ? $"vouchers-{period.StartDate:yyyyMMdd}-{period.EndDate:yyyyMMdd}.zip"
+                : $"vouchers-{periodId:N}.zip";
+
+            HttpContext.Response.Headers.Append("Access-Control-Expose-Headers", "Content-Disposition");
+            return File(zipBytes, "application/zip", fileName);
+        }
+        catch (InvalidOperationException)
+        {
+            return this.ProblemResponse(
+                StatusCodes.Status404NotFound,
+                "Periodo no encontrado",
+                $"No se encontraron datos de nomina para el periodo '{periodId}'.");
+        }
     }
 
     private static string EscapeCsv(object? value)

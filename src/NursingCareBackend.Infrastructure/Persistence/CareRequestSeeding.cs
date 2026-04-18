@@ -60,6 +60,13 @@ public static class CareRequestSeeding
         await db.SaveChangesAsync(cancellationToken);
 
         var rules = await db.CompensationRules.AsNoTracking().ToListAsync(cancellationToken);
+        if (rules.Count == 0)
+        {
+            // Compensation rules not yet seeded — skip payroll line seeding to avoid First() exception
+            await db.SaveChangesAsync(cancellationToken);
+            return;
+        }
+
         var ruleLookup = rules.ToDictionary(r => r.CareRequestCategoryCode ?? "");
 
         var payrollLines = new List<PayrollLine>();

@@ -42,6 +42,8 @@ public sealed class NursingCareDbContext : DbContext
        public DbSet<CompensationRule> CompensationRules => Set<CompensationRule>();
        public DbSet<CompensationAdjustment> CompensationAdjustments => Set<CompensationAdjustment>();
        public DbSet<DeductionRecord> DeductionRecords => Set<DeductionRecord>();
+       public DbSet<PayrollRecalculationAudit> PayrollRecalculationAudits => Set<PayrollRecalculationAudit>();
+       public DbSet<PayrollLineOverride> PayrollLineOverrides => Set<PayrollLineOverride>();
 
        protected override void OnModelCreating(ModelBuilder modelBuilder)
        {
@@ -424,6 +426,30 @@ public sealed class NursingCareDbContext : DbContext
 
                      builder.Property(x => x.Amount).HasColumnType("decimal(10,2)");
                      builder.Property(x => x.Notes).HasMaxLength(1000);
+              });
+
+              modelBuilder.Entity<PayrollRecalculationAudit>(builder =>
+              {
+                     builder.ToTable("PayrollRecalculationAudits");
+                     builder.HasKey(x => x.Id);
+                     builder.Property(x => x.TotalOldNet).HasColumnType("decimal(10,2)");
+                     builder.Property(x => x.TotalNewNet).HasColumnType("decimal(10,2)");
+              });
+
+              modelBuilder.Entity<PayrollLine>(builder =>
+              {
+                     builder.Property(x => x.OriginalNetCompensation).HasColumnType("decimal(10,2)");
+              });
+
+              modelBuilder.Entity<PayrollLineOverride>(builder =>
+              {
+                     builder.ToTable("PayrollLineOverrides");
+                     builder.HasKey(x => x.Id);
+                     builder.Property(x => x.Reason).IsRequired().HasMaxLength(500);
+                     builder.Property(x => x.OverrideAmount).HasColumnType("decimal(10,2)");
+                     builder.Property(x => x.Status)
+                            .HasConversion<string>()
+                            .HasMaxLength(32);
               });
 
               modelBuilder.Entity<Role>(builder =>

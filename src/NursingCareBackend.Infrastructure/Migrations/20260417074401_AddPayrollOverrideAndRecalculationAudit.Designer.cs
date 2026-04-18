@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NursingCareBackend.Infrastructure.Persistence;
 
@@ -11,9 +12,11 @@ using NursingCareBackend.Infrastructure.Persistence;
 namespace NursingCareBackend.Infrastructure.Migrations
 {
     [DbContext(typeof(NursingCareDbContext))]
-    partial class NursingCareDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260417074401_AddPayrollOverrideAndRecalculationAudit")]
+    partial class AddPayrollOverrideAndRecalculationAudit
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -870,9 +873,6 @@ namespace NursingCareBackend.Infrastructure.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("nvarchar(300)");
 
-                    b.Property<bool>("IsOverridden")
-                        .HasColumnType("bit");
-
                     b.Property<decimal>("MedicalSuppliesCompensation")
                         .HasColumnType("decimal(10,2)");
 
@@ -881,9 +881,6 @@ namespace NursingCareBackend.Infrastructure.Migrations
 
                     b.Property<Guid>("NurseUserId")
                         .HasColumnType("uniqueidentifier");
-
-                    b.Property<decimal?>("OriginalNetCompensation")
-                        .HasColumnType("decimal(10,2)");
 
                     b.Property<Guid>("PayrollPeriodId")
                         .HasColumnType("uniqueidentifier");
@@ -912,6 +909,9 @@ namespace NursingCareBackend.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTime?>("ApprovedAtUtc")
+                        .HasColumnType("datetime2");
+
                     b.Property<Guid?>("ApprovedByUserId")
                         .HasColumnType("uniqueidentifier");
 
@@ -931,9 +931,6 @@ namespace NursingCareBackend.Infrastructure.Migrations
 
                     b.Property<Guid>("RequestedByUserId")
                         .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime?>("ResolvedAtUtc")
-                        .HasColumnType("datetime2");
 
                     b.Property<string>("Status")
                         .IsRequired()

@@ -14,6 +14,8 @@ public sealed class PayrollLine
     public decimal AdjustmentsTotal { get; private set; }
     public decimal DeductionsTotal { get; private set; }
     public decimal NetCompensation { get; private set; }
+    public decimal? OriginalNetCompensation { get; private set; }
+    public bool IsOverridden { get; private set; }
     public DateTime CreatedAtUtc { get; private set; }
     public DateTime UpdatedAtUtc { get; private set; }
 
@@ -84,6 +86,14 @@ public sealed class PayrollLine
         AdjustmentsTotal = Round(adjustmentsTotal);
         DeductionsTotal = Round(deductionsTotal);
         NetCompensation = Round(BaseCompensation + TransportIncentive + ComplexityBonus + MedicalSuppliesCompensation + AdjustmentsTotal - DeductionsTotal);
+        UpdatedAtUtc = updatedAtUtc;
+    }
+
+    public void ApplyOverride(decimal overrideAmount, DateTime updatedAtUtc)
+    {
+        OriginalNetCompensation ??= NetCompensation;
+        NetCompensation = Round(overrideAmount);
+        IsOverridden = true;
         UpdatedAtUtc = updatedAtUtc;
     }
 

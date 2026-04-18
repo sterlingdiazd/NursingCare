@@ -1,11 +1,19 @@
 using Microsoft.EntityFrameworkCore;
 using NursingCareBackend.Application.AdminPortal.Payroll;
+using NursingCareBackend.Application.Payroll;
 using NursingCareBackend.Domain.Payroll;
 using NursingCareBackend.Infrastructure.Persistence;
 
 namespace NursingCareBackend.Infrastructure.AdminPortal;
 
-public sealed class AdminPayrollRepository : IAdminPayrollRepository
+file static class StringExtensions
+{
+    public static string? NullIfEmpty(this string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value;
+}
+
+
+public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayrollRepository
 {
     private readonly NursingCareDbContext _dbContext;
 
@@ -321,6 +329,338 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository
         _dbContext.CompensationAdjustments.Remove(adjustment);
         await _dbContext.SaveChangesAsync(cancellationToken);
         return true;
+    }
+
+    public async Task<IReadOnlyList<NursePeriodHistoryItem>> GetNursePeriodHistoryAsync(
+        Guid nurseId,
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken)
+    {
+        // Batch query: load lines for nurse, grouped by period
+        var linesByPeriod = await _dbContext.PayrollLines
+            .AsNoTracking()
+            .Where(l => l.NurseUserId == nurseId)
+            .GroupBy(l => l.PayrollPeriodId)
+            .Select(g => new
+            {
+                PeriodId = g.Key,
+                ServiceCount = g.Count(),
+                TotalCompensation = g.Sum(l => l.NetCompensation)
+            })
+            .ToListAsync(cancellationToken);
+
+        var periodIds = linesByPeriod.Select(x => x.PeriodId).ToList();
+
+        var periods = await _dbContext.PayrollPeriods
+            .AsNoTracking()
+            .Where(p => periodIds.Contains(p.Id))
+            .OrderByDescending(p => p.StartDate)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        var linesByPeriodDict = linesByPeriod.ToDictionary(x => x.PeriodId);
+
+        return periods
+            .Select(p =>
+            {
+                var summary = linesByPeriodDict.GetValueOrDefault(p.Id);
+                return new NursePeriodHistoryItem(
+                    p.Id,
+                    p.StartDate,
+                    p.EndDate,
+                    p.Status.ToString(),
+                    summary?.ServiceCount ?? 0,
+                    summary?.TotalCompensation ?? 0m);
+            })
+            .ToList()
+            .AsReadOnly();
+    }
+
+    public async Task<int> CountNurseLinesInOpenPeriodsAsync(Guid nurseId, CancellationToken cancellationToken)
+    {
+        var openPeriodIds = await _dbContext.PayrollPeriods
+            .AsNoTracking()
+            .Where(p => p.Status == PayrollPeriodStatus.Open)
+            .Select(p => p.Id)
+            .ToListAsync(cancellationToken);
+
+        return await _dbContext.PayrollLines
+            .AsNoTracking()
+            .CountAsync(l => l.NurseUserId == nurseId && openPeriodIds.Contains(l.PayrollPeriodId), cancellationToken);
+    }
+
+    public async Task<int> CountNurseLinesInClosedPeriodsAsync(Guid nurseId, CancellationToken cancellationToken)
+    {
+        var closedPeriodIds = await _dbContext.PayrollPeriods
+            .AsNoTracking()
+            .Where(p => p.Status == PayrollPeriodStatus.Closed)
+            .Select(p => p.Id)
+            .ToListAsync(cancellationToken);
+
+        return await _dbContext.PayrollLines
+            .AsNoTracking()
+            .CountAsync(l => l.NurseUserId == nurseId && closedPeriodIds.Contains(l.PayrollPeriodId), cancellationToken);
+    }
+
+    public async Task<NursePeriodDetail?> GetNursePeriodDetailAsync(Guid periodId, Guid nurseId, CancellationToken cancellationToken)
+    {
+        var period = await _dbContext.PayrollPeriods
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Id == periodId, cancellationToken);
+
+        if (period is null) return null;
+
+        var lines = await _dbContext.PayrollLines
+            .AsNoTracking()
+            .Where(l => l.PayrollPeriodId == periodId && l.NurseUserId == nurseId)
+            .ToListAsync(cancellationToken);
+
+        var executionIds = lines
+            .Where(l => l.ServiceExecutionId.HasValue)
+            .Select(l => l.ServiceExecutionId!.Value)
+            .ToList();
+
+        var executions = executionIds.Count == 0
+            ? new Dictionary<Guid, (Guid CareRequestId, DateOnly ServiceDate)>()
+            : await _dbContext.ServiceExecutions
+                .AsNoTracking()
+                .Where(e => executionIds.Contains(e.Id))
+                .Select(e => new { e.Id, e.CareRequestId, e.ServiceDate })
+                .ToDictionaryAsync(e => e.Id, e => (e.CareRequestId, e.ServiceDate), cancellationToken);
+
+        var serviceRows = lines
+            .Select(l =>
+            {
+                var execData = l.ServiceExecutionId.HasValue && executions.TryGetValue(l.ServiceExecutionId.Value, out var ed)
+                    ? ed
+                    : (CareRequestId: Guid.Empty, ServiceDate: DateOnly.MinValue);
+
+                return new NurseServiceRow(
+                    l.ServiceExecutionId ?? Guid.Empty,
+                    execData.CareRequestId,
+                    execData.ServiceDate,
+                    l.BaseCompensation,
+                    l.TransportIncentive,
+                    l.ComplexityBonus,
+                    l.MedicalSuppliesCompensation,
+                    l.AdjustmentsTotal,
+                    l.DeductionsTotal,
+                    l.NetCompensation);
+            })
+            .ToList()
+            .AsReadOnly();
+
+        return new NursePeriodDetail(
+            period.Id,
+            period.StartDate,
+            period.EndDate,
+            period.Status.ToString(),
+            period.CutoffDate,
+            period.PaymentDate,
+            lines.Sum(l => l.BaseCompensation + l.TransportIncentive + l.ComplexityBonus + l.MedicalSuppliesCompensation),
+            lines.Sum(l => l.DeductionsTotal),
+            lines.Sum(l => l.AdjustmentsTotal),
+            lines.Sum(l => l.NetCompensation),
+            serviceRows);
+    }
+
+    public async Task<PayrollVoucherData?> GetVoucherDataAsync(
+        Guid periodId,
+        Guid nurseId,
+        CancellationToken cancellationToken)
+    {
+        var period = await _dbContext.PayrollPeriods
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Id == periodId, cancellationToken);
+
+        if (period is null) return null;
+
+        var lines = await _dbContext.PayrollLines
+            .AsNoTracking()
+            .Where(l => l.PayrollPeriodId == periodId && l.NurseUserId == nurseId)
+            .OrderBy(l => l.CreatedAtUtc)
+            .ToListAsync(cancellationToken);
+
+        if (lines.Count == 0) return null;
+
+        var user = await _dbContext.Users
+            .AsNoTracking()
+            .Where(u => u.Id == nurseId)
+            .Select(u => new { u.Id, u.Name, u.LastName, u.Email, u.IdentificationNumber })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var deductions = await _dbContext.DeductionRecords
+            .AsNoTracking()
+            .Where(d => d.NurseUserId == nurseId && d.PayrollPeriodId == periodId)
+            .OrderBy(d => d.CreatedAtUtc)
+            .ToListAsync(cancellationToken);
+
+        var displayName = user is null
+            ? nurseId.ToString()
+            : string.Join(" ", new[] { user.Name, user.LastName }.Where(v => !string.IsNullOrWhiteSpace(v)))
+                .NullIfEmpty() ?? user.Email;
+
+        var lineItems = lines
+            .Select(l => new VoucherLineItem
+            {
+                Description = l.Description,
+                BaseCompensation = l.BaseCompensation,
+                TransportIncentive = l.TransportIncentive,
+                ComplexityBonus = l.ComplexityBonus,
+                MedicalSuppliesCompensation = l.MedicalSuppliesCompensation,
+                AdjustmentsTotal = l.AdjustmentsTotal,
+                DeductionsTotal = l.DeductionsTotal,
+                NetCompensation = l.NetCompensation,
+            })
+            .ToList()
+            .AsReadOnly();
+
+        var deductionItems = deductions
+            .Select(d => new VoucherDeductionItem
+            {
+                Label = d.Label,
+                DeductionTypeLabel = d.DeductionType switch
+                {
+                    DeductionType.Loan => "Prestamo",
+                    DeductionType.Advance => "Avance",
+                    _ => "Otro",
+                },
+                Amount = d.Amount,
+            })
+            .ToList()
+            .AsReadOnly();
+
+        return new PayrollVoucherData
+        {
+            PeriodId = period.Id,
+            PeriodStartDate = period.StartDate,
+            PeriodEndDate = period.EndDate,
+            PaymentDate = period.PaymentDate,
+            PeriodStatus = period.Status.ToString(),
+            NurseUserId = nurseId,
+            NurseDisplayName = displayName,
+            NurseCedula = user?.IdentificationNumber,
+            Lines = lineItems,
+            Deductions = deductionItems,
+            TotalGross = lines.Sum(l => l.BaseCompensation + l.TransportIncentive + l.ComplexityBonus + l.MedicalSuppliesCompensation),
+            TotalTransport = lines.Sum(l => l.TransportIncentive),
+            TotalComplexity = lines.Sum(l => l.ComplexityBonus),
+            TotalSupplies = lines.Sum(l => l.MedicalSuppliesCompensation),
+            TotalAdjustments = lines.Sum(l => l.AdjustmentsTotal),
+            TotalDeductions = lines.Sum(l => l.DeductionsTotal),
+            NetCompensation = lines.Sum(l => l.NetCompensation),
+        };
+    }
+
+    public async Task<IReadOnlyList<PayrollVoucherData>> GetAllVoucherDataAsync(
+        Guid periodId,
+        CancellationToken cancellationToken)
+    {
+        var period = await _dbContext.PayrollPeriods
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Id == periodId, cancellationToken);
+
+        if (period is null) return [];
+
+        var allLines = await _dbContext.PayrollLines
+            .AsNoTracking()
+            .Where(l => l.PayrollPeriodId == periodId)
+            .OrderBy(l => l.NurseUserId)
+            .ThenBy(l => l.CreatedAtUtc)
+            .ToListAsync(cancellationToken);
+
+        if (allLines.Count == 0) return [];
+
+        var nurseIds = allLines.Select(l => l.NurseUserId).Distinct().ToList();
+
+        var users = await _dbContext.Users
+            .AsNoTracking()
+            .Where(u => nurseIds.Contains(u.Id))
+            .Select(u => new { u.Id, u.Name, u.LastName, u.Email, u.IdentificationNumber })
+            .ToListAsync(cancellationToken);
+
+        var userLookup = users.ToDictionary(u => u.Id);
+
+        var allDeductions = await _dbContext.DeductionRecords
+            .AsNoTracking()
+            .Where(d => nurseIds.Contains(d.NurseUserId) && d.PayrollPeriodId == periodId)
+            .OrderBy(d => d.NurseUserId)
+            .ThenBy(d => d.CreatedAtUtc)
+            .ToListAsync(cancellationToken);
+
+        var deductionsByNurse = allDeductions
+            .GroupBy(d => d.NurseUserId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var result = new List<PayrollVoucherData>();
+
+        foreach (var nurseGroup in allLines.GroupBy(l => l.NurseUserId))
+        {
+            var nurseId = nurseGroup.Key;
+            var lines = nurseGroup.ToList();
+            var user = userLookup.GetValueOrDefault(nurseId);
+
+            var displayName = user is null
+                ? nurseId.ToString()
+                : string.Join(" ", new[] { user.Name, user.LastName }.Where(v => !string.IsNullOrWhiteSpace(v)))
+                    .NullIfEmpty() ?? user.Email;
+
+            var lineItems = lines
+                .Select(l => new VoucherLineItem
+                {
+                    Description = l.Description,
+                    BaseCompensation = l.BaseCompensation,
+                    TransportIncentive = l.TransportIncentive,
+                    ComplexityBonus = l.ComplexityBonus,
+                    MedicalSuppliesCompensation = l.MedicalSuppliesCompensation,
+                    AdjustmentsTotal = l.AdjustmentsTotal,
+                    DeductionsTotal = l.DeductionsTotal,
+                    NetCompensation = l.NetCompensation,
+                })
+                .ToList()
+                .AsReadOnly();
+
+            var nurseDeductions = deductionsByNurse.GetValueOrDefault(nurseId, []);
+            var deductionItems = nurseDeductions
+                .Select(d => new VoucherDeductionItem
+                {
+                    Label = d.Label,
+                    DeductionTypeLabel = d.DeductionType switch
+                    {
+                        DeductionType.Loan => "Prestamo",
+                        DeductionType.Advance => "Avance",
+                        _ => "Otro",
+                    },
+                    Amount = d.Amount,
+                })
+                .ToList()
+                .AsReadOnly();
+
+            result.Add(new PayrollVoucherData
+            {
+                PeriodId = period.Id,
+                PeriodStartDate = period.StartDate,
+                PeriodEndDate = period.EndDate,
+                PaymentDate = period.PaymentDate,
+                PeriodStatus = period.Status.ToString(),
+                NurseUserId = nurseId,
+                NurseDisplayName = displayName,
+                NurseCedula = user?.IdentificationNumber,
+                Lines = lineItems,
+                Deductions = deductionItems,
+                TotalGross = lines.Sum(l => l.BaseCompensation + l.TransportIncentive + l.ComplexityBonus + l.MedicalSuppliesCompensation),
+                TotalTransport = lines.Sum(l => l.TransportIncentive),
+                TotalComplexity = lines.Sum(l => l.ComplexityBonus),
+                TotalSupplies = lines.Sum(l => l.MedicalSuppliesCompensation),
+                TotalAdjustments = lines.Sum(l => l.AdjustmentsTotal),
+                TotalDeductions = lines.Sum(l => l.DeductionsTotal),
+                NetCompensation = lines.Sum(l => l.NetCompensation),
+            });
+        }
+
+        return result.AsReadOnly();
     }
 
     private async Task<Dictionary<Guid, string>> BuildExecutionLookupAsync(IReadOnlyCollection<Guid> executionIds, CancellationToken cancellationToken)
