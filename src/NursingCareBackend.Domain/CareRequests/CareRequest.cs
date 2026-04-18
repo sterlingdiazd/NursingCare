@@ -28,6 +28,9 @@ public sealed class CareRequest
     public decimal? DistanceFactorMultiplierSnapshot { get; private set; }
     public decimal? ComplexityMultiplierSnapshot { get; private set; }
     public int? VolumeDiscountPercentSnapshot { get; private set; }
+    public decimal? LineBeforeVolumeDiscount { get; private set; }
+    public decimal? UnitPriceAfterVolumeDiscount { get; private set; }
+    public decimal? SubtotalBeforeSupplies { get; private set; }
 
     // Not used by the pricing algorithm, but included for completeness of UC003.
     public string? SuggestedNurse { get; private set; }
@@ -65,6 +68,9 @@ public sealed class CareRequest
         decimal distanceFactorMultiplierSnapshot,
         decimal complexityMultiplierSnapshot,
         int volumeDiscountPercentSnapshot,
+        decimal? lineBeforeVolumeDiscount,
+        decimal? unitPriceAfterVolumeDiscount,
+        decimal? subtotalBeforeSupplies,
         DateTime createdAtUtc)
     {
         if (userID == Guid.Empty)
@@ -97,6 +103,14 @@ public sealed class CareRequest
         if (string.IsNullOrWhiteSpace(pricingCategoryCode))
             throw new ArgumentException("PricingCategoryCode is required.", nameof(pricingCategoryCode));
 
+        var snapshotNonNullCount = (lineBeforeVolumeDiscount.HasValue ? 1 : 0)
+            + (unitPriceAfterVolumeDiscount.HasValue ? 1 : 0)
+            + (subtotalBeforeSupplies.HasValue ? 1 : 0);
+        if (snapshotNonNullCount > 0 && snapshotNonNullCount < 3)
+            throw new ArgumentException(
+                "LineBeforeVolumeDiscount, UnitPriceAfterVolumeDiscount, and SubtotalBeforeSupplies must all be provided or all be null.",
+                nameof(lineBeforeVolumeDiscount));
+
         Id = Guid.NewGuid();
         UserID = userID;
         Description = description;
@@ -123,6 +137,15 @@ public sealed class CareRequest
         DistanceFactorMultiplierSnapshot = distanceFactorMultiplierSnapshot;
         ComplexityMultiplierSnapshot = complexityMultiplierSnapshot;
         VolumeDiscountPercentSnapshot = volumeDiscountPercentSnapshot;
+        LineBeforeVolumeDiscount = lineBeforeVolumeDiscount.HasValue
+            ? decimal.Round(lineBeforeVolumeDiscount.Value, 4, MidpointRounding.AwayFromZero)
+            : null;
+        UnitPriceAfterVolumeDiscount = unitPriceAfterVolumeDiscount.HasValue
+            ? decimal.Round(unitPriceAfterVolumeDiscount.Value, 4, MidpointRounding.AwayFromZero)
+            : null;
+        SubtotalBeforeSupplies = subtotalBeforeSupplies.HasValue
+            ? decimal.Round(subtotalBeforeSupplies.Value, 2, MidpointRounding.AwayFromZero)
+            : null;
 
         Status = CareRequestStatus.Pending;
         CreatedAtUtc = createdAtUtc;
@@ -150,6 +173,9 @@ public sealed class CareRequest
         decimal distanceFactorMultiplierSnapshot,
         decimal complexityMultiplierSnapshot,
         int volumeDiscountPercentSnapshot,
+        decimal? lineBeforeVolumeDiscount,
+        decimal? unitPriceAfterVolumeDiscount,
+        decimal? subtotalBeforeSupplies,
         DateTime createdAtUtc)
     {
         return new CareRequest(
@@ -173,6 +199,9 @@ public sealed class CareRequest
             distanceFactorMultiplierSnapshot: distanceFactorMultiplierSnapshot,
             complexityMultiplierSnapshot: complexityMultiplierSnapshot,
             volumeDiscountPercentSnapshot: volumeDiscountPercentSnapshot,
+            lineBeforeVolumeDiscount: lineBeforeVolumeDiscount,
+            unitPriceAfterVolumeDiscount: unitPriceAfterVolumeDiscount,
+            subtotalBeforeSupplies: subtotalBeforeSupplies,
             createdAtUtc: createdAtUtc);
     }
 
