@@ -111,6 +111,9 @@ public sealed class NursingCareDbContext : DbContext
                      builder.Property(x => x.CategoryFactorSnapshot).HasColumnType("decimal(10,4)");
                      builder.Property(x => x.DistanceFactorMultiplierSnapshot).HasColumnType("decimal(10,4)");
                      builder.Property(x => x.ComplexityMultiplierSnapshot).HasColumnType("decimal(10,4)");
+                     builder.Property(x => x.LineBeforeVolumeDiscount).HasColumnType("decimal(10,4)");
+                     builder.Property(x => x.UnitPriceAfterVolumeDiscount).HasColumnType("decimal(10,4)");
+                     builder.Property(x => x.SubtotalBeforeSupplies).HasColumnType("decimal(10,2)");
               });
 
               modelBuilder.Entity<User>(builder =>

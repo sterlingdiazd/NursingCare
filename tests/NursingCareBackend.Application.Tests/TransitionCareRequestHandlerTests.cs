@@ -16,28 +16,33 @@ public sealed class TransitionCareRequestHandlerTests
     string description,
     DateOnly? careRequestDate = null)
   {
-    return CareRequest.Create(
-      userID: userId,
-      description: description,
-      careRequestReason: null,
-      careRequestType: "domicilio_24h",
-      unitType: "dia_completo",
-      suggestedNurse: null,
-      assignedNurse: AssignedNurseId,
-      unit: 1,
-      price: 3500m,
-      total: 4200m,
-      clientBasePrice: null,
-      distanceFactor: "local",
-      complexityLevel: "estandar",
-      medicalSuppliesCost: null,
-      careRequestDate: careRequestDate,
-      pricingCategoryCode: "domicilio",
-      categoryFactorSnapshot: 1.2m,
-      distanceFactorMultiplierSnapshot: 1.0m,
-      complexityMultiplierSnapshot: 1.0m,
-      volumeDiscountPercentSnapshot: 0,
-      createdAtUtc: DateTime.UtcNow);
+    return CareRequest.Create(new CareRequestCreateParams
+    {
+      UserID = userId,
+      Description = description,
+      CareRequestReason = null,
+      CareRequestType = "domicilio_24h",
+      UnitType = "dia_completo",
+      SuggestedNurse = null,
+      AssignedNurse = AssignedNurseId,
+      Unit = 1,
+      Price = 3500m,
+      Total = 4200m,
+      ClientBasePrice = null,
+      DistanceFactor = "local",
+      ComplexityLevel = "estandar",
+      MedicalSuppliesCost = null,
+      CareRequestDate = careRequestDate,
+      PricingCategoryCode = "domicilio",
+      CategoryFactorSnapshot = 1.2m,
+      DistanceFactorMultiplierSnapshot = 1.0m,
+      ComplexityMultiplierSnapshot = 1.0m,
+      VolumeDiscountPercentSnapshot = 0,
+      LineBeforeVolumeDiscount = null,
+      UnitPriceAfterVolumeDiscount = null,
+      SubtotalBeforeSupplies = null,
+      CreatedAtUtc = DateTime.UtcNow,
+    });
   }
 
   [Fact]

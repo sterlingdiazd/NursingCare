@@ -3,18 +3,12 @@ using System.IO.Compression;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Options;
 using NursingCareBackend.Application.AdminPortal.Payroll;
+using NursingCareBackend.Application.Exceptions;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 
 namespace NursingCareBackend.Infrastructure.Payroll;
-
-public sealed class CompanyInfoOptions
-{
-    public const string SectionName = "CompanyInfo";
-    public string Name { get; set; } = "NursingCare";
-    public string? Rnc { get; set; }
-}
 
 public sealed class PayrollVoucherService : IPayrollVoucherService
 {
@@ -39,7 +33,7 @@ public sealed class PayrollVoucherService : IPayrollVoucherService
 
         if (data is null)
         {
-            throw new InvalidOperationException("Periodo o enfermera no encontrado.");
+            throw new VoucherNotFoundException(periodId, nurseId);
         }
 
         return GeneratePdf(data);
@@ -53,7 +47,7 @@ public sealed class PayrollVoucherService : IPayrollVoucherService
 
         if (allVoucherData.Count == 0)
         {
-            throw new InvalidOperationException("Periodo no encontrado o sin lineas de nomina.");
+            throw new VoucherNotFoundException(periodId);
         }
 
         using var zipStream = new MemoryStream();

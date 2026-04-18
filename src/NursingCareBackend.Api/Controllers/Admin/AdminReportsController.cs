@@ -14,6 +14,7 @@ namespace NursingCareBackend.Api.Controllers.Admin;
 public sealed class AdminReportsController : ControllerBase
 {
     private readonly GetAdminReportHandler _handler;
+    private readonly ILogger<AdminReportsController> _logger;
 
     private static readonly HashSet<string> ValidReportKeys = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -28,9 +29,10 @@ public sealed class AdminReportsController : ControllerBase
         "payroll-summary"
     };
 
-    public AdminReportsController(GetAdminReportHandler handler)
+    public AdminReportsController(GetAdminReportHandler handler, ILogger<AdminReportsController> logger)
     {
         _handler = handler;
+        _logger = logger;
     }
 
     [HttpGet("{reportKey}")]
@@ -57,10 +59,11 @@ public sealed class AdminReportsController : ControllerBase
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Error processing report {ReportKey}", reportKey);
             return this.ProblemResponse(
                 500,
                 "Error al procesar el reporte",
-                ex.Message);
+                "Ocurrió un error al procesar la solicitud.");
         }
     }
 
@@ -98,10 +101,11 @@ public sealed class AdminReportsController : ControllerBase
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Error exporting report {ReportKey}", reportKey);
             return this.ProblemResponse(
                 500,
                 "Error al exportar el reporte",
-                ex.Message);
+                "Ocurrió un error al procesar la solicitud.");
         }
     }
 

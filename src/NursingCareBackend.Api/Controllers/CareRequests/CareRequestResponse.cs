@@ -25,7 +25,15 @@ public sealed record CareRequestResponse(
   DateTime? RejectedAtUtc,
   DateTime? CompletedAtUtc,
   DateTime? CancelledAtUtc,
-  string? RejectionReason)
+  string? RejectionReason,
+  string? PricingCategoryCode,
+  decimal? CategoryFactorSnapshot,
+  decimal? DistanceFactorMultiplierSnapshot,
+  decimal? ComplexityMultiplierSnapshot,
+  int? VolumeDiscountPercentSnapshot,
+  decimal? LineBeforeVolumeDiscount,
+  decimal? UnitPriceAfterVolumeDiscount,
+  decimal? SubtotalBeforeSupplies)
 {
   public static CareRequestResponse FromDomain(CareRequest careRequest)
   {
@@ -52,6 +60,14 @@ public sealed record CareRequestResponse(
       careRequest.RejectedAtUtc,
       careRequest.CompletedAtUtc,
       careRequest.CancelledAtUtc,
-      careRequest.RejectionReason);
+      careRequest.RejectionReason,
+      careRequest.PricingCategoryCode,
+      careRequest.CategoryFactorSnapshot,
+      careRequest.DistanceFactorMultiplierSnapshot,
+      careRequest.ComplexityMultiplierSnapshot,
+      careRequest.VolumeDiscountPercentSnapshot,
+      careRequest.LineBeforeVolumeDiscount,
+      careRequest.UnitPriceAfterVolumeDiscount,
+      careRequest.SubtotalBeforeSupplies);
   }
 }

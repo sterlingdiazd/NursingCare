@@ -28,6 +28,9 @@ public sealed class CareRequest
     public decimal? DistanceFactorMultiplierSnapshot { get; private set; }
     public decimal? ComplexityMultiplierSnapshot { get; private set; }
     public int? VolumeDiscountPercentSnapshot { get; private set; }
+    public decimal? LineBeforeVolumeDiscount { get; private set; }
+    public decimal? UnitPriceAfterVolumeDiscount { get; private set; }
+    public decimal? SubtotalBeforeSupplies { get; private set; }
 
     // Not used by the pricing algorithm, but included for completeness of UC003.
     public string? SuggestedNurse { get; private set; }
@@ -65,6 +68,9 @@ public sealed class CareRequest
         decimal distanceFactorMultiplierSnapshot,
         decimal complexityMultiplierSnapshot,
         int volumeDiscountPercentSnapshot,
+        decimal? lineBeforeVolumeDiscount,
+        decimal? unitPriceAfterVolumeDiscount,
+        decimal? subtotalBeforeSupplies,
         DateTime createdAtUtc)
     {
         if (userID == Guid.Empty)
@@ -97,6 +103,14 @@ public sealed class CareRequest
         if (string.IsNullOrWhiteSpace(pricingCategoryCode))
             throw new ArgumentException("PricingCategoryCode is required.", nameof(pricingCategoryCode));
 
+        var snapshotNonNullCount = (lineBeforeVolumeDiscount.HasValue ? 1 : 0)
+            + (unitPriceAfterVolumeDiscount.HasValue ? 1 : 0)
+            + (subtotalBeforeSupplies.HasValue ? 1 : 0);
+        if (snapshotNonNullCount > 0 && snapshotNonNullCount < 3)
+            throw new ArgumentException(
+                "LineBeforeVolumeDiscount, UnitPriceAfterVolumeDiscount, and SubtotalBeforeSupplies must all be provided or all be null.",
+                nameof(lineBeforeVolumeDiscount));
+
         Id = Guid.NewGuid();
         UserID = userID;
         Description = description;
@@ -123,57 +137,48 @@ public sealed class CareRequest
         DistanceFactorMultiplierSnapshot = distanceFactorMultiplierSnapshot;
         ComplexityMultiplierSnapshot = complexityMultiplierSnapshot;
         VolumeDiscountPercentSnapshot = volumeDiscountPercentSnapshot;
+        LineBeforeVolumeDiscount = lineBeforeVolumeDiscount.HasValue
+            ? decimal.Round(lineBeforeVolumeDiscount.Value, 4, MidpointRounding.AwayFromZero)
+            : null;
+        UnitPriceAfterVolumeDiscount = unitPriceAfterVolumeDiscount.HasValue
+            ? decimal.Round(unitPriceAfterVolumeDiscount.Value, 4, MidpointRounding.AwayFromZero)
+            : null;
+        SubtotalBeforeSupplies = subtotalBeforeSupplies.HasValue
+            ? decimal.Round(subtotalBeforeSupplies.Value, 2, MidpointRounding.AwayFromZero)
+            : null;
 
         Status = CareRequestStatus.Pending;
         CreatedAtUtc = createdAtUtc;
         UpdatedAtUtc = createdAtUtc;
     }
 
-    public static CareRequest Create(
-        Guid userID,
-        string description,
-        string? careRequestReason,
-        string careRequestType,
-        string unitType,
-        string? suggestedNurse,
-        Guid? assignedNurse,
-        int unit,
-        decimal price,
-        decimal total,
-        decimal? clientBasePrice,
-        string? distanceFactor,
-        string? complexityLevel,
-        decimal? medicalSuppliesCost,
-        DateOnly? careRequestDate,
-        string pricingCategoryCode,
-        decimal categoryFactorSnapshot,
-        decimal distanceFactorMultiplierSnapshot,
-        decimal complexityMultiplierSnapshot,
-        int volumeDiscountPercentSnapshot,
-        DateTime createdAtUtc)
+    public static CareRequest Create(CareRequestCreateParams p)
     {
         return new CareRequest(
-            userID: userID,
-            description: description,
-            careRequestReason: careRequestReason,
-            careRequestType: careRequestType,
-            unitType: unitType,
-            suggestedNurse: suggestedNurse,
-            assignedNurse: assignedNurse,
-            unit: unit,
-            price: price,
-            total: total,
-            clientBasePrice: clientBasePrice,
-            distanceFactor: distanceFactor,
-            complexityLevel: complexityLevel,
-            medicalSuppliesCost: medicalSuppliesCost,
-            careRequestDate: careRequestDate,
-            pricingCategoryCode: pricingCategoryCode,
-            categoryFactorSnapshot: categoryFactorSnapshot,
-            distanceFactorMultiplierSnapshot: distanceFactorMultiplierSnapshot,
-            complexityMultiplierSnapshot: complexityMultiplierSnapshot,
-            volumeDiscountPercentSnapshot: volumeDiscountPercentSnapshot,
-            createdAtUtc: createdAtUtc);
+            userID: p.UserID,
+            description: p.Description,
+            careRequestReason: p.CareRequestReason,
+            careRequestType: p.CareRequestType,
+            unitType: p.UnitType,
+            suggestedNurse: p.SuggestedNurse,
+            assignedNurse: p.AssignedNurse,
+            unit: p.Unit,
+            price: p.Price,
+            total: p.Total,
+            clientBasePrice: p.ClientBasePrice,
+            distanceFactor: p.DistanceFactor,
+            complexityLevel: p.ComplexityLevel,
+            medicalSuppliesCost: p.MedicalSuppliesCost,
+            careRequestDate: p.CareRequestDate,
+            pricingCategoryCode: p.PricingCategoryCode,
+            categoryFactorSnapshot: p.CategoryFactorSnapshot,
+            distanceFactorMultiplierSnapshot: p.DistanceFactorMultiplierSnapshot,
+            complexityMultiplierSnapshot: p.ComplexityMultiplierSnapshot,
+            volumeDiscountPercentSnapshot: p.VolumeDiscountPercentSnapshot,
+            lineBeforeVolumeDiscount: p.LineBeforeVolumeDiscount,
+            unitPriceAfterVolumeDiscount: p.UnitPriceAfterVolumeDiscount,
+            subtotalBeforeSupplies: p.SubtotalBeforeSupplies,
+            createdAtUtc: p.CreatedAtUtc);
     }
 
     public void Approve(DateTime transitionedAtUtc)

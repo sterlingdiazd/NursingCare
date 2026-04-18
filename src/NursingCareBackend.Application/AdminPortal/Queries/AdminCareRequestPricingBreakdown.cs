@@ -9,6 +9,8 @@ public sealed record AdminCareRequestPricingBreakdown(
   string? ComplexityLevel,
   decimal ComplexityFactorValue,
   decimal VolumeDiscountPercent,
+  decimal? LineBeforeVolumeDiscount,
+  decimal? UnitPriceAfterVolumeDiscount,
   decimal SubtotalBeforeSupplies,
   decimal MedicalSuppliesCost,
   decimal Total);

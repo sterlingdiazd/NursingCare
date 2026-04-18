@@ -428,7 +428,7 @@ public sealed class AdminCareRequestRepository : IAdminCareRequestRepository
     var distanceFactorValue = careRequest.DistanceFactorMultiplierSnapshot ?? 1.0m;
     var complexityFactorValue = careRequest.ComplexityMultiplierSnapshot ?? 1.0m;
     var medicalSuppliesCost = careRequest.MedicalSuppliesCost ?? 0m;
-    var subtotalBeforeSupplies = decimal.Round(
+    var subtotalBeforeSupplies = careRequest.SubtotalBeforeSupplies ?? decimal.Round(
       Math.Max(0m, careRequest.Total - medicalSuppliesCost),
       2,
       MidpointRounding.AwayFromZero);
@@ -445,6 +445,8 @@ public sealed class AdminCareRequestRepository : IAdminCareRequestRepository
       ComplexityLevel: careRequest.ComplexityLevel,
       ComplexityFactorValue: complexityFactorValue,
       VolumeDiscountPercent: volumeDiscountPercent,
+      LineBeforeVolumeDiscount: careRequest.LineBeforeVolumeDiscount,
+      UnitPriceAfterVolumeDiscount: careRequest.UnitPriceAfterVolumeDiscount,
       SubtotalBeforeSupplies: subtotalBeforeSupplies,
       MedicalSuppliesCost: medicalSuppliesCost,
       Total: careRequest.Total);

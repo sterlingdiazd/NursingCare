@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Options;
 using NursingCareBackend.Application.AdminPortal.Payroll;
+using NursingCareBackend.Application.Exceptions;
 using NursingCareBackend.Infrastructure.Payroll;
 using QuestPDF.Infrastructure;
 
@@ -79,12 +80,12 @@ public sealed class PayrollVoucherServiceTests
     }
 
     [Fact]
-    public async Task GenerateVoucherAsync_WhenNurseNotFound_ThrowsInvalidOperationException()
+    public async Task GenerateVoucherAsync_WhenNurseNotFound_ThrowsVoucherNotFoundException()
     {
         var repoMock = new FakeVoucherRepository(null);
         var service = new PayrollVoucherService(repoMock, Options.Create(DefaultCompanyInfo));
 
-        await Assert.ThrowsAsync<InvalidOperationException>(
+        await Assert.ThrowsAsync<VoucherNotFoundException>(
             () => service.GenerateVoucherAsync(Guid.NewGuid(), Guid.NewGuid()));
     }
 
@@ -126,12 +127,12 @@ public sealed class PayrollVoucherServiceTests
     }
 
     [Fact]
-    public async Task GenerateBulkVouchersZipAsync_WhenNoPeriodData_ThrowsInvalidOperationException()
+    public async Task GenerateBulkVouchersZipAsync_WhenNoPeriodData_ThrowsVoucherNotFoundException()
     {
         var repoMock = new FakeVoucherRepository(null, []);
         var service = new PayrollVoucherService(repoMock, Options.Create(DefaultCompanyInfo));
 
-        await Assert.ThrowsAsync<InvalidOperationException>(
+        await Assert.ThrowsAsync<VoucherNotFoundException>(
             () => service.GenerateBulkVouchersZipAsync(Guid.NewGuid()));
     }
 
