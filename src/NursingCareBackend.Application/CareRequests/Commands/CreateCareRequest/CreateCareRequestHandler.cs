@@ -30,31 +30,33 @@ public sealed class CreateCareRequestHandler
 
         var pricing = await _pricingCalculator.CalculateAsync(command, existingSameUnitTypeCount, cancellationToken);
 
-        var careRequest = CareRequest.Create(
-            userID: command.UserID,
-            description: command.Description,
-            careRequestReason: command.CareRequestReason,
-            careRequestType: command.CareRequestType,
-            unitType: pricing.UnitType,
-            suggestedNurse: command.SuggestedNurse,
-            assignedNurse: command.AssignedNurse,
-            unit: command.Unit,
-            price: pricing.Price,
-            total: pricing.Total,
-            clientBasePrice: command.ClientBasePriceOverride,
-            distanceFactor: pricing.DistanceFactorCode,
-            complexityLevel: pricing.ComplexityLevelCode,
-            medicalSuppliesCost: command.MedicalSuppliesCost,
-            careRequestDate: command.CareRequestDate,
-            pricingCategoryCode: pricing.PricingCategoryCode,
-            categoryFactorSnapshot: pricing.CategoryFactorSnapshot,
-            distanceFactorMultiplierSnapshot: pricing.DistanceFactorMultiplierSnapshot,
-            complexityMultiplierSnapshot: pricing.ComplexityMultiplierSnapshot,
-            volumeDiscountPercentSnapshot: pricing.VolumeDiscountPercentSnapshot,
-            lineBeforeVolumeDiscount: pricing.LineBeforeVolumeDiscount,
-            unitPriceAfterVolumeDiscount: pricing.UnitPriceAfterVolumeDiscount,
-            subtotalBeforeSupplies: pricing.SubtotalBeforeSupplies,
-            createdAtUtc: DateTime.UtcNow);
+        var careRequest = CareRequest.Create(new CareRequestCreateParams
+        {
+            UserID = command.UserID,
+            Description = command.Description,
+            CareRequestReason = command.CareRequestReason,
+            CareRequestType = command.CareRequestType,
+            UnitType = pricing.UnitType,
+            SuggestedNurse = command.SuggestedNurse,
+            AssignedNurse = command.AssignedNurse,
+            Unit = command.Unit,
+            Price = pricing.Price,
+            Total = pricing.Total,
+            ClientBasePrice = command.ClientBasePriceOverride,
+            DistanceFactor = pricing.DistanceFactorCode,
+            ComplexityLevel = pricing.ComplexityLevelCode,
+            MedicalSuppliesCost = command.MedicalSuppliesCost,
+            CareRequestDate = command.CareRequestDate,
+            PricingCategoryCode = pricing.PricingCategoryCode,
+            CategoryFactorSnapshot = pricing.CategoryFactorSnapshot,
+            DistanceFactorMultiplierSnapshot = pricing.DistanceFactorMultiplierSnapshot,
+            ComplexityMultiplierSnapshot = pricing.ComplexityMultiplierSnapshot,
+            VolumeDiscountPercentSnapshot = pricing.VolumeDiscountPercentSnapshot,
+            LineBeforeVolumeDiscount = pricing.LineBeforeVolumeDiscount,
+            UnitPriceAfterVolumeDiscount = pricing.UnitPriceAfterVolumeDiscount,
+            SubtotalBeforeSupplies = pricing.SubtotalBeforeSupplies,
+            CreatedAtUtc = DateTime.UtcNow,
+        });
 
         await _repository.AddAsync(careRequest, cancellationToken);
 

@@ -167,8 +167,8 @@ public sealed class CareRequestsController : ControllerBase
         {
             return this.ProblemResponse(
                 StatusCodes.Status422UnprocessableEntity,
-                "Snapshots no disponibles",
-                "Este registro no contiene snapshots de precios intermedios. La verificacion no esta disponible para registros anteriores a la migracion.");
+                "Verificacion no disponible",
+                "La verificacion de precios no esta disponible para esta solicitud.");
         }
 
         return Ok(PricingVerificationResponse.FromResult(result));
