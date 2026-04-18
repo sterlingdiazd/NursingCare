@@ -20,4 +20,9 @@ RUN apt-get update \
 COPY --from=build /app/out ./
 
 EXPOSE 5050
+
+# Run as non-root user for container hardening
+RUN groupadd --system appgroup && useradd --system --gid appgroup --no-create-home appuser
+USER appuser
+
 ENTRYPOINT ["dotnet", "NursingCareBackend.Api.dll"]
