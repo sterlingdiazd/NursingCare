@@ -69,6 +69,8 @@ public sealed class NursingCareDbContext : DbContext
                      builder.Property(x => x.ApprovedAtUtc);
                      builder.Property(x => x.RejectedAtUtc);
                      builder.Property(x => x.CompletedAtUtc);
+                     builder.Property(x => x.CancelledAtUtc);
+                     builder.Property(x => x.RejectionReason).HasMaxLength(1000);
 
                      // Removed custom column mappings – now using default property names
                      builder.Property(x => x.UserID)

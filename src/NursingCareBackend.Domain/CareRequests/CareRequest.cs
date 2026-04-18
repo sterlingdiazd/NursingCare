@@ -39,6 +39,8 @@ public sealed class CareRequest
     public DateTime? ApprovedAtUtc { get; private set; }
     public DateTime? RejectedAtUtc { get; private set; }
     public DateTime? CompletedAtUtc { get; private set; }
+    public DateTime? CancelledAtUtc { get; private set; }
+    public string? RejectionReason { get; private set; }
 
     private CareRequest() { } // For ORM
 
@@ -188,12 +190,26 @@ public sealed class CareRequest
         UpdatedAtUtc = transitionedAtUtc;
     }
 
-    public void Reject(DateTime transitionedAtUtc)
+    public void Reject(DateTime transitionedAtUtc, string? reason = null)
     {
         EnsurePending(nameof(Reject));
 
         Status = CareRequestStatus.Rejected;
         RejectedAtUtc = transitionedAtUtc;
+        RejectionReason = reason;
+        UpdatedAtUtc = transitionedAtUtc;
+    }
+
+    public void Cancel(DateTime transitionedAtUtc)
+    {
+        if (Status != CareRequestStatus.Pending && Status != CareRequestStatus.Approved)
+        {
+            throw new InvalidOperationException(
+                $"Care request can only be cancelled from Pending or Approved status. Current status is {Status}.");
+        }
+
+        Status = CareRequestStatus.Cancelled;
+        CancelledAtUtc = transitionedAtUtc;
         UpdatedAtUtc = transitionedAtUtc;
     }
 

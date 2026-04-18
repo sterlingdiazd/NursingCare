@@ -1,5 +1,6 @@
 using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
 using NursingCareBackend.Application.CareRequests;
+using NursingCareBackend.Application.AdminPortal.Auditing;
 using NursingCareBackend.Application.AdminPortal.Notifications;
 using NursingCareBackend.Domain.CareRequests;
 using NursingCareBackend.Application.Payroll;
@@ -11,15 +12,18 @@ public sealed class TransitionCareRequestHandler
   private readonly ICareRequestRepository _repository;
   private readonly IAdminNotificationPublisher _notifications;
   private readonly IPayrollCompensationService _payrollCompensationService;
+  private readonly IAdminAuditService _auditService;
 
   public TransitionCareRequestHandler(
     ICareRequestRepository repository,
     IAdminNotificationPublisher notifications,
-    IPayrollCompensationService payrollCompensationService)
+    IPayrollCompensationService payrollCompensationService,
+    IAdminAuditService auditService)
   {
     _repository = repository;
     _notifications = notifications;
     _payrollCompensationService = payrollCompensationService;
+    _auditService = auditService;
   }
 
   public async Task<CareRequest> Handle(
@@ -44,7 +48,7 @@ public sealed class TransitionCareRequestHandler
         careRequest.Approve(transitionedAtUtc);
         break;
       case CareRequestTransitionAction.Reject:
-        careRequest.Reject(transitionedAtUtc);
+        careRequest.Reject(transitionedAtUtc, command.Reason);
         break;
       case CareRequestTransitionAction.Complete:
         if (!command.ActingUserId.HasValue || command.ActingUserId == Guid.Empty)
@@ -54,11 +58,25 @@ public sealed class TransitionCareRequestHandler
 
         careRequest.Complete(transitionedAtUtc, command.ActingUserId.Value);
         break;
+      case CareRequestTransitionAction.Cancel:
+        careRequest.Cancel(transitionedAtUtc);
+        break;
       default:
         throw new ArgumentOutOfRangeException(nameof(command.Action), command.Action, "Unsupported care request transition.");
     }
 
     await _repository.UpdateAsync(careRequest, cancellationToken);
+
+    await _auditService.WriteAsync(
+      new AdminAuditRecord(
+        ActorUserId: command.ActingUserId,
+        ActorRole: "System",
+        Action: command.Action.ToString(),
+        EntityType: "CareRequest",
+        EntityId: careRequest.Id.ToString(),
+        Notes: command.Action == CareRequestTransitionAction.Reject ? command.Reason : null,
+        MetadataJson: null),
+      cancellationToken);
 
     if (command.Action == CareRequestTransitionAction.Complete)
     {
@@ -93,6 +111,22 @@ public sealed class TransitionCareRequestHandler
           EntityId: careRequest.Id.ToString(),
           DeepLinkPath: $"/admin/care-requests/{careRequest.Id}",
           Source: "Operacion de enfermeria",
+          RequiresAction: false),
+        cancellationToken);
+    }
+
+    if (command.Action == CareRequestTransitionAction.Cancel)
+    {
+      await _notifications.PublishToAdminsAsync(
+        new AdminNotificationPublishRequest(
+          Category: "care_request_cancelled",
+          Severity: "Medium",
+          Title: "Solicitud cancelada",
+          Body: $"La solicitud \"{careRequest.Description}\" fue cancelada.",
+          EntityType: "CareRequest",
+          EntityId: careRequest.Id.ToString(),
+          DeepLinkPath: $"/admin/care-requests/{careRequest.Id}",
+          Source: "Cliente",
           RequiresAction: false),
         cancellationToken);
     }

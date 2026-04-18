@@ -1,3 +1,4 @@
+using NursingCareBackend.Application.AdminPortal.Auditing;
 using NursingCareBackend.Application.CareRequests;
 using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
 using NursingCareBackend.Application.CareRequests.Commands.TransitionCareRequest;
@@ -44,7 +45,7 @@ public sealed class TransitionCareRequestHandlerTests
   {
     var careRequest = CreateDomicilioSample(Guid.NewGuid(), "Approve me");
     var repository = new FakeCareRequestRepository(careRequest);
-    var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher(), new FakePayrollCompensationService());
+    var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher(), new FakePayrollCompensationService(), new FakeAdminAuditService());
 
     var result = await handler.Handle(
       new TransitionCareRequestCommand(careRequest.Id, CareRequestTransitionAction.Approve),
@@ -60,7 +61,7 @@ public sealed class TransitionCareRequestHandlerTests
   {
     var careRequest = CreateDomicilioSample(Guid.NewGuid(), "Reject me");
     var repository = new FakeCareRequestRepository(careRequest);
-    var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher(), new FakePayrollCompensationService());
+    var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher(), new FakePayrollCompensationService(), new FakeAdminAuditService());
 
     var result = await handler.Handle(
       new TransitionCareRequestCommand(careRequest.Id, CareRequestTransitionAction.Reject),
@@ -79,7 +80,7 @@ public sealed class TransitionCareRequestHandlerTests
 
     var repository = new FakeCareRequestRepository(careRequest);
     var payrollService = new FakePayrollCompensationService();
-    var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher(), payrollService);
+    var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher(), payrollService, new FakeAdminAuditService());
 
     var result = await handler.Handle(
       new TransitionCareRequestCommand(careRequest.Id, CareRequestTransitionAction.Complete, AssignedNurseId),
@@ -101,7 +102,7 @@ public sealed class TransitionCareRequestHandlerTests
     careRequest.Approve(DateTime.UtcNow.AddMinutes(-5));
 
     var repository = new FakeCareRequestRepository(careRequest);
-    var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher(), new FakePayrollCompensationService());
+    var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher(), new FakePayrollCompensationService(), new FakeAdminAuditService());
 
     var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => handler.Handle(
       new TransitionCareRequestCommand(careRequest.Id, CareRequestTransitionAction.Complete, AssignedNurseId),
@@ -114,7 +115,7 @@ public sealed class TransitionCareRequestHandlerTests
   public async Task Handle_Should_Throw_When_Request_Does_Not_Exist()
   {
     var repository = new FakeCareRequestRepository();
-    var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher(), new FakePayrollCompensationService());
+    var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher(), new FakePayrollCompensationService(), new FakeAdminAuditService());
 
     var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() => handler.Handle(
       new TransitionCareRequestCommand(Guid.NewGuid(), CareRequestTransitionAction.Approve),
@@ -196,6 +197,17 @@ public sealed class TransitionCareRequestHandlerTests
     public Task RecordExecutionForCompletedCareRequestAsync(CareRequest careRequest, CancellationToken cancellationToken)
     {
       LastRecordedCareRequestId = careRequest.Id;
+      return Task.CompletedTask;
+    }
+  }
+
+  private sealed class FakeAdminAuditService : IAdminAuditService
+  {
+    public List<AdminAuditRecord> Records { get; } = new();
+
+    public Task WriteAsync(AdminAuditRecord record, CancellationToken cancellationToken = default)
+    {
+      Records.Add(record);
       return Task.CompletedTask;
     }
   }

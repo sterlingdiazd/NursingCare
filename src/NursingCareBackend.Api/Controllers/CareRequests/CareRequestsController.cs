@@ -128,13 +128,21 @@ public sealed class CareRequestsController : ControllerBase
 
     [HttpPost("{id:guid}/reject")]
     [Authorize(Policy = "CareRequestApprover")]
-    public Task<ActionResult<CareRequestResponse>> Reject(Guid id, CancellationToken cancellationToken)
-      => Transition(id, CareRequestTransitionAction.Reject, cancellationToken);
+    public Task<ActionResult<CareRequestResponse>> Reject(
+        Guid id,
+        [FromBody] RejectCareRequestRequest? request,
+        CancellationToken cancellationToken)
+      => Transition(id, CareRequestTransitionAction.Reject, cancellationToken, reason: request?.Reason);
 
     [HttpPost("{id:guid}/complete")]
     [Authorize(Policy = "CareRequestCompleter")]
     public Task<ActionResult<CareRequestResponse>> Complete(Guid id, CancellationToken cancellationToken)
       => Transition(id, CareRequestTransitionAction.Complete, cancellationToken);
+
+    [HttpPost("{id:guid}/cancel")]
+    [Authorize(Policy = "CareRequestCanceller")]
+    public Task<ActionResult<CareRequestResponse>> Cancel(Guid id, CancellationToken cancellationToken)
+      => Transition(id, CareRequestTransitionAction.Cancel, cancellationToken);
 
     [HttpPut("{id:guid}/assignment")]
     [Authorize(Roles = SystemRoles.Admin)]
@@ -153,10 +161,11 @@ public sealed class CareRequestsController : ControllerBase
     private async Task<ActionResult<CareRequestResponse>> Transition(
         Guid id,
         CareRequestTransitionAction action,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? reason = null)
     {
         var updated = await _transitionHandler.Handle(
-            new TransitionCareRequestCommand(id, action, ResolveCurrentUserId()),
+            new TransitionCareRequestCommand(id, action, ResolveCurrentUserId(), reason),
             cancellationToken);
 
         return Ok(CareRequestResponse.FromDomain(updated));

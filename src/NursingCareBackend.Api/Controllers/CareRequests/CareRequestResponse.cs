@@ -23,7 +23,9 @@ public sealed record CareRequestResponse(
   DateTime UpdatedAtUtc,
   DateTime? ApprovedAtUtc,
   DateTime? RejectedAtUtc,
-  DateTime? CompletedAtUtc)
+  DateTime? CompletedAtUtc,
+  DateTime? CancelledAtUtc,
+  string? RejectionReason)
 {
   public static CareRequestResponse FromDomain(CareRequest careRequest)
   {
@@ -48,6 +50,8 @@ public sealed record CareRequestResponse(
       careRequest.UpdatedAtUtc,
       careRequest.ApprovedAtUtc,
       careRequest.RejectedAtUtc,
-      careRequest.CompletedAtUtc);
+      careRequest.CompletedAtUtc,
+      careRequest.CancelledAtUtc,
+      careRequest.RejectionReason);
   }
 }

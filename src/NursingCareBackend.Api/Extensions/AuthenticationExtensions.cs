@@ -65,6 +65,11 @@ public static class AuthenticationExtensions
         policy
           .RequireRole(SystemRoles.Nurse)
           .AddRequirements(new OperationalAccessRequirement()));
+
+      options.AddPolicy("CareRequestCanceller", policy =>
+        policy
+          .RequireRole(SystemRoles.Client, SystemRoles.Admin)
+          .AddRequirements(new OperationalAccessRequirement()));
     });
 
     services.AddScoped<IAuthorizationHandler, OperationalAccessHandler>();
