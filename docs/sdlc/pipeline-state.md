@@ -2,13 +2,13 @@
 
 ## Note
 goal: Enforce payroll period immutability — 7 write guards with domain EnsureOpen() method
-current_phase: 03-code-review-qa
+current_phase: rework-complete
 status: completed
-last_completed_step: 03-code-review-qa/qa-general
-key_decisions: [all guards pre-existing, CR-007 medium (EnsureOpen defensive enum check), CR-001/CR-002 low (conditional guard intent correct by design), TQ-001/TQ-002/TQ-003 low test-quality findings, 0 blocking findings, 25/25 immutability tests pass, 0 new vulnerable packages, 12 pre-existing API failures unrelated]
+last_completed_step: rework/fix-qa-findings + git-commit-and-push
+key_decisions: [SEC-002 fix: set Content-Type before WriteAsJsonAsync in ExceptionHandlingMiddleware (headers read-only after body stream starts), all other 7 findings were already resolved, 10/10 integration tests pass, 18/18 domain tests pass, commit 453aa4b pushed to feature branch]
 blockers: none
-next_step: orchestrator to review all parallel-D results (qa-general-agent done, appsec-agent done), then proceed to Phase E or commit
-updated_at: 2026-04-19T22:10:00Z
+next_step: orchestrator to create pull request or proceed to documentation phase
+updated_at: 2026-04-19T23:00:00Z
 
 ## Current Initiative
 
@@ -20,7 +20,7 @@ updated_at: 2026-04-19T22:10:00Z
 - **current_mode:** parallel-D completed (both appsec-agent and qa-general-agent done)
 - **status:** completed
 - **feature_branch:** feature/2026-04-19T2100-payroll-period-immutability
-- **commit_sha:** not committed
+- **commit_sha:** 453aa4b
 - **pr_url:** not created
 
 ## Phase Log
@@ -30,9 +30,11 @@ updated_at: 2026-04-19T22:10:00Z
 - [2026-04-19T21:45:00Z] 03-code-review-qa/appsec — 34 AppSec tests authored (16 RBAC, 10 negative/boundary, 4 contract, 4 security+bypass); 7 immutability tests confirmed passing; 2 findings: SEC-001 medium (CreateAdjustment guard bypass via orphan serviceExecutionId), SEC-002 low (Content-Type application/json vs application/problem+json); 12 pre-existing failures in unrelated test classes confirmed not caused by this initiative
 - [2026-04-19T22:10:00Z] 03-code-review-qa/qa-general — Code review completed; 0 blocking findings; 1 medium (CR-007 EnsureOpen enum gap), 2 low code-review, 3 low test-quality; all 9 domain + 7 API immutability tests passed; full domain suite 18/18; full API suite 241/253 (12 pre-existing failures confirmed unrelated); dependency audit: 0 vulnerable packages; architecture compliance: all principles satisfied
 
+- [2026-04-19T23:00:00Z] rework/fix-qa-findings — Fixed SEC-002 (Content-Type set before WriteAsJsonAsync; headers read-only post-body-write); confirmed 7 other findings already resolved; 10/10 integration tests + 18/18 domain tests pass; build 0 errors; committed 453aa4b and pushed to feature branch
+
 ## Re-work Iterations
 
-- implementation <> code-review-qa: 0/3
+- implementation <> code-review-qa: 1/3
 
 ## Escalations
 
