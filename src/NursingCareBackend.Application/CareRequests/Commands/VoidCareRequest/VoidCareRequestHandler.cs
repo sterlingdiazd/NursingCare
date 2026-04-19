@@ -37,7 +37,7 @@ public sealed class VoidCareRequestHandler
             throw new KeyNotFoundException($"Care request '{command.CareRequestId}' was not found.");
         }
 
-        var voidedAtUtc = DateTime.UtcNow;
+        var voidedAtUtc = command.VoidedAtUtc;
         careRequest.Void(command.VoidReason, voidedAtUtc);
 
         await _repository.UpdateAsync(careRequest, cancellationToken);

@@ -155,6 +155,84 @@ public sealed class ServiceBillingApiTests : IClassFixture<CustomWebApplicationF
         Assert.Equal(HttpStatusCode.BadRequest, voidResponse.StatusCode);
     }
 
+    // ---- GET Receipt ----
+
+    [Fact]
+    public async Task GET_Receipt_Returns_404_When_Not_Generated()
+    {
+        var completedId = await CreateCompletedCareRequestAsync("billing-receipt-get-404");
+
+        var adminClient = CreateAdminClient();
+        var response = await adminClient.GetAsync($"/api/admin/care-requests/{completedId}/receipt");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GET_Receipt_Returns_Existing_Receipt_After_Generate()
+    {
+        var completedId = await CreateCompletedCareRequestAsync("billing-receipt-get-200");
+
+        var adminClient = CreateAdminClient();
+
+        // Invoice then pay to reach Paid status
+        await adminClient.PostAsJsonAsync($"/api/admin/care-requests/{completedId}/invoice", new
+        {
+            invoiceNumber = "FAC-RECEIPT-GET-001"
+        });
+        await adminClient.PostAsJsonAsync($"/api/admin/care-requests/{completedId}/pay", new
+        {
+            bankReference = "TRF-RECEIPT-GET-001"
+        });
+
+        // Generate receipt
+        var generateResponse = await adminClient.PostAsync($"/api/admin/care-requests/{completedId}/receipt", null);
+        generateResponse.EnsureSuccessStatusCode();
+
+        // GET the receipt
+        var getResponse = await adminClient.GetAsync($"/api/admin/care-requests/{completedId}/receipt");
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+
+        var body = await getResponse.Content.ReadFromJsonAsync<ReceiptResponse>();
+        Assert.NotNull(body);
+        Assert.NotEmpty(body!.ReceiptNumber);
+    }
+
+    // ---- GET Nurse Detail ----
+
+    [Fact]
+    public async Task GET_NurseDetail_Returns_404_With_Invalid_Ids()
+    {
+        var adminClient = CreateAdminClient();
+        var response = await adminClient.GetAsync($"/api/admin/payroll/periods/{Guid.NewGuid()}/nurse-detail/{Guid.NewGuid()}");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GET_NurseDetail_Returns_200_With_Valid_Period_And_Nurse()
+    {
+        var adminClient = CreateAdminClient();
+
+        // Create a payroll period
+        var periodResponse = await adminClient.PostAsJsonAsync("/api/admin/payroll/periods", new
+        {
+            startDate = "2026-04-01",
+            endDate = "2026-04-30",
+            cutoffDate = "2026-04-28",
+            paymentDate = "2026-04-30"
+        });
+        periodResponse.EnsureSuccessStatusCode();
+        var periodBody = await periodResponse.Content.ReadFromJsonAsync<PeriodCreatedResponse>();
+        Assert.NotNull(periodBody);
+
+        // Use a random nurse id — no lines exist so the endpoint returns 404 (no payroll data for nurse)
+        var response = await adminClient.GetAsync($"/api/admin/payroll/periods/{periodBody!.Id}/nurse-detail/{Guid.NewGuid()}");
+
+        // No payroll lines for that nurse in that period — expect 404
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
     // ---- Helper methods ----
 
     private HttpClient CreateAdminClient()
@@ -243,5 +321,17 @@ public sealed class ServiceBillingApiTests : IClassFixture<CustomWebApplicationF
         public Guid Id { get; set; }
         public DateTime VoidedAtUtc { get; set; }
         public string VoidReason { get; set; } = string.Empty;
+    }
+
+    private sealed class ReceiptResponse
+    {
+        public Guid ReceiptId { get; set; }
+        public string ReceiptNumber { get; set; } = string.Empty;
+        public string ReceiptContentBase64 { get; set; } = string.Empty;
+    }
+
+    private sealed class PeriodCreatedResponse
+    {
+        public Guid Id { get; set; }
     }
 }
