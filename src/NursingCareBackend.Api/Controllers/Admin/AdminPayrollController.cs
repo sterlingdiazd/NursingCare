@@ -193,12 +193,17 @@ public sealed class AdminPayrollController : ControllerBase
     [HttpPost("deductions")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> CreateDeduction([FromBody] CreateDeductionRequest request, CancellationToken cancellationToken)
     {
         try
         {
             var id = await _repository.CreateDeductionAsync(request, cancellationToken);
             return CreatedAtAction(nameof(GetDeductions), new { }, new { id });
+        }
+        catch (PayrollPeriodClosedException ex)
+        {
+            return this.ProblemResponse(StatusCodes.Status409Conflict, "Periodo cerrado", ex.Message);
         }
         catch (ArgumentException ex)
         {
@@ -210,19 +215,27 @@ public sealed class AdminPayrollController : ControllerBase
     [HttpDelete("deductions/{id:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> DeleteDeduction(Guid id, CancellationToken cancellationToken)
     {
-        var found = await _repository.DeleteDeductionAsync(id, cancellationToken);
-
-        if (!found)
+        try
         {
-            return this.ProblemResponse(
-                StatusCodes.Status404NotFound,
-                "Deduccion no encontrada",
-                $"No se encontro la deduccion con id '{id}'.");
-        }
+            var found = await _repository.DeleteDeductionAsync(id, cancellationToken);
 
-        return NoContent();
+            if (!found)
+            {
+                return this.ProblemResponse(
+                    StatusCodes.Status404NotFound,
+                    "Deduccion no encontrada",
+                    $"No se encontro la deduccion con id '{id}'.");
+            }
+
+            return NoContent();
+        }
+        catch (PayrollPeriodClosedException ex)
+        {
+            return this.ProblemResponse(StatusCodes.Status409Conflict, "Periodo cerrado", ex.Message);
+        }
     }
 
     // GET /api/admin/payroll/adjustments
@@ -240,12 +253,17 @@ public sealed class AdminPayrollController : ControllerBase
     [HttpPost("adjustments")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> CreateAdjustment([FromBody] CreateCompensationAdjustmentRequest request, CancellationToken cancellationToken)
     {
         try
         {
             var id = await _repository.CreateAdjustmentAsync(request, cancellationToken);
             return CreatedAtAction(nameof(GetAdjustments), new { }, new { id });
+        }
+        catch (PayrollPeriodClosedException ex)
+        {
+            return this.ProblemResponse(StatusCodes.Status409Conflict, "Periodo cerrado", ex.Message);
         }
         catch (ArgumentException ex)
         {
@@ -338,6 +356,7 @@ public sealed class AdminPayrollController : ControllerBase
     [HttpPost("lines/{lineId:guid}/override")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> SubmitOverride(
         Guid lineId,
         [FromBody] SubmitOverrideRequest request,
@@ -354,6 +373,10 @@ public sealed class AdminPayrollController : ControllerBase
             var overrideId = await _overrideRepository.SubmitOverrideAsync(requestWithLineId, adminId, DateTime.UtcNow, cancellationToken);
             return Created($"/api/admin/payroll/lines/{lineId}/override", new { overrideId });
         }
+        catch (PayrollPeriodClosedException ex)
+        {
+            return this.ProblemResponse(StatusCodes.Status409Conflict, "Periodo cerrado", ex.Message);
+        }
         catch (ArgumentException ex)
         {
             return this.ProblemResponse(StatusCodes.Status400BadRequest, "Datos invalidos", ex.Message);
@@ -365,6 +388,7 @@ public sealed class AdminPayrollController : ControllerBase
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> ApproveOverride(
         Guid lineId,
         CancellationToken cancellationToken)
@@ -373,15 +397,22 @@ public sealed class AdminPayrollController : ControllerBase
         if (adminId == Guid.Empty)
             return this.ProblemResponse(StatusCodes.Status400BadRequest, "Sin identidad", "No se pudo determinar el usuario administrador.");
 
-        var (found, error) = await _overrideRepository.ApproveOverrideAsync(lineId, adminId, DateTime.UtcNow, cancellationToken);
+        try
+        {
+            var (found, error) = await _overrideRepository.ApproveOverrideAsync(lineId, adminId, DateTime.UtcNow, cancellationToken);
 
-        if (!found)
-            return this.ProblemResponse(StatusCodes.Status404NotFound, "Override no encontrado", $"No hay una solicitud de compensacion pendiente para la linea '{lineId}'.");
+            if (!found)
+                return this.ProblemResponse(StatusCodes.Status404NotFound, "Override no encontrado", $"No hay una solicitud de compensacion pendiente para la linea '{lineId}'.");
 
-        if (error is not null)
-            return this.ProblemResponse(StatusCodes.Status403Forbidden, "No autorizado", "Not authorized to approve this override.");
+            if (error is not null)
+                return this.ProblemResponse(StatusCodes.Status403Forbidden, "No autorizado", "Not authorized to approve this override.");
 
-        return NoContent();
+            return NoContent();
+        }
+        catch (PayrollPeriodClosedException ex)
+        {
+            return this.ProblemResponse(StatusCodes.Status409Conflict, "Periodo cerrado", ex.Message);
+        }
     }
 
     // GET /api/admin/payroll/periods/{periodId}/voucher/{nurseId}
@@ -443,6 +474,28 @@ public sealed class AdminPayrollController : ControllerBase
                 "Periodo no encontrado",
                 "No se encontraron datos de nomina para el periodo especificado.");
         }
+    }
+
+    // GET /api/admin/payroll/periods/{periodId}/nurse-detail/{nurseUserId}
+    [HttpGet("periods/{periodId:guid}/nurse-detail/{nurseUserId:guid}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetNursePayrollDetail(
+        Guid periodId,
+        Guid nurseUserId,
+        CancellationToken cancellationToken)
+    {
+        var detail = await _repository.GetNursePeriodDetailAsync(periodId, nurseUserId, cancellationToken);
+
+        if (detail is null)
+        {
+            return this.ProblemResponse(
+                StatusCodes.Status404NotFound,
+                "Detalle no encontrado",
+                $"No se encontraron datos de nomina para el periodo '{periodId}' y la enfermera '{nurseUserId}'.");
+        }
+
+        return Ok(detail);
     }
 
     private static string EscapeCsv(object? value)

@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -5,6 +6,11 @@ using NursingCareBackend.Api.Extensions;
 using NursingCareBackend.Application.AdminPortal.Queries;
 using NursingCareBackend.Application.AdminPortal.Shifts;
 using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
+using NursingCareBackend.Application.CareRequests.Commands.GenerateReceipt;
+using NursingCareBackend.Application.CareRequests.Commands.InvoiceCareRequest;
+using NursingCareBackend.Application.CareRequests.Commands.PayCareRequest;
+using NursingCareBackend.Application.CareRequests.Commands.VoidCareRequest;
+using NursingCareBackend.Application.CareRequests.Queries.GetReceipt;
 using NursingCareBackend.Application.Identity.Repositories;
 using NursingCareBackend.Domain.Identity;
 
@@ -22,6 +28,11 @@ public sealed class AdminCareRequestsController : ControllerBase
   private readonly IUserRepository _userRepository;
   private readonly RegisterCareRequestShiftHandler _registerShiftHandler;
   private readonly RecordCareRequestShiftChangeHandler _recordShiftChangeHandler;
+  private readonly InvoiceCareRequestHandler _invoiceHandler;
+  private readonly PayCareRequestHandler _payHandler;
+  private readonly VoidCareRequestHandler _voidHandler;
+  private readonly GenerateReceiptHandler _generateReceiptHandler;
+  private readonly GetReceiptHandler _getReceiptHandler;
 
   public AdminCareRequestsController(
     GetAdminCareRequestsHandler getListHandler,
@@ -30,7 +41,12 @@ public sealed class AdminCareRequestsController : ControllerBase
     CreateCareRequestHandler createHandler,
     IUserRepository userRepository,
     RegisterCareRequestShiftHandler registerShiftHandler,
-    RecordCareRequestShiftChangeHandler recordShiftChangeHandler)
+    RecordCareRequestShiftChangeHandler recordShiftChangeHandler,
+    InvoiceCareRequestHandler invoiceHandler,
+    PayCareRequestHandler payHandler,
+    VoidCareRequestHandler voidHandler,
+    GenerateReceiptHandler generateReceiptHandler,
+    GetReceiptHandler getReceiptHandler)
   {
     _getListHandler = getListHandler;
     _getDetailHandler = getDetailHandler;
@@ -39,6 +55,17 @@ public sealed class AdminCareRequestsController : ControllerBase
     _userRepository = userRepository;
     _registerShiftHandler = registerShiftHandler;
     _recordShiftChangeHandler = recordShiftChangeHandler;
+    _invoiceHandler = invoiceHandler;
+    _payHandler = payHandler;
+    _voidHandler = voidHandler;
+    _generateReceiptHandler = generateReceiptHandler;
+    _getReceiptHandler = getReceiptHandler;
+  }
+
+  private Guid GetAdminUserId()
+  {
+    var claim = User.FindFirst(ClaimTypes.NameIdentifier);
+    return claim != null ? Guid.Parse(claim.Value) : Guid.Empty;
   }
 
   [HttpGet]
@@ -193,6 +220,141 @@ public sealed class AdminCareRequestsController : ControllerBase
     return CreatedAtAction(nameof(GetById), new { id }, new { shiftId });
   }
 
+  [HttpPost("{id:guid}/invoice")]
+  [ProducesResponseType(StatusCodes.Status200OK)]
+  [ProducesResponseType(StatusCodes.Status400BadRequest)]
+  [ProducesResponseType(StatusCodes.Status404NotFound)]
+  [ProducesResponseType(StatusCodes.Status409Conflict)]
+  public async Task<IActionResult> Invoice(
+    Guid id,
+    [FromBody] InvoiceCareRequestRequest request,
+    CancellationToken cancellationToken)
+  {
+    var adminId = GetAdminUserId();
+    if (adminId == Guid.Empty)
+      return this.ProblemResponse(StatusCodes.Status400BadRequest, "Sin identidad", "No se pudo determinar el usuario administrador.");
+
+    try
+    {
+      var result = await _invoiceHandler.Handle(
+        new InvoiceCareRequestCommand(id, request.InvoiceNumber, request.InvoiceDate ?? DateTime.UtcNow, adminId),
+        cancellationToken);
+      return Ok(result);
+    }
+    catch (KeyNotFoundException)
+    {
+      return this.ProblemResponse(StatusCodes.Status404NotFound, "Solicitud no encontrada", null);
+    }
+    catch (InvalidOperationException ex)
+    {
+      return this.ProblemResponse(StatusCodes.Status400BadRequest, "Transicion invalida", ex.Message);
+    }
+  }
+
+  [HttpPost("{id:guid}/pay")]
+  [ProducesResponseType(StatusCodes.Status200OK)]
+  [ProducesResponseType(StatusCodes.Status400BadRequest)]
+  [ProducesResponseType(StatusCodes.Status404NotFound)]
+  public async Task<IActionResult> Pay(
+    Guid id,
+    [FromBody] PayCareRequestRequest request,
+    CancellationToken cancellationToken)
+  {
+    var adminId = GetAdminUserId();
+    if (adminId == Guid.Empty)
+      return this.ProblemResponse(StatusCodes.Status400BadRequest, "Sin identidad", "No se pudo determinar el usuario administrador.");
+
+    try
+    {
+      var result = await _payHandler.Handle(
+        new PayCareRequestCommand(id, request.BankReference, request.PaymentDate ?? DateTime.UtcNow, adminId),
+        cancellationToken);
+      return Ok(result);
+    }
+    catch (KeyNotFoundException)
+    {
+      return this.ProblemResponse(StatusCodes.Status404NotFound, "Solicitud no encontrada", null);
+    }
+    catch (InvalidOperationException ex)
+    {
+      return this.ProblemResponse(StatusCodes.Status400BadRequest, "Transicion invalida", ex.Message);
+    }
+  }
+
+  [HttpPost("{id:guid}/void")]
+  [ProducesResponseType(StatusCodes.Status200OK)]
+  [ProducesResponseType(StatusCodes.Status400BadRequest)]
+  [ProducesResponseType(StatusCodes.Status404NotFound)]
+  public async Task<IActionResult> Void(
+    Guid id,
+    [FromBody] VoidCareRequestRequest request,
+    CancellationToken cancellationToken)
+  {
+    var adminId = GetAdminUserId();
+    if (adminId == Guid.Empty)
+      return this.ProblemResponse(StatusCodes.Status400BadRequest, "Sin identidad", "No se pudo determinar el usuario administrador.");
+
+    try
+    {
+      var result = await _voidHandler.Handle(
+        new VoidCareRequestCommand(id, request.VoidReason, adminId),
+        cancellationToken);
+      return Ok(result);
+    }
+    catch (KeyNotFoundException)
+    {
+      return this.ProblemResponse(StatusCodes.Status404NotFound, "Solicitud no encontrada", null);
+    }
+    catch (InvalidOperationException ex)
+    {
+      return this.ProblemResponse(StatusCodes.Status400BadRequest, "Transicion invalida", ex.Message);
+    }
+  }
+
+  [HttpPost("{id:guid}/receipt")]
+  [ProducesResponseType(StatusCodes.Status200OK)]
+  [ProducesResponseType(StatusCodes.Status400BadRequest)]
+  [ProducesResponseType(StatusCodes.Status404NotFound)]
+  public async Task<IActionResult> GenerateReceipt(
+    Guid id,
+    CancellationToken cancellationToken)
+  {
+    var adminId = GetAdminUserId();
+    if (adminId == Guid.Empty)
+      return this.ProblemResponse(StatusCodes.Status400BadRequest, "Sin identidad", "No se pudo determinar el usuario administrador.");
+
+    try
+    {
+      var result = await _generateReceiptHandler.Handle(
+        new GenerateReceiptCommand(id, adminId),
+        cancellationToken);
+      return Ok(result);
+    }
+    catch (KeyNotFoundException)
+    {
+      return this.ProblemResponse(StatusCodes.Status404NotFound, "Solicitud no encontrada", null);
+    }
+    catch (InvalidOperationException ex)
+    {
+      return this.ProblemResponse(StatusCodes.Status400BadRequest, "Estado invalido", ex.Message);
+    }
+  }
+
+  [HttpGet("{id:guid}/receipt")]
+  [ProducesResponseType(StatusCodes.Status200OK)]
+  [ProducesResponseType(StatusCodes.Status404NotFound)]
+  public async Task<IActionResult> GetReceipt(
+    Guid id,
+    CancellationToken cancellationToken)
+  {
+    var result = await _getReceiptHandler.Handle(id, cancellationToken);
+
+    if (result is null)
+      return this.ProblemResponse(StatusCodes.Status404NotFound, "Recibo no encontrado", $"No existe recibo para la solicitud '{id}'.");
+
+    return Ok(result);
+  }
+
   [HttpPost("{id:guid}/shifts/{shiftId:guid}/changes")]
   [ProducesResponseType(StatusCodes.Status204NoContent)]
   [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -225,6 +387,23 @@ public sealed class AdminCareRequestsController : ControllerBase
     var text = value.ToString() ?? string.Empty;
     return $"\"{text.Replace("\"", "\"\"")}\"";
   }
+}
+
+public sealed class InvoiceCareRequestRequest
+{
+  public string InvoiceNumber { get; set; } = default!;
+  public DateTime? InvoiceDate { get; set; }
+}
+
+public sealed class PayCareRequestRequest
+{
+  public string BankReference { get; set; } = default!;
+  public DateTime? PaymentDate { get; set; }
+}
+
+public sealed class VoidCareRequestRequest
+{
+  public string VoidReason { get; set; } = default!;
 }
 
 public sealed class RegisterAdminCareRequestShiftRequest

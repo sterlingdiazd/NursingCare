@@ -23,6 +23,7 @@ using NursingCareBackend.Infrastructure.AdminPortal;
 using NursingCareBackend.Infrastructure.Catalogs;
 using NursingCareBackend.Infrastructure.Authentication;
 using NursingCareBackend.Infrastructure.Email;
+using NursingCareBackend.Application.CareRequests;
 using NursingCareBackend.Infrastructure.CareRequests;
 using NursingCareBackend.Infrastructure.Identity;
 using NursingCareBackend.Infrastructure.Persistence;
@@ -88,8 +89,11 @@ public static class DependencyInjection
                 ?? "NursingCare";
         });
 
-        // Care Request Repository
+        // Care Request Repository and billing
         services.AddScoped<ICareRequestRepository, CareRequestRepository>();
+        services.AddScoped<IPaymentValidationRepository, PaymentValidationRepository>();
+        services.AddScoped<IReceiptRepository, ReceiptRepository>();
+        services.AddScoped<IReceiptPdfService, ReceiptPdfService>();
         services.AddScoped<IAdminDashboardRepository, AdminDashboardRepository>();
         services.AddScoped<IAdminActionQueueRepository, AdminActionQueueRepository>();
         services.AddScoped<IAdminCareRequestRepository, AdminCareRequestRepository>();

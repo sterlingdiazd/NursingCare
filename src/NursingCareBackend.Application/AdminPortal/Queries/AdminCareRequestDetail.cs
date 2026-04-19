@@ -2,6 +2,19 @@ using NursingCareBackend.Application.AdminPortal.Shifts;
 
 namespace NursingCareBackend.Application.AdminPortal.Queries;
 
+public sealed record AdminCareRequestBillingInfo(
+  string? InvoiceNumber,
+  DateTime? InvoicedAtUtc,
+  DateTime? PaidAtUtc,
+  DateTime? VoidedAtUtc,
+  string? VoidReason,
+  string? BankReference,
+  DateTime? ValidationDate,
+  string? ReceiptNumber,
+  Guid? ReceiptId,
+  DateTime? ReceiptGeneratedAtUtc
+);
+
 public sealed record AdminCareRequestDetail(
   Guid Id,
   Guid ClientUserId,
@@ -33,4 +46,5 @@ public sealed record AdminCareRequestDetail(
   AdminCareRequestPricingBreakdown PricingBreakdown,
   AdminPayrollCompensationSnapshot? PayrollCompensation,
   IReadOnlyList<AdminShiftRecordSummary> Shifts,
-  IReadOnlyList<AdminCareRequestTimelineEvent> Timeline);
+  IReadOnlyList<AdminCareRequestTimelineEvent> Timeline,
+  AdminCareRequestBillingInfo? BillingInfo);

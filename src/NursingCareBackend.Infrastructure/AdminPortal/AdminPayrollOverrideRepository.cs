@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using NursingCareBackend.Application.AdminPortal.Payroll;
+using NursingCareBackend.Application.Exceptions;
 using NursingCareBackend.Domain.Payroll;
 using NursingCareBackend.Infrastructure.Persistence;
 
@@ -21,11 +22,19 @@ public sealed class AdminPayrollOverrideRepository : IAdminPayrollOverrideReposi
         CancellationToken cancellationToken)
     {
         // Validate line exists
-        var lineExists = await _dbContext.PayrollLines
-            .AnyAsync(l => l.Id == request.LineId, cancellationToken);
+        var line = await _dbContext.PayrollLines
+            .FirstOrDefaultAsync(l => l.Id == request.LineId, cancellationToken);
 
-        if (!lineExists)
+        if (line is null)
             throw new ArgumentException($"PayrollLine '{request.LineId}' not found.");
+
+        // Payroll immutability guard: reject override submissions for closed periods
+        var periodForLine = await _dbContext.PayrollPeriods
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Id == line.PayrollPeriodId, cancellationToken);
+
+        if (periodForLine is not null && periodForLine.IsClosed)
+            throw new PayrollPeriodClosedException(periodForLine.Id);
 
         // Cancel any existing pending override for this line
         var existingPending = await _dbContext.PayrollLineOverrides
@@ -62,16 +71,24 @@ public sealed class AdminPayrollOverrideRepository : IAdminPayrollOverrideReposi
         if (overrideEntity.RequestedByUserId == approvedByUserId)
             return (true, "El mismo administrador que solicitó la compensación manual no puede aprobarla.");
 
-        var line = await _dbContext.PayrollLines
+        var lineForApprove = await _dbContext.PayrollLines
             .FirstOrDefaultAsync(l => l.Id == lineId, cancellationToken);
 
-        if (line is null)
+        if (lineForApprove is null)
             return (false, null);
+
+        // Payroll immutability guard: reject approval for closed periods
+        var periodForApprove = await _dbContext.PayrollPeriods
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Id == lineForApprove.PayrollPeriodId, cancellationToken);
+
+        if (periodForApprove is not null && periodForApprove.IsClosed)
+            throw new PayrollPeriodClosedException(periodForApprove.Id);
 
         try
         {
             overrideEntity.Approve(approvedByUserId, now);
-            line.ApplyOverride(overrideEntity.OverrideAmount, now);
+            lineForApprove.ApplyOverride(overrideEntity.OverrideAmount, now);
             await _dbContext.SaveChangesAsync(cancellationToken);
             return (true, null);
         }

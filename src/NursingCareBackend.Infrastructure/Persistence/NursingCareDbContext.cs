@@ -16,6 +16,8 @@ public sealed class NursingCareDbContext : DbContext
        }
 
        public DbSet<CareRequest> CareRequests => Set<CareRequest>();
+       public DbSet<PaymentValidation> PaymentValidations => Set<PaymentValidation>();
+       public DbSet<Receipt> Receipts => Set<Receipt>();
        public DbSet<User> Users => Set<User>();
        public DbSet<Nurse> Nurses => Set<Nurse>();
        public DbSet<Client> Clients => Set<Client>();
@@ -47,6 +49,29 @@ public sealed class NursingCareDbContext : DbContext
 
        protected override void OnModelCreating(ModelBuilder modelBuilder)
        {
+              modelBuilder.Entity<PaymentValidation>(builder =>
+              {
+                     builder.ToTable("PaymentValidations");
+                     builder.HasKey(x => x.Id);
+                     builder.HasIndex(x => x.CareRequestId).IsUnique();
+                     builder.Property(x => x.BankReference).IsRequired().HasMaxLength(100);
+                     builder.Property(x => x.InvoiceReference).IsRequired().HasMaxLength(50);
+                     builder.Property(x => x.SystemTotal).HasColumnType("decimal(10,2)");
+                     builder.Property(x => x.ValidatedAtUtc).IsRequired();
+                     builder.Property(x => x.CreatedAtUtc).IsRequired();
+              });
+
+              modelBuilder.Entity<Receipt>(builder =>
+              {
+                     builder.ToTable("Receipts");
+                     builder.HasKey(x => x.Id);
+                     builder.HasIndex(x => x.CareRequestId).IsUnique();
+                     builder.HasIndex(x => x.ReceiptNumber).IsUnique();
+                     builder.Property(x => x.ReceiptNumber).IsRequired().HasMaxLength(30);
+                     builder.Property(x => x.ReceiptContent).IsRequired();
+                     builder.Property(x => x.GeneratedAtUtc).IsRequired();
+              });
+
               modelBuilder.Entity<CareRequest>(builder =>
               {
                      builder.ToTable("CareRequests");
@@ -71,6 +96,13 @@ public sealed class NursingCareDbContext : DbContext
                      builder.Property(x => x.CompletedAtUtc);
                      builder.Property(x => x.CancelledAtUtc);
                      builder.Property(x => x.RejectionReason).HasMaxLength(1000);
+
+                     builder.Property(x => x.InvoiceNumber).HasMaxLength(50);
+                     builder.Property(x => x.InvoicedAtUtc);
+                     builder.Property(x => x.PaidAtUtc);
+                     builder.Property(x => x.VoidedAtUtc);
+                     builder.Property(x => x.VoidReason).HasMaxLength(500);
+                     builder.Ignore(x => x.IsVoided);
 
                      // Removed custom column mappings – now using default property names
                      builder.Property(x => x.UserID)
