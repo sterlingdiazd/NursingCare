@@ -45,6 +45,14 @@ public sealed class CareRequest
     public DateTime? CancelledAtUtc { get; private set; }
     public string? RejectionReason { get; private set; }
 
+    // Service lifecycle billing fields
+    public string? InvoiceNumber { get; private set; }
+    public DateTime? InvoicedAtUtc { get; private set; }
+    public DateTime? PaidAtUtc { get; private set; }
+    public DateTime? VoidedAtUtc { get; private set; }
+    public string? VoidReason { get; private set; }
+    public bool IsVoided => VoidedAtUtc.HasValue;
+
     private CareRequest() { } // For ORM
 
     private CareRequest(
@@ -245,6 +253,56 @@ public sealed class CareRequest
         Status = CareRequestStatus.Completed;
         CompletedAtUtc = transitionedAtUtc;
         UpdatedAtUtc = transitionedAtUtc;
+    }
+
+    public void Invoice(string invoiceNumber, DateTime invoiceDate)
+    {
+        if (Status != CareRequestStatus.Completed)
+        {
+            throw new InvalidOperationException(
+                $"Care request can only be invoiced from Completed status. Current status is {Status}.");
+        }
+
+        if (string.IsNullOrWhiteSpace(invoiceNumber))
+            throw new ArgumentException("Invoice number cannot be empty.", nameof(invoiceNumber));
+
+        InvoiceNumber = invoiceNumber;
+        Status = CareRequestStatus.Invoiced;
+        InvoicedAtUtc = invoiceDate;
+        UpdatedAtUtc = invoiceDate;
+    }
+
+    public void Pay(string bankReference, DateTime paymentDate)
+    {
+        if (Status != CareRequestStatus.Invoiced)
+        {
+            throw new InvalidOperationException(
+                $"Care request can only be paid from Invoiced status. Current status is {Status}.");
+        }
+
+        if (string.IsNullOrWhiteSpace(bankReference))
+            throw new ArgumentException("Bank reference cannot be empty.", nameof(bankReference));
+
+        Status = CareRequestStatus.Paid;
+        PaidAtUtc = paymentDate;
+        UpdatedAtUtc = paymentDate;
+    }
+
+    public void Void(string voidReason, DateTime voidedAtUtc)
+    {
+        if (Status != CareRequestStatus.Completed && Status != CareRequestStatus.Invoiced)
+        {
+            throw new InvalidOperationException(
+                $"Care request can only be voided from Completed or Invoiced status. Current status is {Status}.");
+        }
+
+        if (string.IsNullOrWhiteSpace(voidReason))
+            throw new ArgumentException("Void reason cannot be empty.", nameof(voidReason));
+
+        Status = CareRequestStatus.Voided;
+        VoidReason = voidReason;
+        VoidedAtUtc = voidedAtUtc;
+        UpdatedAtUtc = voidedAtUtc;
     }
 
     public void AssignNurse(Guid nurseUserId, DateTime assignedAtUtc)

@@ -2,8 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using NursingCareBackend.Application.AdminPortal.Queries;
 using NursingCareBackend.Application.AdminPortal.Shifts;
 using NursingCareBackend.Domain.CareRequests;
-using NursingCareBackend.Domain.Payroll;
 using NursingCareBackend.Domain.Identity;
+using NursingCareBackend.Domain.Payroll;
 using NursingCareBackend.Infrastructure.Persistence;
 
 namespace NursingCareBackend.Infrastructure.AdminPortal;
@@ -112,6 +112,31 @@ public sealed class AdminCareRequestRepository : IAdminCareRequestRepository
 
     var shiftSummaries = BuildShiftSummaries(shiftEntities, shiftChangeEntities, users);
 
+    // Load billing info (PaymentValidation + Receipt)
+    var paymentValidation = await _dbContext.PaymentValidations
+      .AsNoTracking()
+      .FirstOrDefaultAsync(pv => pv.CareRequestId == careRequest.Id, cancellationToken);
+
+    var receipt = await _dbContext.Receipts
+      .AsNoTracking()
+      .FirstOrDefaultAsync(r => r.CareRequestId == careRequest.Id, cancellationToken);
+
+    AdminCareRequestBillingInfo? billingInfo = null;
+    if (careRequest.InvoicedAtUtc.HasValue || careRequest.VoidedAtUtc.HasValue)
+    {
+      billingInfo = new AdminCareRequestBillingInfo(
+        InvoiceNumber: careRequest.InvoiceNumber,
+        InvoicedAtUtc: careRequest.InvoicedAtUtc,
+        PaidAtUtc: careRequest.PaidAtUtc,
+        VoidedAtUtc: careRequest.VoidedAtUtc,
+        VoidReason: careRequest.VoidReason,
+        BankReference: paymentValidation?.BankReference,
+        ValidationDate: paymentValidation?.ValidatedAtUtc,
+        ReceiptNumber: receipt?.ReceiptNumber,
+        ReceiptId: receipt?.Id,
+        ReceiptGeneratedAtUtc: receipt?.GeneratedAtUtc);
+    }
+
     return new AdminCareRequestDetail(
       Id: careRequest.Id,
       ClientUserId: careRequest.UserID,
@@ -143,7 +168,8 @@ public sealed class AdminCareRequestRepository : IAdminCareRequestRepository
       PricingBreakdown: BuildPricingBreakdown(careRequest),
       PayrollCompensation: serviceExecution is null ? null : BuildPayrollCompensation(serviceExecution),
       Shifts: shiftSummaries,
-      Timeline: BuildTimeline(careRequest));
+      Timeline: BuildTimeline(careRequest),
+      BillingInfo: billingInfo);
   }
 
   public async Task<IReadOnlyList<AdminCareRequestClientOption>> GetActiveClientOptionsAsync(
