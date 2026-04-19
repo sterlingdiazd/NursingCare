@@ -36,7 +36,7 @@ public sealed class AdminReportsApiTests : IClassFixture<CustomWebApplicationFac
 
         var pendingId = await CreateCareRequestAsClientAsync(firstClientToken, "Pending Request");
         var approvedId = await CreateCareRequestAsClientAsync(secondClientToken, "Approved Request");
-        
+
         await AssignCareRequestAsync(approvedId, activeNurseUserId);
         await ApproveCareRequestAsync(approvedId);
 

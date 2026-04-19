@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NursingCareBackend.Infrastructure.Persistence;
 
@@ -11,9 +12,11 @@ using NursingCareBackend.Infrastructure.Persistence;
 namespace NursingCareBackend.Infrastructure.Migrations
 {
     [DbContext(typeof(NursingCareDbContext))]
-    partial class NursingCareDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260419213417_AddBillingFieldsToCareRequest")]
+    partial class AddBillingFieldsToCareRequest
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -149,8 +152,7 @@ namespace NursingCareBackend.Infrastructure.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("BankReference")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("CancelledAtUtc")
                         .HasColumnType("datetime2");
@@ -195,8 +197,7 @@ namespace NursingCareBackend.Infrastructure.Migrations
                         .HasColumnType("decimal(10,4)");
 
                     b.Property<string>("InvoiceNumber")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("InvoicedAtUtc")
                         .HasColumnType("datetime2");
@@ -221,8 +222,7 @@ namespace NursingCareBackend.Infrastructure.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<string>("ReceiptNumber")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("RejectedAtUtc")
                         .HasColumnType("datetime2");
@@ -260,8 +260,7 @@ namespace NursingCareBackend.Infrastructure.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("VoidReason")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("VoidedAtUtc")
                         .HasColumnType("datetime2");

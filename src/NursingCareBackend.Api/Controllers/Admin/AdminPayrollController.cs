@@ -35,7 +35,12 @@ public sealed class AdminPayrollController : ControllerBase
     private Guid GetAdminUserId()
     {
         var claim = User.FindFirst(ClaimTypes.NameIdentifier);
-        return claim != null ? Guid.Parse(claim.Value) : Guid.Empty;
+        if (claim is null || !Guid.TryParse(claim.Value, out var userId))
+        {
+            throw new UnauthorizedAccessException("Admin user identity claim is missing or invalid.");
+        }
+
+        return userId;
     }
 
     // GET /api/admin/payroll/periods
@@ -280,14 +285,14 @@ public sealed class AdminPayrollController : ControllerBase
         var openPeriods = await _repository.GetPeriodsAsync(
             new AdminPayrollPeriodListFilter(1, 1, "Open"),
             cancellationToken);
-        
+
         var closedPeriods = await _repository.GetPeriodsAsync(
             new AdminPayrollPeriodListFilter(1, 5, "Closed"),
             cancellationToken);
 
         decimal currentTotal = 0;
         var allNurseIds = new List<Guid>();
-        
+
         if (openPeriods.Items.FirstOrDefault() is var openPeriod && openPeriod != null)
         {
             var lines = await _repository.GetPeriodLinesAsync(openPeriod.Id, cancellationToken);
@@ -327,9 +332,6 @@ public sealed class AdminPayrollController : ControllerBase
         CancellationToken cancellationToken)
     {
         var adminId = GetAdminUserId();
-        if (adminId == Guid.Empty)
-            return this.ProblemResponse(StatusCodes.Status400BadRequest, "Sin identidad", "No se pudo determinar el usuario administrador.");
-
         var result = await _recalculationService.RecalculateAsync(adminId, request, cancellationToken);
         return Ok(result);
     }
@@ -344,9 +346,6 @@ public sealed class AdminPayrollController : ControllerBase
         CancellationToken cancellationToken)
     {
         var adminId = GetAdminUserId();
-        if (adminId == Guid.Empty)
-            return this.ProblemResponse(StatusCodes.Status400BadRequest, "Sin identidad", "No se pudo determinar el usuario administrador.");
-
         var requestWithLineId = request with { LineId = lineId };
 
         try
@@ -370,16 +369,13 @@ public sealed class AdminPayrollController : ControllerBase
         CancellationToken cancellationToken)
     {
         var adminId = GetAdminUserId();
-        if (adminId == Guid.Empty)
-            return this.ProblemResponse(StatusCodes.Status400BadRequest, "Sin identidad", "No se pudo determinar el usuario administrador.");
-
         var (found, error) = await _overrideRepository.ApproveOverrideAsync(lineId, adminId, DateTime.UtcNow, cancellationToken);
 
         if (!found)
             return this.ProblemResponse(StatusCodes.Status404NotFound, "Override no encontrado", $"No hay una solicitud de compensacion pendiente para la linea '{lineId}'.");
 
         if (error is not null)
-            return this.ProblemResponse(StatusCodes.Status403Forbidden, "No autorizado", "Not authorized to approve this override.");
+            return this.ProblemResponse(StatusCodes.Status403Forbidden, "No autorizado", error);
 
         return NoContent();
     }

@@ -10,272 +10,272 @@ namespace NursingCareBackend.Application.AdminPortal.Users;
 
 public sealed class AdminUserManagementService : IAdminUserManagementService
 {
-  private static readonly HashSet<string> SupportedRoles = new(
-    [SystemRoles.Admin, SystemRoles.Client, SystemRoles.Nurse],
-    StringComparer.OrdinalIgnoreCase);
+    private static readonly HashSet<string> SupportedRoles = new(
+      [SystemRoles.Admin, SystemRoles.Client, SystemRoles.Nurse],
+      StringComparer.OrdinalIgnoreCase);
 
-  private readonly IUserRepository _userRepository;
-  private readonly IRoleRepository _roleRepository;
-  private readonly IRefreshTokenRepository _refreshTokenRepository;
-  private readonly IAdminUserManagementRepository _adminUserManagementRepository;
-  private readonly IAdminAuditService _adminAuditService;
-  private readonly IAdminNotificationPublisher _notifications;
+    private readonly IUserRepository _userRepository;
+    private readonly IRoleRepository _roleRepository;
+    private readonly IRefreshTokenRepository _refreshTokenRepository;
+    private readonly IAdminUserManagementRepository _adminUserManagementRepository;
+    private readonly IAdminAuditService _adminAuditService;
+    private readonly IAdminNotificationPublisher _notifications;
 
-  public AdminUserManagementService(
-    IUserRepository userRepository,
-    IRoleRepository roleRepository,
-    IRefreshTokenRepository refreshTokenRepository,
-    IAdminUserManagementRepository adminUserManagementRepository,
-    IAdminAuditService adminAuditService,
-    IAdminNotificationPublisher notifications)
-  {
-    _userRepository = userRepository;
-    _roleRepository = roleRepository;
-    _refreshTokenRepository = refreshTokenRepository;
-    _adminUserManagementRepository = adminUserManagementRepository;
-    _adminAuditService = adminAuditService;
-    _notifications = notifications;
-  }
-
-  public async Task<AdminUserDetail> UpdateIdentityAsync(
-    Guid userId,
-    AdminUserIdentityUpdate request,
-    CancellationToken cancellationToken = default)
-  {
-    var user = await GetRequiredUserAsync(userId, cancellationToken);
-    ValidateIdentityUpdate(request);
-
-    var normalizedEmail = request.Email.Trim();
-    var existingUser = await _userRepository.GetByEmailAsync(normalizedEmail, cancellationToken);
-    if (existingUser is not null && existingUser.Id != userId)
+    public AdminUserManagementService(
+      IUserRepository userRepository,
+      IRoleRepository roleRepository,
+      IRefreshTokenRepository refreshTokenRepository,
+      IAdminUserManagementRepository adminUserManagementRepository,
+      IAdminAuditService adminAuditService,
+      IAdminNotificationPublisher notifications)
     {
-      throw new InvalidOperationException("User with this email already exists.");
+        _userRepository = userRepository;
+        _roleRepository = roleRepository;
+        _refreshTokenRepository = refreshTokenRepository;
+        _adminUserManagementRepository = adminUserManagementRepository;
+        _adminAuditService = adminAuditService;
+        _notifications = notifications;
     }
 
-    user.Name = request.Name.Trim();
-    user.LastName = request.LastName.Trim();
-    user.IdentificationNumber = request.IdentificationNumber.Trim();
-    user.Phone = request.Phone.Trim();
-    user.Email = normalizedEmail;
-
-    if (string.IsNullOrWhiteSpace(user.DisplayName))
+    public async Task<AdminUserDetail> UpdateIdentityAsync(
+      Guid userId,
+      AdminUserIdentityUpdate request,
+      CancellationToken cancellationToken = default)
     {
-      user.DisplayName = $"{user.Name} {user.LastName}".Trim();
+        var user = await GetRequiredUserAsync(userId, cancellationToken);
+        ValidateIdentityUpdate(request);
+
+        var normalizedEmail = request.Email.Trim();
+        var existingUser = await _userRepository.GetByEmailAsync(normalizedEmail, cancellationToken);
+        if (existingUser is not null && existingUser.Id != userId)
+        {
+            throw new InvalidOperationException("User with this email already exists.");
+        }
+
+        user.Name = request.Name.Trim();
+        user.LastName = request.LastName.Trim();
+        user.IdentificationNumber = request.IdentificationNumber.Trim();
+        user.Phone = request.Phone.Trim();
+        user.Email = normalizedEmail;
+
+        if (string.IsNullOrWhiteSpace(user.DisplayName))
+        {
+            user.DisplayName = $"{user.Name} {user.LastName}".Trim();
+        }
+
+        await _userRepository.UpdateAsync(user, cancellationToken);
+
+        return await GetRequiredDetailAsync(userId, cancellationToken);
     }
 
-    await _userRepository.UpdateAsync(user, cancellationToken);
-
-    return await GetRequiredDetailAsync(userId, cancellationToken);
-  }
-
-  public async Task<AdminUserDetail> UpdateRolesAsync(
-    Guid userId,
-    IReadOnlyCollection<string> roleNames,
-    Guid? actorUserId,
-    CancellationToken cancellationToken = default)
-  {
-    var user = await GetRequiredUserAsync(userId, cancellationToken);
-    var normalizedRoleNames = NormalizeRoleNames(roleNames);
-    var hadAdminRole = user.UserRoles.Any(userRole => string.Equals(
-      userRole.Role.Name,
-      SystemRoles.Admin,
-      StringComparison.OrdinalIgnoreCase));
-
-    if (normalizedRoleNames.Count == 0)
+    public async Task<AdminUserDetail> UpdateRolesAsync(
+      Guid userId,
+      IReadOnlyCollection<string> roleNames,
+      Guid? actorUserId,
+      CancellationToken cancellationToken = default)
     {
-      throw new InvalidOperationException("At least one role is required.");
+        var user = await GetRequiredUserAsync(userId, cancellationToken);
+        var normalizedRoleNames = NormalizeRoleNames(roleNames);
+        var hadAdminRole = user.UserRoles.Any(userRole => string.Equals(
+          userRole.Role.Name,
+          SystemRoles.Admin,
+          StringComparison.OrdinalIgnoreCase));
+
+        if (normalizedRoleNames.Count == 0)
+        {
+            throw new InvalidOperationException("At least one role is required.");
+        }
+
+        if (actorUserId == userId
+          && user.UserRoles.Any(userRole => string.Equals(userRole.Role.Name, SystemRoles.Admin, StringComparison.OrdinalIgnoreCase))
+          && !normalizedRoleNames.Contains(SystemRoles.Admin))
+        {
+            throw new InvalidOperationException("The Admin role cannot be removed from your own account.");
+        }
+
+        ValidateRolePolicy(user, normalizedRoleNames);
+
+        var desiredRoles = new List<Role>();
+        foreach (var roleName in normalizedRoleNames)
+        {
+            var role = await _roleRepository.GetByNameAsync(roleName, cancellationToken);
+            if (role is null)
+            {
+                throw new InvalidOperationException($"Role '{roleName}' not found.");
+            }
+
+            desiredRoles.Add(role);
+        }
+
+        var desiredRoleIds = desiredRoles.Select(role => role.Id).ToHashSet();
+        var removableRoles = user.UserRoles
+          .Where(userRole => !desiredRoleIds.Contains(userRole.RoleId))
+          .ToList();
+
+        foreach (var removableRole in removableRoles)
+        {
+            user.UserRoles.Remove(removableRole);
+        }
+
+        foreach (var desiredRole in desiredRoles)
+        {
+            if (user.UserRoles.Any(userRole => userRole.RoleId == desiredRole.Id))
+            {
+                continue;
+            }
+
+            user.UserRoles.Add(new UserRole
+            {
+                UserId = user.Id,
+                RoleId = desiredRole.Id,
+                Role = desiredRole,
+            });
+        }
+
+        await _userRepository.UpdateAsync(user, cancellationToken);
+
+        if (!hadAdminRole && normalizedRoleNames.Contains(SystemRoles.Admin))
+        {
+            await _adminAuditService.WriteAsync(
+              new AdminAuditRecord(
+                ActorUserId: actorUserId,
+                ActorRole: SystemRoles.Admin,
+                Action: AdminAuditActions.AdminRoleGranted,
+                EntityType: "User",
+                EntityId: user.Id.ToString(),
+                Notes: $"Admin role granted to {user.Email}.",
+                MetadataJson: JsonSerializer.Serialize(new
+                {
+                    email = user.Email,
+                    roleNames = normalizedRoleNames
+                    .OrderBy(roleName => roleName, StringComparer.OrdinalIgnoreCase)
+                    .ToArray()
+                })),
+              cancellationToken);
+        }
+
+        return await GetRequiredDetailAsync(userId, cancellationToken);
     }
 
-    if (actorUserId == userId
-      && user.UserRoles.Any(userRole => string.Equals(userRole.Role.Name, SystemRoles.Admin, StringComparison.OrdinalIgnoreCase))
-      && !normalizedRoleNames.Contains(SystemRoles.Admin))
+    public async Task<AdminUserDetail> UpdateActiveStateAsync(
+      Guid userId,
+      bool isActive,
+      Guid? actorUserId,
+      CancellationToken cancellationToken = default)
     {
-      throw new InvalidOperationException("The Admin role cannot be removed from your own account.");
+        var user = await GetRequiredUserAsync(userId, cancellationToken);
+
+        if (!isActive && actorUserId == userId)
+        {
+            throw new InvalidOperationException("You cannot deactivate your own account.");
+        }
+
+        if (user.IsActive == isActive)
+        {
+            return await GetRequiredDetailAsync(userId, cancellationToken);
+        }
+
+        user.IsActive = isActive;
+        await _userRepository.UpdateAsync(user, cancellationToken);
+
+        if (!isActive)
+        {
+            await _refreshTokenRepository.RevokeActiveTokensForUserAsync(userId, cancellationToken);
+
+            await _notifications.PublishToAdminsAsync(
+              new AdminNotificationPublishRequest(
+                Category: "user_deactivated",
+                Severity: "High",
+                Title: "Cuenta de usuario desactivada",
+                Body: $"La cuenta {user.Email} fue desactivada por administracion.",
+                EntityType: "User",
+                EntityId: user.Id.ToString(),
+                DeepLinkPath: $"/admin/users/{user.Id}",
+                Source: "Administracion",
+                RequiresAction: false),
+              cancellationToken);
+        }
+
+        return await GetRequiredDetailAsync(userId, cancellationToken);
     }
 
-    ValidateRolePolicy(user, normalizedRoleNames);
-
-    var desiredRoles = new List<Role>();
-    foreach (var roleName in normalizedRoleNames)
+    public async Task<AdminUserSessionInvalidationResult> InvalidateSessionsAsync(
+      Guid userId,
+      CancellationToken cancellationToken = default)
     {
-      var role = await _roleRepository.GetByNameAsync(roleName, cancellationToken);
-      if (role is null)
-      {
-        throw new InvalidOperationException($"Role '{roleName}' not found.");
-      }
-
-      desiredRoles.Add(role);
+        await GetRequiredUserAsync(userId, cancellationToken);
+        var revokedCount = await _refreshTokenRepository.RevokeActiveTokensForUserAsync(userId, cancellationToken);
+        return new AdminUserSessionInvalidationResult(userId, revokedCount);
     }
 
-    var desiredRoleIds = desiredRoles.Select(role => role.Id).ToHashSet();
-    var removableRoles = user.UserRoles
-      .Where(userRole => !desiredRoleIds.Contains(userRole.RoleId))
-      .ToList();
-
-    foreach (var removableRole in removableRoles)
+    private async Task<User> GetRequiredUserAsync(Guid userId, CancellationToken cancellationToken)
     {
-      user.UserRoles.Remove(removableRole);
+        if (userId == Guid.Empty)
+        {
+            throw new ArgumentException("User ID cannot be empty.", nameof(userId));
+        }
+
+        var user = await _userRepository.GetByIdAsync(userId, cancellationToken);
+        if (user is null)
+        {
+            throw new KeyNotFoundException($"User with ID {userId} not found.");
+        }
+
+        return user;
     }
 
-    foreach (var desiredRole in desiredRoles)
+    private async Task<AdminUserDetail> GetRequiredDetailAsync(Guid userId, CancellationToken cancellationToken)
     {
-      if (user.UserRoles.Any(userRole => userRole.RoleId == desiredRole.Id))
-      {
-        continue;
-      }
+        var detail = await _adminUserManagementRepository.GetByIdAsync(userId, cancellationToken);
+        if (detail is null)
+        {
+            throw new KeyNotFoundException($"User with ID {userId} not found.");
+        }
 
-      user.UserRoles.Add(new UserRole
-      {
-        UserId = user.Id,
-        RoleId = desiredRole.Id,
-        Role = desiredRole,
-      });
+        return detail;
     }
 
-    await _userRepository.UpdateAsync(user, cancellationToken);
-
-    if (!hadAdminRole && normalizedRoleNames.Contains(SystemRoles.Admin))
+    private static void ValidateIdentityUpdate(AdminUserIdentityUpdate request)
     {
-      await _adminAuditService.WriteAsync(
-        new AdminAuditRecord(
-          ActorUserId: actorUserId,
-          ActorRole: SystemRoles.Admin,
-          Action: AdminAuditActions.AdminRoleGranted,
-          EntityType: "User",
-          EntityId: user.Id.ToString(),
-          Notes: $"Admin role granted to {user.Email}.",
-          MetadataJson: JsonSerializer.Serialize(new
-          {
-            email = user.Email,
-            roleNames = normalizedRoleNames
-              .OrderBy(roleName => roleName, StringComparer.OrdinalIgnoreCase)
-              .ToArray()
-          })),
-        cancellationToken);
+        IdentityInputRules.EnsureTextOnlyRequired(request.Name, nameof(request.Name), "Name");
+        IdentityInputRules.EnsureTextOnlyRequired(request.LastName, nameof(request.LastName), "Last name");
+        IdentityInputRules.EnsureIdentificationNumber(request.IdentificationNumber, nameof(request.IdentificationNumber));
+        IdentityInputRules.EnsurePhone(request.Phone, nameof(request.Phone));
+
+        if (string.IsNullOrWhiteSpace(request.Email))
+        {
+            throw new ArgumentException("Email is required.", nameof(request.Email));
+        }
     }
 
-    return await GetRequiredDetailAsync(userId, cancellationToken);
-  }
-
-  public async Task<AdminUserDetail> UpdateActiveStateAsync(
-    Guid userId,
-    bool isActive,
-    Guid? actorUserId,
-    CancellationToken cancellationToken = default)
-  {
-    var user = await GetRequiredUserAsync(userId, cancellationToken);
-
-    if (!isActive && actorUserId == userId)
+    private static HashSet<string> NormalizeRoleNames(IReadOnlyCollection<string> roleNames)
     {
-      throw new InvalidOperationException("You cannot deactivate your own account.");
+        return roleNames
+          .Where(roleName => !string.IsNullOrWhiteSpace(roleName))
+          .Select(roleName => roleName.Trim())
+          .ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
 
-    if (user.IsActive == isActive)
+    private static void ValidateRolePolicy(User user, IReadOnlyCollection<string> roleNames)
     {
-      return await GetRequiredDetailAsync(userId, cancellationToken);
+        foreach (var roleName in roleNames)
+        {
+            if (!SupportedRoles.Contains(roleName))
+            {
+                throw new InvalidOperationException("The selected role is not supported.");
+            }
+
+            if (string.Equals(roleName, SystemRoles.Nurse, StringComparison.OrdinalIgnoreCase)
+              && user.ProfileType != UserProfileType.NURSE)
+            {
+                throw new InvalidOperationException("The Nurse role can only be assigned to nurse profiles.");
+            }
+
+            if (string.Equals(roleName, SystemRoles.Client, StringComparison.OrdinalIgnoreCase)
+              && user.ProfileType != UserProfileType.CLIENT)
+            {
+                throw new InvalidOperationException("The Client role can only be assigned to client profiles.");
+            }
+        }
     }
-
-    user.IsActive = isActive;
-    await _userRepository.UpdateAsync(user, cancellationToken);
-
-    if (!isActive)
-    {
-      await _refreshTokenRepository.RevokeActiveTokensForUserAsync(userId, cancellationToken);
-
-      await _notifications.PublishToAdminsAsync(
-        new AdminNotificationPublishRequest(
-          Category: "user_deactivated",
-          Severity: "High",
-          Title: "Cuenta de usuario desactivada",
-          Body: $"La cuenta {user.Email} fue desactivada por administracion.",
-          EntityType: "User",
-          EntityId: user.Id.ToString(),
-          DeepLinkPath: $"/admin/users/{user.Id}",
-          Source: "Administracion",
-          RequiresAction: false),
-        cancellationToken);
-    }
-
-    return await GetRequiredDetailAsync(userId, cancellationToken);
-  }
-
-  public async Task<AdminUserSessionInvalidationResult> InvalidateSessionsAsync(
-    Guid userId,
-    CancellationToken cancellationToken = default)
-  {
-    await GetRequiredUserAsync(userId, cancellationToken);
-    var revokedCount = await _refreshTokenRepository.RevokeActiveTokensForUserAsync(userId, cancellationToken);
-    return new AdminUserSessionInvalidationResult(userId, revokedCount);
-  }
-
-  private async Task<User> GetRequiredUserAsync(Guid userId, CancellationToken cancellationToken)
-  {
-    if (userId == Guid.Empty)
-    {
-      throw new ArgumentException("User ID cannot be empty.", nameof(userId));
-    }
-
-    var user = await _userRepository.GetByIdAsync(userId, cancellationToken);
-    if (user is null)
-    {
-      throw new KeyNotFoundException($"User with ID {userId} not found.");
-    }
-
-    return user;
-  }
-
-  private async Task<AdminUserDetail> GetRequiredDetailAsync(Guid userId, CancellationToken cancellationToken)
-  {
-    var detail = await _adminUserManagementRepository.GetByIdAsync(userId, cancellationToken);
-    if (detail is null)
-    {
-      throw new KeyNotFoundException($"User with ID {userId} not found.");
-    }
-
-    return detail;
-  }
-
-  private static void ValidateIdentityUpdate(AdminUserIdentityUpdate request)
-  {
-    IdentityInputRules.EnsureTextOnlyRequired(request.Name, nameof(request.Name), "Name");
-    IdentityInputRules.EnsureTextOnlyRequired(request.LastName, nameof(request.LastName), "Last name");
-    IdentityInputRules.EnsureIdentificationNumber(request.IdentificationNumber, nameof(request.IdentificationNumber));
-    IdentityInputRules.EnsurePhone(request.Phone, nameof(request.Phone));
-
-    if (string.IsNullOrWhiteSpace(request.Email))
-    {
-      throw new ArgumentException("Email is required.", nameof(request.Email));
-    }
-  }
-
-  private static HashSet<string> NormalizeRoleNames(IReadOnlyCollection<string> roleNames)
-  {
-    return roleNames
-      .Where(roleName => !string.IsNullOrWhiteSpace(roleName))
-      .Select(roleName => roleName.Trim())
-      .ToHashSet(StringComparer.OrdinalIgnoreCase);
-  }
-
-  private static void ValidateRolePolicy(User user, IReadOnlyCollection<string> roleNames)
-  {
-    foreach (var roleName in roleNames)
-    {
-      if (!SupportedRoles.Contains(roleName))
-      {
-        throw new InvalidOperationException("The selected role is not supported.");
-      }
-
-      if (string.Equals(roleName, SystemRoles.Nurse, StringComparison.OrdinalIgnoreCase)
-        && user.ProfileType != UserProfileType.NURSE)
-      {
-        throw new InvalidOperationException("The Nurse role can only be assigned to nurse profiles.");
-      }
-
-      if (string.Equals(roleName, SystemRoles.Client, StringComparison.OrdinalIgnoreCase)
-        && user.ProfileType != UserProfileType.CLIENT)
-      {
-        throw new InvalidOperationException("The Client role can only be assigned to client profiles.");
-      }
-    }
-  }
 }

@@ -45,6 +45,16 @@ public sealed class CareRequest
     public DateTime? CancelledAtUtc { get; private set; }
     public string? RejectionReason { get; private set; }
 
+    // Billing fields
+    public string? InvoiceNumber { get; private set; }
+    public DateTime? InvoicedAtUtc { get; private set; }
+    public string? BankReference { get; private set; }
+    public DateTime? PaidAtUtc { get; private set; }
+    public string? VoidReason { get; private set; }
+    public DateTime? VoidedAtUtc { get; private set; }
+    public string? ReceiptNumber { get; private set; }
+    public DateTime? ReceiptGeneratedAtUtc { get; private set; }
+
     private CareRequest() { } // For ORM
 
     private CareRequest(
@@ -256,6 +266,57 @@ public sealed class CareRequest
 
         AssignedNurse = nurseUserId;
         UpdatedAtUtc = assignedAtUtc;
+    }
+
+    public void MarkAsInvoiced(string invoiceNumber, DateTime invoicedAtUtc)
+    {
+        if (Status != CareRequestStatus.Completed)
+            throw new InvalidOperationException("Solo se puede facturar una solicitud completada.");
+        if (string.IsNullOrWhiteSpace(invoiceNumber))
+            throw new ArgumentException("El número de factura es requerido.", nameof(invoiceNumber));
+
+        Status = CareRequestStatus.Invoiced;
+        InvoiceNumber = invoiceNumber;
+        InvoicedAtUtc = invoicedAtUtc;
+        UpdatedAtUtc = invoicedAtUtc;
+    }
+
+    public void RecordPayment(string bankReference, DateTime paidAtUtc)
+    {
+        if (Status != CareRequestStatus.Invoiced)
+            throw new InvalidOperationException("Solo se puede registrar pago en una solicitud facturada.");
+        if (string.IsNullOrWhiteSpace(bankReference))
+            throw new ArgumentException("La referencia bancaria es requerida.", nameof(bankReference));
+
+        Status = CareRequestStatus.Paid;
+        BankReference = bankReference;
+        PaidAtUtc = paidAtUtc;
+        UpdatedAtUtc = paidAtUtc;
+    }
+
+    public void VoidRequest(string voidReason, DateTime voidedAtUtc)
+    {
+        if (Status != CareRequestStatus.Invoiced && Status != CareRequestStatus.Paid)
+            throw new InvalidOperationException("Solo se puede anular una solicitud facturada o pagada.");
+        if (string.IsNullOrWhiteSpace(voidReason))
+            throw new ArgumentException("El motivo de anulación es requerido.", nameof(voidReason));
+
+        Status = CareRequestStatus.Voided;
+        VoidReason = voidReason;
+        VoidedAtUtc = voidedAtUtc;
+        UpdatedAtUtc = voidedAtUtc;
+    }
+
+    public string GenerateReceipt(DateTime generatedAtUtc)
+    {
+        if (Status != CareRequestStatus.Paid)
+            throw new InvalidOperationException("Solo se puede generar recibo para una solicitud pagada.");
+
+        var receiptNum = $"R-{Id.ToString("N")[..8].ToUpperInvariant()}-{generatedAtUtc:yyyyMMdd}";
+        ReceiptNumber = receiptNum;
+        ReceiptGeneratedAtUtc = generatedAtUtc;
+        UpdatedAtUtc = generatedAtUtc;
+        return receiptNum;
     }
 
     private void EnsurePending(string actionName)

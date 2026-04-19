@@ -6,29 +6,29 @@ namespace NursingCareBackend.Infrastructure.AdminPortal;
 
 public sealed class AdminAuditService : IAdminAuditService
 {
-  private readonly NursingCareDbContext _dbContext;
+    private readonly NursingCareDbContext _dbContext;
 
-  public AdminAuditService(NursingCareDbContext dbContext)
-  {
-    _dbContext = dbContext;
-  }
-
-  public async Task WriteAsync(AdminAuditRecord record, CancellationToken cancellationToken = default)
-  {
-    var auditLog = new AuditLog
+    public AdminAuditService(NursingCareDbContext dbContext)
     {
-      Id = Guid.NewGuid(),
-      ActorUserId = record.ActorUserId,
-      ActorRole = record.ActorRole.Trim(),
-      Action = record.Action.Trim(),
-      EntityType = record.EntityType.Trim(),
-      EntityId = record.EntityId.Trim(),
-      Notes = string.IsNullOrWhiteSpace(record.Notes) ? null : record.Notes.Trim(),
-      MetadataJson = string.IsNullOrWhiteSpace(record.MetadataJson) ? null : record.MetadataJson,
-      CreatedAtUtc = DateTime.UtcNow
-    };
+        _dbContext = dbContext;
+    }
 
-    _dbContext.AuditLogs.Add(auditLog);
-    await _dbContext.SaveChangesAsync(cancellationToken);
-  }
+    public async Task WriteAsync(AdminAuditRecord record, CancellationToken cancellationToken = default)
+    {
+        var auditLog = new AuditLog
+        {
+            Id = Guid.NewGuid(),
+            ActorUserId = record.ActorUserId,
+            ActorRole = record.ActorRole.Trim(),
+            Action = record.Action.Trim(),
+            EntityType = record.EntityType.Trim(),
+            EntityId = record.EntityId.Trim(),
+            Notes = string.IsNullOrWhiteSpace(record.Notes) ? null : record.Notes.Trim(),
+            MetadataJson = string.IsNullOrWhiteSpace(record.MetadataJson) ? null : record.MetadataJson,
+            CreatedAtUtc = DateTime.UtcNow
+        };
+
+        _dbContext.AuditLogs.Add(auditLog);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
 }

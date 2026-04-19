@@ -32,7 +32,7 @@ public sealed class AdminShiftRepository : IAdminShiftRepository
             var endDateTime = filter.EndDate.Value.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc);
             query = query.Where(s => s.ScheduledStartUtc <= endDateTime);
         }
-        if (!string.IsNullOrWhiteSpace(filter.Status) 
+        if (!string.IsNullOrWhiteSpace(filter.Status)
             && Enum.TryParse<ShiftRecordStatus>(filter.Status, ignoreCase: true, out var status))
             query = query.Where(s => s.Status == status);
 
@@ -52,8 +52,8 @@ public sealed class AdminShiftRepository : IAdminShiftRepository
                 s.Id,
                 s.CareRequestId,
                 s.NurseUserId ?? Guid.Empty,
-                s.NurseUserId.HasValue 
-                    ? nurseLookup.GetValueOrDefault(s.NurseUserId.Value, s.NurseUserId.Value.ToString()) 
+                s.NurseUserId.HasValue
+                    ? nurseLookup.GetValueOrDefault(s.NurseUserId.Value, s.NurseUserId.Value.ToString())
                     : "Sin asignar",
                 s.ScheduledStartUtc?.ToString("o") ?? "",
                 s.ScheduledEndUtc?.ToString("o"),
@@ -76,7 +76,7 @@ public sealed class AdminShiftRepository : IAdminShiftRepository
         var nurseLookup = shift.NurseUserId.HasValue
             ? await BuildNurseLookupAsync(new[] { shift.NurseUserId!.Value }, cancellationToken)
             : new Dictionary<Guid, string>();
-        
+
         var changes = await GetShiftChangesAsync(shiftId, cancellationToken);
 
         return new AdminShiftRecordDetail(
@@ -108,7 +108,7 @@ public sealed class AdminShiftRepository : IAdminShiftRepository
             .Distinct()
             .ToList();
 
-        var nurseLookup = allNurseIds.Count > 0 
+        var nurseLookup = allNurseIds.Count > 0
             ? await BuildNurseLookupAsync(allNurseIds, cancellationToken)
             : new Dictionary<Guid, string>();
 
@@ -116,12 +116,12 @@ public sealed class AdminShiftRepository : IAdminShiftRepository
             .Select(c => new AdminShiftChangeItem(
                 c.Id,
                 c.PreviousNurseUserId,
-                c.PreviousNurseUserId.HasValue 
-                    ? nurseLookup.GetValueOrDefault(c.PreviousNurseUserId.Value, c.PreviousNurseUserId.Value.ToString()) 
+                c.PreviousNurseUserId.HasValue
+                    ? nurseLookup.GetValueOrDefault(c.PreviousNurseUserId.Value, c.PreviousNurseUserId.Value.ToString())
                     : null,
                 c.NewNurseUserId,
-                c.NewNurseUserId.HasValue 
-                    ? nurseLookup.GetValueOrDefault(c.NewNurseUserId.Value, c.NewNurseUserId.Value.ToString()) 
+                c.NewNurseUserId.HasValue
+                    ? nurseLookup.GetValueOrDefault(c.NewNurseUserId.Value, c.NewNurseUserId.Value.ToString())
                     : null,
                 c.Reason,
                 c.EffectiveAtUtc,

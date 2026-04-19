@@ -9,211 +9,298 @@ namespace NursingCareBackend.Application.Tests;
 
 public sealed class TransitionCareRequestHandlerTests
 {
-  private static readonly Guid AssignedNurseId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+    private static readonly Guid AssignedNurseId = Guid.Parse("11111111-1111-1111-1111-111111111111");
 
-  private static CareRequest CreateDomicilioSample(
-    Guid userId,
-    string description,
-    DateOnly? careRequestDate = null)
-  {
-    return CareRequest.Create(new CareRequestCreateParams
+    private static CareRequest CreateDomicilioSample(
+      Guid userId,
+      string description,
+      DateOnly? careRequestDate = null)
     {
-      UserID = userId,
-      Description = description,
-      CareRequestReason = null,
-      CareRequestType = "domicilio_24h",
-      UnitType = "dia_completo",
-      SuggestedNurse = null,
-      AssignedNurse = AssignedNurseId,
-      Unit = 1,
-      Price = 3500m,
-      Total = 4200m,
-      ClientBasePrice = null,
-      DistanceFactor = "local",
-      ComplexityLevel = "estandar",
-      MedicalSuppliesCost = null,
-      CareRequestDate = careRequestDate,
-      PricingCategoryCode = "domicilio",
-      CategoryFactorSnapshot = 1.2m,
-      DistanceFactorMultiplierSnapshot = 1.0m,
-      ComplexityMultiplierSnapshot = 1.0m,
-      VolumeDiscountPercentSnapshot = 0,
-      LineBeforeVolumeDiscount = null,
-      UnitPriceAfterVolumeDiscount = null,
-      SubtotalBeforeSupplies = null,
-      CreatedAtUtc = DateTime.UtcNow,
-    });
-  }
-
-  [Fact]
-  public async Task Handle_Should_Approve_And_Persist_Pending_Request()
-  {
-    var careRequest = CreateDomicilioSample(Guid.NewGuid(), "Approve me");
-    var repository = new FakeCareRequestRepository(careRequest);
-    var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher(), new FakePayrollCompensationService(), new FakeAdminAuditService());
-
-    var result = await handler.Handle(
-      new TransitionCareRequestCommand(careRequest.Id, CareRequestTransitionAction.Approve),
-      CancellationToken.None);
-
-    Assert.Equal(CareRequestStatus.Approved, result.Status);
-    Assert.NotNull(result.ApprovedAtUtc);
-    Assert.Same(careRequest, repository.UpdatedCareRequest);
-  }
-
-  [Fact]
-  public async Task Handle_Should_Reject_And_Persist_Pending_Request()
-  {
-    var careRequest = CreateDomicilioSample(Guid.NewGuid(), "Reject me");
-    var repository = new FakeCareRequestRepository(careRequest);
-    var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher(), new FakePayrollCompensationService(), new FakeAdminAuditService());
-
-    var result = await handler.Handle(
-      new TransitionCareRequestCommand(careRequest.Id, CareRequestTransitionAction.Reject),
-      CancellationToken.None);
-
-    Assert.Equal(CareRequestStatus.Rejected, result.Status);
-    Assert.NotNull(result.RejectedAtUtc);
-    Assert.Same(careRequest, repository.UpdatedCareRequest);
-  }
-
-  [Fact]
-  public async Task Handle_Should_Complete_And_Persist_Approved_Request()
-  {
-    var careRequest = CreateDomicilioSample(Guid.NewGuid(), "Complete me");
-    careRequest.Approve(DateTime.UtcNow.AddMinutes(-5));
-
-    var repository = new FakeCareRequestRepository(careRequest);
-    var payrollService = new FakePayrollCompensationService();
-    var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher(), payrollService, new FakeAdminAuditService());
-
-    var result = await handler.Handle(
-      new TransitionCareRequestCommand(careRequest.Id, CareRequestTransitionAction.Complete, AssignedNurseId),
-      CancellationToken.None);
-
-    Assert.Equal(CareRequestStatus.Completed, result.Status);
-    Assert.NotNull(result.CompletedAtUtc);
-    Assert.Same(careRequest, repository.UpdatedCareRequest);
-    Assert.Equal(careRequest.Id, payrollService.LastRecordedCareRequestId);
-  }
-
-  [Fact]
-  public async Task Handle_Should_Throw_When_Completion_Date_Is_In_The_Future()
-  {
-    var careRequest = CreateDomicilioSample(
-      Guid.NewGuid(),
-      "Future completion",
-      DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)));
-    careRequest.Approve(DateTime.UtcNow.AddMinutes(-5));
-
-    var repository = new FakeCareRequestRepository(careRequest);
-    var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher(), new FakePayrollCompensationService(), new FakeAdminAuditService());
-
-    var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => handler.Handle(
-      new TransitionCareRequestCommand(careRequest.Id, CareRequestTransitionAction.Complete, AssignedNurseId),
-      CancellationToken.None));
-
-    Assert.Contains("cannot be completed before its scheduled care-request date", exception.Message);
-  }
-
-  [Fact]
-  public async Task Handle_Should_Throw_When_Request_Does_Not_Exist()
-  {
-    var repository = new FakeCareRequestRepository();
-    var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher(), new FakePayrollCompensationService(), new FakeAdminAuditService());
-
-    var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() => handler.Handle(
-      new TransitionCareRequestCommand(Guid.NewGuid(), CareRequestTransitionAction.Approve),
-      CancellationToken.None));
-
-    Assert.Contains("was not found", exception.Message);
-  }
-
-  private sealed class FakeCareRequestRepository : ICareRequestRepository
-  {
-    private readonly Dictionary<Guid, CareRequest> _items = new();
-
-    public FakeCareRequestRepository(params CareRequest[] careRequests)
-    {
-      foreach (var careRequest in careRequests)
-      {
-        _items[careRequest.Id] = careRequest;
-      }
+        return CareRequest.Create(new CareRequestCreateParams
+        {
+            UserID = userId,
+            Description = description,
+            CareRequestReason = null,
+            CareRequestType = "domicilio_24h",
+            UnitType = "dia_completo",
+            SuggestedNurse = null,
+            AssignedNurse = AssignedNurseId,
+            Unit = 1,
+            Price = 3500m,
+            Total = 4200m,
+            ClientBasePrice = null,
+            DistanceFactor = "local",
+            ComplexityLevel = "estandar",
+            MedicalSuppliesCost = null,
+            CareRequestDate = careRequestDate,
+            PricingCategoryCode = "domicilio",
+            CategoryFactorSnapshot = 1.2m,
+            DistanceFactorMultiplierSnapshot = 1.0m,
+            ComplexityMultiplierSnapshot = 1.0m,
+            VolumeDiscountPercentSnapshot = 0,
+            LineBeforeVolumeDiscount = null,
+            UnitPriceAfterVolumeDiscount = null,
+            SubtotalBeforeSupplies = null,
+            CreatedAtUtc = DateTime.UtcNow,
+        });
     }
 
-    public CareRequest? UpdatedCareRequest { get; private set; }
-
-    public Task AddAsync(CareRequest careRequest, CancellationToken cancellationToken)
+    [Fact]
+    public async Task Handle_Should_Approve_And_Persist_Pending_Request()
     {
-      _items[careRequest.Id] = careRequest;
-      return Task.CompletedTask;
+        var careRequest = CreateDomicilioSample(Guid.NewGuid(), "Approve me");
+        var repository = new FakeCareRequestRepository(careRequest);
+        var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher(), new FakePayrollCompensationService(), new FakeAdminAuditService());
+
+        var result = await handler.Handle(
+          new TransitionCareRequestCommand(careRequest.Id, CareRequestTransitionAction.Approve),
+          CancellationToken.None);
+
+        Assert.Equal(CareRequestStatus.Approved, result.Status);
+        Assert.NotNull(result.ApprovedAtUtc);
+        Assert.Same(careRequest, repository.UpdatedCareRequest);
     }
 
-    public Task<IReadOnlyList<CareRequest>> GetAllAsync(CareRequestAccessScope scope, CancellationToken cancellationToken)
+    [Fact]
+    public async Task Handle_Should_Reject_And_Persist_Pending_Request()
     {
-      var items = _items.Values
-        .Where(careRequest =>
-          scope.CreatedByUserId is null || careRequest.UserID == scope.CreatedByUserId.Value)
-        .Where(careRequest =>
-          scope.AssignedNurseUserId is null || careRequest.AssignedNurse == scope.AssignedNurseUserId.Value)
-        .ToList();
+        var careRequest = CreateDomicilioSample(Guid.NewGuid(), "Reject me");
+        var repository = new FakeCareRequestRepository(careRequest);
+        var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher(), new FakePayrollCompensationService(), new FakeAdminAuditService());
 
-      return Task.FromResult<IReadOnlyList<CareRequest>>(items);
+        var result = await handler.Handle(
+          new TransitionCareRequestCommand(careRequest.Id, CareRequestTransitionAction.Reject),
+          CancellationToken.None);
+
+        Assert.Equal(CareRequestStatus.Rejected, result.Status);
+        Assert.NotNull(result.RejectedAtUtc);
+        Assert.Same(careRequest, repository.UpdatedCareRequest);
     }
 
-    public Task<CareRequest?> GetByIdAsync(Guid id, CareRequestAccessScope scope, CancellationToken cancellationToken)
+    [Fact]
+    public async Task Handle_Should_Complete_And_Persist_Approved_Request()
     {
-      if (!_items.TryGetValue(id, out var careRequest))
-      {
-        return Task.FromResult<CareRequest?>(null);
-      }
+        var careRequest = CreateDomicilioSample(Guid.NewGuid(), "Complete me");
+        careRequest.Approve(DateTime.UtcNow.AddMinutes(-5));
 
-      if (scope.CreatedByUserId is not null && careRequest.UserID != scope.CreatedByUserId.Value)
-      {
-        return Task.FromResult<CareRequest?>(null);
-      }
+        var repository = new FakeCareRequestRepository(careRequest);
+        var payrollService = new FakePayrollCompensationService();
+        var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher(), payrollService, new FakeAdminAuditService());
 
-      if (scope.AssignedNurseUserId is not null && careRequest.AssignedNurse != scope.AssignedNurseUserId.Value)
-      {
-        return Task.FromResult<CareRequest?>(null);
-      }
+        var result = await handler.Handle(
+          new TransitionCareRequestCommand(careRequest.Id, CareRequestTransitionAction.Complete, AssignedNurseId),
+          CancellationToken.None);
 
-      return Task.FromResult<CareRequest?>(careRequest);
+        Assert.Equal(CareRequestStatus.Completed, result.Status);
+        Assert.NotNull(result.CompletedAtUtc);
+        Assert.Same(careRequest, repository.UpdatedCareRequest);
+        Assert.Equal(careRequest.Id, payrollService.LastRecordedCareRequestId);
     }
 
-    public Task UpdateAsync(CareRequest careRequest, CancellationToken cancellationToken)
+    [Fact]
+    public async Task Handle_Should_Throw_When_Completion_Date_Is_In_The_Future()
     {
-      UpdatedCareRequest = careRequest;
-      _items[careRequest.Id] = careRequest;
-      return Task.CompletedTask;
+        var careRequest = CreateDomicilioSample(
+          Guid.NewGuid(),
+          "Future completion",
+          DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)));
+        careRequest.Approve(DateTime.UtcNow.AddMinutes(-5));
+
+        var repository = new FakeCareRequestRepository(careRequest);
+        var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher(), new FakePayrollCompensationService(), new FakeAdminAuditService());
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => handler.Handle(
+          new TransitionCareRequestCommand(careRequest.Id, CareRequestTransitionAction.Complete, AssignedNurseId),
+          CancellationToken.None));
+
+        Assert.Contains("cannot be completed before its scheduled care-request date", exception.Message);
     }
 
-    public Task<int> CountByUserAndUnitTypeAsync(
-      Guid clientId,
-      string unitType,
-      CancellationToken cancellationToken)
-      => Task.FromResult(0);
-  }
-
-  private sealed class FakePayrollCompensationService : IPayrollCompensationService
-  {
-    public Guid? LastRecordedCareRequestId { get; private set; }
-
-    public Task RecordExecutionForCompletedCareRequestAsync(CareRequest careRequest, CancellationToken cancellationToken)
+    [Fact]
+    public async Task Handle_Should_Throw_When_Request_Does_Not_Exist()
     {
-      LastRecordedCareRequestId = careRequest.Id;
-      return Task.CompletedTask;
+        var repository = new FakeCareRequestRepository();
+        var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher(), new FakePayrollCompensationService(), new FakeAdminAuditService());
+
+        var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() => handler.Handle(
+          new TransitionCareRequestCommand(Guid.NewGuid(), CareRequestTransitionAction.Approve),
+          CancellationToken.None));
+
+        Assert.Contains("was not found", exception.Message);
     }
-  }
 
-  private sealed class FakeAdminAuditService : IAdminAuditService
-  {
-    public List<AdminAuditRecord> Records { get; } = new();
-
-    public Task WriteAsync(AdminAuditRecord record, CancellationToken cancellationToken = default)
+    [Fact]
+    public async Task Handle_Invoice_ShouldTransitionToInvoiced()
     {
-      Records.Add(record);
-      return Task.CompletedTask;
+        var careRequest = CreateDomicilioSample(Guid.NewGuid(), "Invoice me");
+        careRequest.Approve(DateTime.UtcNow.AddMinutes(-10));
+        careRequest.Complete(DateTime.UtcNow.AddMinutes(-5), AssignedNurseId);
+
+        var repository = new FakeCareRequestRepository(careRequest);
+        var notificationPublisher = new FakeAdminNotificationPublisher();
+        var handler = new TransitionCareRequestHandler(repository, notificationPublisher, new FakePayrollCompensationService(), new FakeAdminAuditService());
+
+        var result = await handler.Handle(
+          new TransitionCareRequestCommand(careRequest.Id, CareRequestTransitionAction.Invoice, InvoiceNumber: "INV-001"),
+          CancellationToken.None);
+
+        Assert.Equal(CareRequestStatus.Invoiced, result.Status);
+        Assert.Equal("INV-001", result.InvoiceNumber);
+        Assert.NotNull(result.InvoicedAtUtc);
+        Assert.Same(careRequest, repository.UpdatedCareRequest);
     }
-  }
+
+    [Fact]
+    public async Task Handle_Pay_ShouldTransitionToPaid()
+    {
+        var careRequest = CreateDomicilioSample(Guid.NewGuid(), "Pay me");
+        careRequest.Approve(DateTime.UtcNow.AddMinutes(-15));
+        careRequest.Complete(DateTime.UtcNow.AddMinutes(-10), AssignedNurseId);
+        careRequest.MarkAsInvoiced("INV-002", DateTime.UtcNow.AddMinutes(-5));
+
+        var repository = new FakeCareRequestRepository(careRequest);
+        var notificationPublisher = new FakeAdminNotificationPublisher();
+        var handler = new TransitionCareRequestHandler(repository, notificationPublisher, new FakePayrollCompensationService(), new FakeAdminAuditService());
+
+        var result = await handler.Handle(
+          new TransitionCareRequestCommand(careRequest.Id, CareRequestTransitionAction.Pay, BankReference: "REF-XYZ-123"),
+          CancellationToken.None);
+
+        Assert.Equal(CareRequestStatus.Paid, result.Status);
+        Assert.Equal("REF-XYZ-123", result.BankReference);
+        Assert.NotNull(result.PaidAtUtc);
+        Assert.Same(careRequest, repository.UpdatedCareRequest);
+    }
+
+    [Fact]
+    public async Task Handle_Void_ShouldTransitionToVoided()
+    {
+        var careRequest = CreateDomicilioSample(Guid.NewGuid(), "Void me");
+        careRequest.Approve(DateTime.UtcNow.AddMinutes(-15));
+        careRequest.Complete(DateTime.UtcNow.AddMinutes(-10), AssignedNurseId);
+        careRequest.MarkAsInvoiced("INV-003", DateTime.UtcNow.AddMinutes(-5));
+
+        var repository = new FakeCareRequestRepository(careRequest);
+        var notificationPublisher = new FakeAdminNotificationPublisher();
+        var handler = new TransitionCareRequestHandler(repository, notificationPublisher, new FakePayrollCompensationService(), new FakeAdminAuditService());
+
+        var result = await handler.Handle(
+          new TransitionCareRequestCommand(careRequest.Id, CareRequestTransitionAction.Void, Reason: "Error en facturacion"),
+          CancellationToken.None);
+
+        Assert.Equal(CareRequestStatus.Voided, result.Status);
+        Assert.Equal("Error en facturacion", result.VoidReason);
+        Assert.NotNull(result.VoidedAtUtc);
+        Assert.Same(careRequest, repository.UpdatedCareRequest);
+    }
+
+    [Fact]
+    public async Task Handle_GenerateReceipt_ShouldSetReceiptNumber()
+    {
+        var careRequest = CreateDomicilioSample(Guid.NewGuid(), "Receipt me");
+        careRequest.Approve(DateTime.UtcNow.AddMinutes(-20));
+        careRequest.Complete(DateTime.UtcNow.AddMinutes(-15), AssignedNurseId);
+        careRequest.MarkAsInvoiced("INV-004", DateTime.UtcNow.AddMinutes(-10));
+        careRequest.RecordPayment("REF-BANK-456", DateTime.UtcNow.AddMinutes(-5));
+
+        var repository = new FakeCareRequestRepository(careRequest);
+        var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher(), new FakePayrollCompensationService(), new FakeAdminAuditService());
+
+        var result = await handler.Handle(
+          new TransitionCareRequestCommand(careRequest.Id, CareRequestTransitionAction.GenerateReceipt),
+          CancellationToken.None);
+
+        Assert.NotNull(result.ReceiptNumber);
+        Assert.NotEmpty(result.ReceiptNumber);
+        Assert.NotNull(result.ReceiptGeneratedAtUtc);
+        Assert.Same(careRequest, repository.UpdatedCareRequest);
+    }
+
+    private sealed class FakeCareRequestRepository : ICareRequestRepository
+    {
+        private readonly Dictionary<Guid, CareRequest> _items = new();
+
+        public FakeCareRequestRepository(params CareRequest[] careRequests)
+        {
+            foreach (var careRequest in careRequests)
+            {
+                _items[careRequest.Id] = careRequest;
+            }
+        }
+
+        public CareRequest? UpdatedCareRequest { get; private set; }
+
+        public Task AddAsync(CareRequest careRequest, CancellationToken cancellationToken)
+        {
+            _items[careRequest.Id] = careRequest;
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyList<CareRequest>> GetAllAsync(CareRequestAccessScope scope, CancellationToken cancellationToken)
+        {
+            var items = _items.Values
+              .Where(careRequest =>
+                scope.CreatedByUserId is null || careRequest.UserID == scope.CreatedByUserId.Value)
+              .Where(careRequest =>
+                scope.AssignedNurseUserId is null || careRequest.AssignedNurse == scope.AssignedNurseUserId.Value)
+              .ToList();
+
+            return Task.FromResult<IReadOnlyList<CareRequest>>(items);
+        }
+
+        public Task<CareRequest?> GetByIdAsync(Guid id, CareRequestAccessScope scope, CancellationToken cancellationToken)
+        {
+            if (!_items.TryGetValue(id, out var careRequest))
+            {
+                return Task.FromResult<CareRequest?>(null);
+            }
+
+            if (scope.CreatedByUserId is not null && careRequest.UserID != scope.CreatedByUserId.Value)
+            {
+                return Task.FromResult<CareRequest?>(null);
+            }
+
+            if (scope.AssignedNurseUserId is not null && careRequest.AssignedNurse != scope.AssignedNurseUserId.Value)
+            {
+                return Task.FromResult<CareRequest?>(null);
+            }
+
+            return Task.FromResult<CareRequest?>(careRequest);
+        }
+
+        public Task UpdateAsync(CareRequest careRequest, CancellationToken cancellationToken)
+        {
+            UpdatedCareRequest = careRequest;
+            _items[careRequest.Id] = careRequest;
+            return Task.CompletedTask;
+        }
+
+        public Task<int> CountByUserAndUnitTypeAsync(
+          Guid clientId,
+          string unitType,
+          CancellationToken cancellationToken)
+          => Task.FromResult(0);
+    }
+
+    private sealed class FakePayrollCompensationService : IPayrollCompensationService
+    {
+        public Guid? LastRecordedCareRequestId { get; private set; }
+
+        public Task RecordExecutionForCompletedCareRequestAsync(CareRequest careRequest, CancellationToken cancellationToken)
+        {
+            LastRecordedCareRequestId = careRequest.Id;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakeAdminAuditService : IAdminAuditService
+    {
+        public List<AdminAuditRecord> Records { get; } = new();
+
+        public Task WriteAsync(AdminAuditRecord record, CancellationToken cancellationToken = default)
+        {
+            Records.Add(record);
+            return Task.CompletedTask;
+        }
+    }
 }

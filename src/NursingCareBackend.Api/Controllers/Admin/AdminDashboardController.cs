@@ -10,20 +10,20 @@ namespace NursingCareBackend.Api.Controllers.Admin;
 [Authorize(Roles = SystemRoles.Admin)]
 public sealed class AdminDashboardController : ControllerBase
 {
-  private readonly GetAdminDashboardHandler _handler;
+    private readonly GetAdminDashboardHandler _handler;
 
-  public AdminDashboardController(GetAdminDashboardHandler handler)
-  {
-    _handler = handler;
-  }
+    public AdminDashboardController(GetAdminDashboardHandler handler)
+    {
+        _handler = handler;
+    }
 
-  [HttpGet]
-  [ProducesResponseType(StatusCodes.Status200OK)]
-  [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-  [ProducesResponseType(StatusCodes.Status403Forbidden)]
-  public async Task<IActionResult> Get(CancellationToken cancellationToken)
-  {
-    var snapshot = await _handler.Handle(cancellationToken);
-    return Ok(snapshot);
-  }
+    [HttpGet]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> Get(CancellationToken cancellationToken)
+    {
+        var snapshot = await _handler.Handle(cancellationToken);
+        return Ok(snapshot);
+    }
 }

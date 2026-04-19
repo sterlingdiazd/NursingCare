@@ -9,110 +9,110 @@ namespace NursingCareBackend.Api.Tests;
 
 public sealed class AdminAccountsApiTests
 {
-  [Fact]
-  public async Task POST_AdminAccounts_Should_Create_Admin_User_And_Write_Audit_Record()
-  {
-    using var factory = new CustomWebApplicationFactory();
-    var adminSession = await CreateBootstrapAdminAsync(factory, $"admin-create-root-{Guid.NewGuid():N}");
-
-    var response = await adminSession.Client.PostAsJsonAsync("/api/admin/admin-accounts", new
+    [Fact]
+    public async Task POST_AdminAccounts_Should_Create_Admin_User_And_Write_Audit_Record()
     {
-      name = "Mariela",
-      lastName = "Rojas",
-      identificationNumber = "00111222333",
-      phone = "8095550199",
-      email = $"admin-creada-{Guid.NewGuid():N}@nursingcare.local",
-      password = "Pass123!",
-      confirmPassword = "Pass123!"
-    });
+        using var factory = new CustomWebApplicationFactory();
+        var adminSession = await CreateBootstrapAdminAsync(factory, $"admin-create-root-{Guid.NewGuid():N}");
 
-    Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var response = await adminSession.Client.PostAsJsonAsync("/api/admin/admin-accounts", new
+        {
+            name = "Mariela",
+            lastName = "Rojas",
+            identificationNumber = "00111222333",
+            phone = "8095550199",
+            email = $"admin-creada-{Guid.NewGuid():N}@nursingcare.local",
+            password = "Pass123!",
+            confirmPassword = "Pass123!"
+        });
 
-    var payload = await response.Content.ReadFromJsonAsync<AdminUserDetailDto>();
-    Assert.NotNull(payload);
-    Assert.Equal("ADMIN", payload!.ProfileType);
-    Assert.Equal("Active", payload.AccountStatus);
-    Assert.Equal(new[] { "ADMIN" }, payload.RoleNames);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-    using var scope = factory.Services.CreateScope();
-    var dbContext = scope.ServiceProvider.GetRequiredService<NursingCareDbContext>();
+        var payload = await response.Content.ReadFromJsonAsync<AdminUserDetailDto>();
+        Assert.NotNull(payload);
+        Assert.Equal("ADMIN", payload!.ProfileType);
+        Assert.Equal("Active", payload.AccountStatus);
+        Assert.Equal(new[] { "ADMIN" }, payload.RoleNames);
 
-    var createdUser = await dbContext.Users
-      .Include(user => user.UserRoles)
-      .ThenInclude(userRole => userRole.Role)
-      .SingleAsync(user => user.Id == payload.Id);
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<NursingCareDbContext>();
 
-    Assert.Equal(payload.Email, createdUser.Email);
-    Assert.Contains(createdUser.UserRoles, userRole => userRole.Role.Name == "ADMIN");
+        var createdUser = await dbContext.Users
+          .Include(user => user.UserRoles)
+          .ThenInclude(userRole => userRole.Role)
+          .SingleAsync(user => user.Id == payload.Id);
 
-    var auditLog = await dbContext.AuditLogs
-      .SingleAsync(item => item.Action == "AdminAccountCreated" && item.EntityId == payload.Id.ToString());
+        Assert.Equal(payload.Email, createdUser.Email);
+        Assert.Contains(createdUser.UserRoles, userRole => userRole.Role.Name == "ADMIN");
 
-    Assert.Equal(adminSession.UserId, auditLog.ActorUserId);
-    Assert.Equal("ADMIN", auditLog.ActorRole);
-  }
+        var auditLog = await dbContext.AuditLogs
+          .SingleAsync(item => item.Action == "AdminAccountCreated" && item.EntityId == payload.Id.ToString());
 
-  [Fact]
-  public async Task POST_AdminAccounts_Should_Reject_Non_Admin_Users()
-  {
-    using var factory = new CustomWebApplicationFactory();
-    var client = factory.CreateClient();
-    var email = $"admin-account-forbidden-{Guid.NewGuid():N}@nursingcare.local";
+        Assert.Equal(adminSession.UserId, auditLog.ActorUserId);
+        Assert.Equal("ADMIN", auditLog.ActorRole);
+    }
 
-    var registerResponse = await client.PostAsJsonAsync("/api/auth/register", new
+    [Fact]
+    public async Task POST_AdminAccounts_Should_Reject_Non_Admin_Users()
     {
-      name = "Luisa",
-      lastName = "Perez",
-      identificationNumber = "00133445566",
-      phone = "8095550166",
-      email,
-      password = "Pass123!",
-      confirmPassword = "Pass123!"
-    });
+        using var factory = new CustomWebApplicationFactory();
+        var client = factory.CreateClient();
+        var email = $"admin-account-forbidden-{Guid.NewGuid():N}@nursingcare.local";
 
-    registerResponse.EnsureSuccessStatusCode();
-    var session = await registerResponse.Content.ReadFromJsonAsync<AuthResponseDto>();
+        var registerResponse = await client.PostAsJsonAsync("/api/auth/register", new
+        {
+            name = "Luisa",
+            lastName = "Perez",
+            identificationNumber = "00133445566",
+            phone = "8095550166",
+            email,
+            password = "Pass123!",
+            confirmPassword = "Pass123!"
+        });
 
-    client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", session!.Token);
+        registerResponse.EnsureSuccessStatusCode();
+        var session = await registerResponse.Content.ReadFromJsonAsync<AuthResponseDto>();
 
-    var response = await client.PostAsJsonAsync("/api/admin/admin-accounts", new
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", session!.Token);
+
+        var response = await client.PostAsJsonAsync("/api/admin/admin-accounts", new
+        {
+            name = "Mariela",
+            lastName = "Rojas",
+            identificationNumber = "00111222333",
+            phone = "8095550199",
+            email = $"admin-no-{Guid.NewGuid():N}@nursingcare.local",
+            password = "Pass123!",
+            confirmPassword = "Pass123!"
+        });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    private static async Task<BootstrapAdminSession> CreateBootstrapAdminAsync(
+      CustomWebApplicationFactory factory,
+      string scenario)
     {
-      name = "Mariela",
-      lastName = "Rojas",
-      identificationNumber = "00111222333",
-      phone = "8095550199",
-      email = $"admin-no-{Guid.NewGuid():N}@nursingcare.local",
-      password = "Pass123!",
-      confirmPassword = "Pass123!"
-    });
+        var adminClient = factory.CreateClient();
+        adminClient.DefaultRequestHeaders.Authorization =
+          new AuthenticationHeaderValue("Bearer", JwtTestTokens.CreateAdminToken(factory.Services));
 
-    Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
-  }
+        return new BootstrapAdminSession(adminClient, Guid.Parse("00000000-0000-0000-0000-000000000001"));
+    }
 
-  private static async Task<BootstrapAdminSession> CreateBootstrapAdminAsync(
-    CustomWebApplicationFactory factory,
-    string scenario)
-  {
-    var adminClient = factory.CreateClient();
-    adminClient.DefaultRequestHeaders.Authorization =
-      new AuthenticationHeaderValue("Bearer", JwtTestTokens.CreateAdminToken(factory.Services));
+    private sealed record BootstrapAdminSession(HttpClient Client, Guid UserId);
 
-    return new BootstrapAdminSession(adminClient, Guid.Parse("00000000-0000-0000-0000-000000000001"));
-  }
+    private sealed class AuthResponseDto
+    {
+        public string Token { get; set; } = string.Empty;
+    }
 
-  private sealed record BootstrapAdminSession(HttpClient Client, Guid UserId);
-
-  private sealed class AuthResponseDto
-  {
-    public string Token { get; set; } = string.Empty;
-  }
-
-  private sealed class AdminUserDetailDto
-  {
-    public Guid Id { get; set; }
-    public string Email { get; set; } = string.Empty;
-    public string ProfileType { get; set; } = string.Empty;
-    public string AccountStatus { get; set; } = string.Empty;
-    public string[] RoleNames { get; set; } = [];
-  }
+    private sealed class AdminUserDetailDto
+    {
+        public Guid Id { get; set; }
+        public string Email { get; set; } = string.Empty;
+        public string ProfileType { get; set; } = string.Empty;
+        public string AccountStatus { get; set; } = string.Empty;
+        public string[] RoleNames { get; set; } = [];
+    }
 }

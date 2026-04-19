@@ -75,12 +75,12 @@ public sealed class CatalogOptionsController : ControllerBase
         {
             return $"{name.Trim()} {lastName.Trim()}";
         }
-        
+
         if (!string.IsNullOrWhiteSpace(name))
         {
             return name.Trim();
         }
-        
+
         return email;
     }
 

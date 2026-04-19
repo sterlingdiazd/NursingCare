@@ -12,183 +12,183 @@ namespace NursingCareBackend.Api.Tests;
 
 public sealed class AdminAuditLogApiTests
 {
-  [Fact]
-  public async Task Search_WithoutAuth_Returns401()
-  {
-    using var factory = new CustomWebApplicationFactory();
-    var client = factory.CreateClient();
-
-    var response = await client.GetAsync("/api/admin/audit-logs");
-
-    Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-  }
-
-  [Fact]
-  public async Task Search_WithAdminAuth_ReturnsAuditLogs()
-  {
-    using var factory = new CustomWebApplicationFactory();
-    var adminSession = await CreateBootstrapAdminAsync(factory, $"audit-search-{Guid.NewGuid():N}");
-
-    using var scope = factory.Services.CreateScope();
-    var dbContext = scope.ServiceProvider.GetRequiredService<NursingCareDbContext>();
-
-    var auditLog = new AuditLog
+    [Fact]
+    public async Task Search_WithoutAuth_Returns401()
     {
-      Id = Guid.NewGuid(),
-      ActorUserId = adminSession.UserId,
-      ActorRole = "ADMIN",
-      Action = "TestAction",
-      EntityType = "TestEntity",
-      EntityId = Guid.NewGuid().ToString(),
-      Notes = "Test notes",
-      MetadataJson = "{\"test\":\"data\"}",
-      CreatedAtUtc = DateTime.UtcNow
-    };
+        using var factory = new CustomWebApplicationFactory();
+        var client = factory.CreateClient();
 
-    dbContext.AuditLogs.Add(auditLog);
-    await dbContext.SaveChangesAsync();
+        var response = await client.GetAsync("/api/admin/audit-logs");
 
-    var response = await adminSession.Client.GetAsync("/api/admin/audit-logs");
-
-    Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-    var result = await response.Content.ReadFromJsonAsync<AuditLogSearchResult>();
-    Assert.NotNull(result);
-    Assert.True(result.TotalCount > 0);
-    Assert.Contains(result.Items, item => item.Id == auditLog.Id);
-  }
-
-  [Fact]
-  public async Task Search_WithFilters_ReturnsFilteredResults()
-  {
-    using var factory = new CustomWebApplicationFactory();
-    var adminSession = await CreateBootstrapAdminAsync(factory, $"audit-filter-{Guid.NewGuid():N}");
-
-    using var scope = factory.Services.CreateScope();
-    var dbContext = scope.ServiceProvider.GetRequiredService<NursingCareDbContext>();
-
-    var specificAction = "SpecificTestAction_" + Guid.NewGuid().ToString("N")[..8];
-    var auditLog = new AuditLog
-    {
-      Id = Guid.NewGuid(),
-      ActorUserId = adminSession.UserId,
-      ActorRole = "ADMIN",
-      Action = specificAction,
-      EntityType = "FilterTestEntity",
-      EntityId = Guid.NewGuid().ToString(),
-      Notes = "Filtered test",
-      CreatedAtUtc = DateTime.UtcNow
-    };
-
-    dbContext.AuditLogs.Add(auditLog);
-    await dbContext.SaveChangesAsync();
-
-    var response = await adminSession.Client.GetAsync($"/api/admin/audit-logs?action={specificAction}");
-
-    Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-    var result = await response.Content.ReadFromJsonAsync<AuditLogSearchResult>();
-    Assert.NotNull(result);
-    Assert.True(result.TotalCount > 0);
-    Assert.All(result.Items, item => Assert.Contains(specificAction, item.Action));
-  }
-
-  [Fact]
-  public async Task GetById_WithValidId_ReturnsDetail()
-  {
-    using var factory = new CustomWebApplicationFactory();
-    var adminSession = await CreateBootstrapAdminAsync(factory, $"audit-detail-{Guid.NewGuid():N}");
-
-    using var scope = factory.Services.CreateScope();
-    var dbContext = scope.ServiceProvider.GetRequiredService<NursingCareDbContext>();
-
-    var auditLog = new AuditLog
-    {
-      Id = Guid.NewGuid(),
-      ActorUserId = adminSession.UserId,
-      ActorRole = "ADMIN",
-      Action = "DetailTestAction",
-      EntityType = "DetailTestEntity",
-      EntityId = Guid.NewGuid().ToString(),
-      Notes = "Detail test notes",
-      MetadataJson = "{\"key\":\"value\"}",
-      CreatedAtUtc = DateTime.UtcNow
-    };
-
-    dbContext.AuditLogs.Add(auditLog);
-    await dbContext.SaveChangesAsync();
-
-    var response = await adminSession.Client.GetAsync($"/api/admin/audit-logs/{auditLog.Id}");
-
-    Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-    var detail = await response.Content.ReadFromJsonAsync<AuditLogDetail>();
-    Assert.NotNull(detail);
-    Assert.Equal(auditLog.Id, detail.Id);
-    Assert.Equal(auditLog.Action, detail.Action);
-    Assert.Equal(auditLog.EntityType, detail.EntityType);
-    Assert.Equal(auditLog.MetadataJson, detail.MetadataJson);
-  }
-
-  [Fact]
-  public async Task GetById_WithInvalidId_Returns404()
-  {
-    using var factory = new CustomWebApplicationFactory();
-    var adminSession = await CreateBootstrapAdminAsync(factory, $"audit-404-{Guid.NewGuid():N}");
-
-    var nonExistentId = Guid.NewGuid();
-    var response = await adminSession.Client.GetAsync($"/api/admin/audit-logs/{nonExistentId}");
-
-    Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-  }
-
-  [Fact]
-  public async Task Search_WithPagination_ReturnsCorrectPage()
-  {
-    using var factory = new CustomWebApplicationFactory();
-    var adminSession = await CreateBootstrapAdminAsync(factory, $"audit-page-{Guid.NewGuid():N}");
-
-    using var scope = factory.Services.CreateScope();
-    var dbContext = scope.ServiceProvider.GetRequiredService<NursingCareDbContext>();
-
-    var testPrefix = "PaginationTest_" + Guid.NewGuid().ToString("N")[..8];
-    for (int i = 0; i < 15; i++)
-    {
-      var auditLog = new AuditLog
-      {
-        Id = Guid.NewGuid(),
-        ActorUserId = adminSession.UserId,
-        ActorRole = "ADMIN",
-        Action = $"{testPrefix}_{i}",
-        EntityType = "PaginationEntity",
-        EntityId = Guid.NewGuid().ToString(),
-        CreatedAtUtc = DateTime.UtcNow.AddMinutes(-i)
-      };
-      dbContext.AuditLogs.Add(auditLog);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
-    await dbContext.SaveChangesAsync();
 
-    var response = await adminSession.Client.GetAsync($"/api/admin/audit-logs?action={testPrefix}&pageSize=10&pageNumber=1");
+    [Fact]
+    public async Task Search_WithAdminAuth_ReturnsAuditLogs()
+    {
+        using var factory = new CustomWebApplicationFactory();
+        var adminSession = await CreateBootstrapAdminAsync(factory, $"audit-search-{Guid.NewGuid():N}");
 
-    Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<NursingCareDbContext>();
 
-    var result = await response.Content.ReadFromJsonAsync<AuditLogSearchResult>();
-    Assert.NotNull(result);
-    Assert.Equal(10, result.Items.Count);
-    Assert.Equal(1, result.PageNumber);
-    Assert.True(result.TotalCount >= 15);
-  }
+        var auditLog = new AuditLog
+        {
+            Id = Guid.NewGuid(),
+            ActorUserId = adminSession.UserId,
+            ActorRole = "ADMIN",
+            Action = "TestAction",
+            EntityType = "TestEntity",
+            EntityId = Guid.NewGuid().ToString(),
+            Notes = "Test notes",
+            MetadataJson = "{\"test\":\"data\"}",
+            CreatedAtUtc = DateTime.UtcNow
+        };
 
-  private static async Task<BootstrapAdminSession> CreateBootstrapAdminAsync(
-    CustomWebApplicationFactory factory,
-    string scenario)
-  {
-    var adminClient = factory.CreateClient();
-    adminClient.DefaultRequestHeaders.Authorization =
-      new AuthenticationHeaderValue("Bearer", JwtTestTokens.CreateAdminToken(factory.Services));
+        dbContext.AuditLogs.Add(auditLog);
+        await dbContext.SaveChangesAsync();
 
-    return new BootstrapAdminSession(adminClient, Guid.Parse("00000000-0000-0000-0000-000000000001"));
-  }
+        var response = await adminSession.Client.GetAsync("/api/admin/audit-logs");
 
-  private sealed record BootstrapAdminSession(HttpClient Client, Guid UserId);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var result = await response.Content.ReadFromJsonAsync<AuditLogSearchResult>();
+        Assert.NotNull(result);
+        Assert.True(result.TotalCount > 0);
+        Assert.Contains(result.Items, item => item.Id == auditLog.Id);
+    }
+
+    [Fact]
+    public async Task Search_WithFilters_ReturnsFilteredResults()
+    {
+        using var factory = new CustomWebApplicationFactory();
+        var adminSession = await CreateBootstrapAdminAsync(factory, $"audit-filter-{Guid.NewGuid():N}");
+
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<NursingCareDbContext>();
+
+        var specificAction = "SpecificTestAction_" + Guid.NewGuid().ToString("N")[..8];
+        var auditLog = new AuditLog
+        {
+            Id = Guid.NewGuid(),
+            ActorUserId = adminSession.UserId,
+            ActorRole = "ADMIN",
+            Action = specificAction,
+            EntityType = "FilterTestEntity",
+            EntityId = Guid.NewGuid().ToString(),
+            Notes = "Filtered test",
+            CreatedAtUtc = DateTime.UtcNow
+        };
+
+        dbContext.AuditLogs.Add(auditLog);
+        await dbContext.SaveChangesAsync();
+
+        var response = await adminSession.Client.GetAsync($"/api/admin/audit-logs?action={specificAction}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var result = await response.Content.ReadFromJsonAsync<AuditLogSearchResult>();
+        Assert.NotNull(result);
+        Assert.True(result.TotalCount > 0);
+        Assert.All(result.Items, item => Assert.Contains(specificAction, item.Action));
+    }
+
+    [Fact]
+    public async Task GetById_WithValidId_ReturnsDetail()
+    {
+        using var factory = new CustomWebApplicationFactory();
+        var adminSession = await CreateBootstrapAdminAsync(factory, $"audit-detail-{Guid.NewGuid():N}");
+
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<NursingCareDbContext>();
+
+        var auditLog = new AuditLog
+        {
+            Id = Guid.NewGuid(),
+            ActorUserId = adminSession.UserId,
+            ActorRole = "ADMIN",
+            Action = "DetailTestAction",
+            EntityType = "DetailTestEntity",
+            EntityId = Guid.NewGuid().ToString(),
+            Notes = "Detail test notes",
+            MetadataJson = "{\"key\":\"value\"}",
+            CreatedAtUtc = DateTime.UtcNow
+        };
+
+        dbContext.AuditLogs.Add(auditLog);
+        await dbContext.SaveChangesAsync();
+
+        var response = await adminSession.Client.GetAsync($"/api/admin/audit-logs/{auditLog.Id}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var detail = await response.Content.ReadFromJsonAsync<AuditLogDetail>();
+        Assert.NotNull(detail);
+        Assert.Equal(auditLog.Id, detail.Id);
+        Assert.Equal(auditLog.Action, detail.Action);
+        Assert.Equal(auditLog.EntityType, detail.EntityType);
+        Assert.Equal(auditLog.MetadataJson, detail.MetadataJson);
+    }
+
+    [Fact]
+    public async Task GetById_WithInvalidId_Returns404()
+    {
+        using var factory = new CustomWebApplicationFactory();
+        var adminSession = await CreateBootstrapAdminAsync(factory, $"audit-404-{Guid.NewGuid():N}");
+
+        var nonExistentId = Guid.NewGuid();
+        var response = await adminSession.Client.GetAsync($"/api/admin/audit-logs/{nonExistentId}");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Search_WithPagination_ReturnsCorrectPage()
+    {
+        using var factory = new CustomWebApplicationFactory();
+        var adminSession = await CreateBootstrapAdminAsync(factory, $"audit-page-{Guid.NewGuid():N}");
+
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<NursingCareDbContext>();
+
+        var testPrefix = "PaginationTest_" + Guid.NewGuid().ToString("N")[..8];
+        for (int i = 0; i < 15; i++)
+        {
+            var auditLog = new AuditLog
+            {
+                Id = Guid.NewGuid(),
+                ActorUserId = adminSession.UserId,
+                ActorRole = "ADMIN",
+                Action = $"{testPrefix}_{i}",
+                EntityType = "PaginationEntity",
+                EntityId = Guid.NewGuid().ToString(),
+                CreatedAtUtc = DateTime.UtcNow.AddMinutes(-i)
+            };
+            dbContext.AuditLogs.Add(auditLog);
+        }
+        await dbContext.SaveChangesAsync();
+
+        var response = await adminSession.Client.GetAsync($"/api/admin/audit-logs?action={testPrefix}&pageSize=10&pageNumber=1");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var result = await response.Content.ReadFromJsonAsync<AuditLogSearchResult>();
+        Assert.NotNull(result);
+        Assert.Equal(10, result.Items.Count);
+        Assert.Equal(1, result.PageNumber);
+        Assert.True(result.TotalCount >= 15);
+    }
+
+    private static async Task<BootstrapAdminSession> CreateBootstrapAdminAsync(
+      CustomWebApplicationFactory factory,
+      string scenario)
+    {
+        var adminClient = factory.CreateClient();
+        adminClient.DefaultRequestHeaders.Authorization =
+          new AuthenticationHeaderValue("Bearer", JwtTestTokens.CreateAdminToken(factory.Services));
+
+        return new BootstrapAdminSession(adminClient, Guid.Parse("00000000-0000-0000-0000-000000000001"));
+    }
+
+    private sealed record BootstrapAdminSession(HttpClient Client, Guid UserId);
 }

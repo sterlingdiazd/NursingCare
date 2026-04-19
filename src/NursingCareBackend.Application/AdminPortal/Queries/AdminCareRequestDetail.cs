@@ -33,4 +33,12 @@ public sealed record AdminCareRequestDetail(
   AdminCareRequestPricingBreakdown PricingBreakdown,
   AdminPayrollCompensationSnapshot? PayrollCompensation,
   IReadOnlyList<AdminShiftRecordSummary> Shifts,
-  IReadOnlyList<AdminCareRequestTimelineEvent> Timeline);
+  IReadOnlyList<AdminCareRequestTimelineEvent> Timeline,
+  string? InvoiceNumber,
+  DateTime? InvoicedAtUtc,
+  string? BankReference,
+  DateTime? PaidAtUtc,
+  string? VoidReason,
+  DateTime? VoidedAtUtc,
+  string? ReceiptNumber,
+  DateTime? ReceiptGeneratedAtUtc);

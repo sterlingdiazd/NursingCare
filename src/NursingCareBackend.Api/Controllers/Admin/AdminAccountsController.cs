@@ -12,47 +12,47 @@ namespace NursingCareBackend.Api.Controllers.Admin;
 [Authorize(Roles = SystemRoles.Admin)]
 public sealed class AdminAccountsController : ControllerBase
 {
-  private readonly IAdminAccountProvisioningService _adminAccountProvisioningService;
+    private readonly IAdminAccountProvisioningService _adminAccountProvisioningService;
 
-  public AdminAccountsController(IAdminAccountProvisioningService adminAccountProvisioningService)
-  {
-    _adminAccountProvisioningService = adminAccountProvisioningService;
-  }
-
-  [HttpPost]
-  [ProducesResponseType(typeof(AdminUserDetail), StatusCodes.Status201Created)]
-  [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-  public async Task<ActionResult<AdminUserDetail>> Create(
-    [FromBody] CreateAdminAccountApiRequest request,
-    CancellationToken cancellationToken)
-  {
-    var actorUserId = ResolveActorUserId();
-    if (actorUserId is null)
+    public AdminAccountsController(IAdminAccountProvisioningService adminAccountProvisioningService)
     {
-      return this.ProblemResponse(
-        StatusCodes.Status401Unauthorized,
-        "No autorizado",
-        "La sesion actual no incluye un identificador administrativo valido.");
+        _adminAccountProvisioningService = adminAccountProvisioningService;
     }
 
-    var detail = await _adminAccountProvisioningService.CreateAsync(
-      new CreateAdminAccountRequest(
-        request.Name,
-        request.LastName,
-        request.IdentificationNumber,
-        request.Phone,
-        request.Email,
-        request.Password,
-        request.ConfirmPassword),
-      actorUserId.Value,
-      cancellationToken);
+    [HttpPost]
+    [ProducesResponseType(typeof(AdminUserDetail), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<AdminUserDetail>> Create(
+      [FromBody] CreateAdminAccountApiRequest request,
+      CancellationToken cancellationToken)
+    {
+        var actorUserId = ResolveActorUserId();
+        if (actorUserId is null)
+        {
+            return this.ProblemResponse(
+              StatusCodes.Status401Unauthorized,
+              "No autorizado",
+              "La sesion actual no incluye un identificador administrativo valido.");
+        }
 
-    return StatusCode(StatusCodes.Status201Created, detail);
-  }
+        var detail = await _adminAccountProvisioningService.CreateAsync(
+          new CreateAdminAccountRequest(
+            request.Name,
+            request.LastName,
+            request.IdentificationNumber,
+            request.Phone,
+            request.Email,
+            request.Password,
+            request.ConfirmPassword),
+          actorUserId.Value,
+          cancellationToken);
 
-  private Guid? ResolveActorUserId()
-  {
-    var rawValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
-    return Guid.TryParse(rawValue, out var userId) ? userId : null;
-  }
+        return StatusCode(StatusCodes.Status201Created, detail);
+    }
+
+    private Guid? ResolveActorUserId()
+    {
+        var rawValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        return Guid.TryParse(rawValue, out var userId) ? userId : null;
+    }
 }

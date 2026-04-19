@@ -88,13 +88,13 @@ public sealed class AdminReportsController : ControllerBase
         {
             var data = await _handler.HandleAsync(reportKey, from, to, pageNumber, pageSize, cancellationToken);
             var csvString = GenerateCsvForReport(reportKey, data);
-            
+
             var bytes = Encoding.UTF8.GetBytes(csvString);
             var result = new FileContentResult(bytes, "text/csv")
             {
                 FileDownloadName = $"{reportKey}-{DateTime.UtcNow:yyyyMMdd}.csv"
             };
-            
+
             // Allow JS to see the content-disposition header for filename extraction
             HttpContext.Response.Headers.Append("Access-Control-Expose-Headers", "Content-Disposition");
             return result;
@@ -124,14 +124,14 @@ public sealed class AdminReportsController : ControllerBase
                 sb.AppendLine($"Sin asignar,{r.UnassignedCount}");
                 sb.AppendLine($"Vencidas,{r.OverdueCount}");
                 break;
-                
+
             case AssignmentApprovalBacklogReport r:
                 sb.AppendLine("Metrica,Valor");
                 sb.AppendLine($"Pendientes sin enfermera,{r.PendingUnassignedCount}");
                 sb.AppendLine($"Pendientes con enfermera esperando aprobacion,{r.PendingAssignedAwaitingApprovalCount}");
                 sb.AppendLine($"Dias promedio en espera,{r.AverageDaysPending:F2}");
                 break;
-                
+
             case NurseOnboardingReport r:
                 sb.AppendLine("Metrica,Valor");
                 sb.AppendLine($"Total registradas,{r.TotalRegisteredCount}");
@@ -140,14 +140,14 @@ public sealed class AdminReportsController : ControllerBase
                 sb.AppendLine($"Inactivas,{r.InactiveCount}");
                 sb.AppendLine($"Completadas en periodo,{r.CompletedThisPeriodCount}");
                 break;
-                
+
             case ActiveInactiveUsersReport r:
                 sb.AppendLine("Perfil,Activas,Inactivas");
                 sb.AppendLine($"Administrador,{r.AdminActiveCount},{r.AdminInactiveCount}");
                 sb.AppendLine($"Cliente,{r.ClientActiveCount},{r.ClientInactiveCount}");
                 sb.AppendLine($"Enfermera,{r.NurseActiveCount},{r.NurseInactiveCount}");
                 break;
-                
+
             case NurseUtilizationReport r:
                 sb.AppendLine("ID Enfermera,Nombre,Total Asignadas,Completadas,Pendientes,Tasa de Cierre");
                 foreach (var row in r.Rows)
@@ -155,7 +155,7 @@ public sealed class AdminReportsController : ControllerBase
                     sb.AppendLine($"{EscapeCsv(row.NurseId)},{EscapeCsv(row.NurseName)},{row.TotalAssigned},{row.Completed},{row.Pending},{row.CompletionRate:P2}");
                 }
                 break;
-                
+
             case CareRequestCompletionReport r:
                 sb.AppendLine("Metrica,Valor");
                 sb.AppendLine($"Total completadas,{r.TotalCompletedCount}");
@@ -167,7 +167,7 @@ public sealed class AdminReportsController : ControllerBase
                     sb.AppendLine($"{EscapeCsv(kvp.Key)},{kvp.Value}");
                 }
                 break;
-                
+
             case PriceUsageSummaryReport r:
                 sb.AppendLine("Tipo de Servicio,Conteo,Total Promedio,Ingresos Totales");
                 foreach (var row in r.TopRequestTypes)
@@ -175,7 +175,7 @@ public sealed class AdminReportsController : ControllerBase
                     sb.AppendLine($"{EscapeCsv(row.RequestType)},{row.Count},{row.AverageTotal:F2},{row.TotalRevenue:F2}");
                 }
                 break;
-                
+
             case NotificationVolumeReport r:
                 sb.AppendLine("Metrica,Valor");
                 sb.AppendLine($"Total notificaciones,{r.TotalNotificationsCount}");
@@ -205,7 +205,7 @@ public sealed class AdminReportsController : ControllerBase
                     sb.AppendLine($"{EscapeCsv(row.NurseName)},{EscapeCsv(row.CareRequestId)},{EscapeCsv(row.CareRequestType)},{EscapeCsv(row.PricingCategoryCode)},{row.ExecutedAtUtc:yyyy-MM-dd},{EscapeCsv(row.EmploymentType)},{EscapeCsv(row.ServiceVariant)},{row.CareRequestTotal:F2},{row.BaseCompensation:F2},{row.TransportIncentive:F2},{row.ComplexityBonus:F2},{row.MedicalSuppliesCompensation:F2},{row.AdjustmentsTotal:F2},{row.DeductionsTotal:F2},{row.NetCompensation:F2}");
                 }
                 break;
-                
+
             default:
                 sb.AppendLine("Datos no disponibles");
                 break;

@@ -12,68 +12,68 @@ namespace NursingCareBackend.Api.Extensions;
 
 public static class AuthenticationExtensions
 {
-  public static IServiceCollection AddJwtAuthentication(
-    this IServiceCollection services,
-    IConfiguration configuration)
-  {
-    var jwtSection = configuration.GetSection("Jwt");
-    var jwtKey = jwtSection["Key"];
-    var jwtIssuer = jwtSection["Issuer"];
-    var jwtAudience = jwtSection["Audience"];
-
-    if (string.IsNullOrWhiteSpace(jwtKey))
+    public static IServiceCollection AddJwtAuthentication(
+      this IServiceCollection services,
+      IConfiguration configuration)
     {
-      throw new InvalidOperationException("JWT configuration is missing 'Jwt:Key'.");
-    }
+        var jwtSection = configuration.GetSection("Jwt");
+        var jwtKey = jwtSection["Key"];
+        var jwtIssuer = jwtSection["Issuer"];
+        var jwtAudience = jwtSection["Audience"];
 
-    var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
-
-    services
-      .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-      .AddJwtBearer(options =>
-      {
-        options.TokenValidationParameters = new TokenValidationParameters
+        if (string.IsNullOrWhiteSpace(jwtKey))
         {
-          ValidateIssuer = true,
-          ValidateAudience = true,
-          ValidateLifetime = true,
-          ValidateIssuerSigningKey = true,
-          NameClaimType = ClaimTypes.Email,
-          RoleClaimType = ClaimTypes.Role,
-          ValidIssuer = jwtIssuer,
-          ValidAudience = jwtAudience,
-          IssuerSigningKey = signingKey
-        };
-      });
+            throw new InvalidOperationException("JWT configuration is missing 'Jwt:Key'.");
+        }
 
-    services.AddAuthorization(options =>
-    {
-      options.AddPolicy("CareRequestReader", policy =>
-        policy
-          .RequireRole(SystemRoles.Client, SystemRoles.Nurse, SystemRoles.Admin)
-          .AddRequirements(new OperationalAccessRequirement()));
+        var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
 
-      options.AddPolicy("CareRequestCreator", policy =>
-        policy
-          .RequireRole(SystemRoles.Client, SystemRoles.Admin)
-          .AddRequirements(new OperationalAccessRequirement()));
+        services
+          .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+          .AddJwtBearer(options =>
+          {
+              options.TokenValidationParameters = new TokenValidationParameters
+              {
+                  ValidateIssuer = true,
+                  ValidateAudience = true,
+                  ValidateLifetime = true,
+                  ValidateIssuerSigningKey = true,
+                  NameClaimType = ClaimTypes.Email,
+                  RoleClaimType = ClaimTypes.Role,
+                  ValidIssuer = jwtIssuer,
+                  ValidAudience = jwtAudience,
+                  IssuerSigningKey = signingKey
+              };
+          });
 
-      options.AddPolicy("CareRequestApprover", policy =>
-        policy.RequireRole(SystemRoles.Admin));
+        services.AddAuthorization(options =>
+        {
+            options.AddPolicy("CareRequestReader", policy =>
+          policy
+            .RequireRole(SystemRoles.Client, SystemRoles.Nurse, SystemRoles.Admin)
+            .AddRequirements(new OperationalAccessRequirement()));
 
-      options.AddPolicy("CareRequestCompleter", policy =>
-        policy
-          .RequireRole(SystemRoles.Nurse)
-          .AddRequirements(new OperationalAccessRequirement()));
+            options.AddPolicy("CareRequestCreator", policy =>
+          policy
+            .RequireRole(SystemRoles.Client, SystemRoles.Admin)
+            .AddRequirements(new OperationalAccessRequirement()));
 
-      options.AddPolicy("CareRequestCanceller", policy =>
-        policy
-          .RequireRole(SystemRoles.Client, SystemRoles.Admin)
-          .AddRequirements(new OperationalAccessRequirement()));
-    });
+            options.AddPolicy("CareRequestApprover", policy =>
+          policy.RequireRole(SystemRoles.Admin));
 
-    services.AddScoped<IAuthorizationHandler, OperationalAccessHandler>();
+            options.AddPolicy("CareRequestCompleter", policy =>
+          policy
+            .RequireRole(SystemRoles.Nurse)
+            .AddRequirements(new OperationalAccessRequirement()));
 
-    return services;
-  }
+            options.AddPolicy("CareRequestCanceller", policy =>
+          policy
+            .RequireRole(SystemRoles.Client, SystemRoles.Admin)
+            .AddRequirements(new OperationalAccessRequirement()));
+        });
+
+        services.AddScoped<IAuthorizationHandler, OperationalAccessHandler>();
+
+        return services;
+    }
 }

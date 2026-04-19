@@ -12,29 +12,29 @@ namespace NursingCareBackend.Application;
 
 public static class DependencyInjection
 {
-  public static IServiceCollection AddApplicationServices(this IServiceCollection services)
-  {
-    services.AddScoped<AssignCareRequestNurseHandler>();
-    services.AddScoped<CreateCareRequestHandler>();
-    services.AddScoped<TransitionCareRequestHandler>();
-    services.AddScoped<GetCareRequestsHandler>();
-    services.AddScoped<GetCareRequestByIdHandler>();
-    services.AddScoped<VerifyPricingHandler>();
-    services.AddScoped<GetAdminDashboardHandler>();
-    services.AddScoped<GetAdminActionQueueHandler>();
-    services.AddScoped<GetAdminCareRequestsHandler>();
-    services.AddScoped<GetAdminCareRequestDetailHandler>();
-    services.AddScoped<GetAdminCareRequestClientOptionsHandler>();
-    services.AddScoped<RegisterCareRequestShiftHandler>();
-    services.AddScoped<RecordCareRequestShiftChangeHandler>();
-    services.AddScoped<GetAdminClientsHandler>();
-    services.AddScoped<GetAdminClientDetailHandler>();
-    services.AddScoped<GetAdminUsersHandler>();
-    services.AddScoped<GetAdminUserDetailHandler>();
-    services.AddScoped<IAdminAccountProvisioningService, AdminAccountProvisioningService>();
-    services.AddScoped<IAdminClientManagementService, AdminClientManagementService>();
-    services.AddScoped<IAdminUserManagementService, AdminUserManagementService>();
+    public static IServiceCollection AddApplicationServices(this IServiceCollection services)
+    {
+        services.AddScoped<AssignCareRequestNurseHandler>();
+        services.AddScoped<CreateCareRequestHandler>();
+        services.AddScoped<TransitionCareRequestHandler>();
+        services.AddScoped<GetCareRequestsHandler>();
+        services.AddScoped<GetCareRequestByIdHandler>();
+        services.AddScoped<VerifyPricingHandler>();
+        services.AddScoped<GetAdminDashboardHandler>();
+        services.AddScoped<GetAdminActionQueueHandler>();
+        services.AddScoped<GetAdminCareRequestsHandler>();
+        services.AddScoped<GetAdminCareRequestDetailHandler>();
+        services.AddScoped<GetAdminCareRequestClientOptionsHandler>();
+        services.AddScoped<RegisterCareRequestShiftHandler>();
+        services.AddScoped<RecordCareRequestShiftChangeHandler>();
+        services.AddScoped<GetAdminClientsHandler>();
+        services.AddScoped<GetAdminClientDetailHandler>();
+        services.AddScoped<GetAdminUsersHandler>();
+        services.AddScoped<GetAdminUserDetailHandler>();
+        services.AddScoped<IAdminAccountProvisioningService, AdminAccountProvisioningService>();
+        services.AddScoped<IAdminClientManagementService, AdminClientManagementService>();
+        services.AddScoped<IAdminUserManagementService, AdminUserManagementService>();
 
-    return services;
-  }
+        return services;
+    }
 }

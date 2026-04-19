@@ -5,15 +5,15 @@ namespace NursingCareBackend.Application.CareRequests.Queries;
 
 public sealed class GetCareRequestByIdHandler
 {
-  private readonly ICareRequestRepository _repository;
+    private readonly ICareRequestRepository _repository;
 
-  public GetCareRequestByIdHandler(ICareRequestRepository repository)
-  {
-    _repository = repository;
-  }
+    public GetCareRequestByIdHandler(ICareRequestRepository repository)
+    {
+        _repository = repository;
+    }
 
-  public Task<CareRequest?> Handle(Guid id, CareRequestAccessScope scope, CancellationToken cancellationToken)
-  {
-    return _repository.GetByIdAsync(id, scope, cancellationToken);
-  }
+    public Task<CareRequest?> Handle(Guid id, CareRequestAccessScope scope, CancellationToken cancellationToken)
+    {
+        return _repository.GetByIdAsync(id, scope, cancellationToken);
+    }
 }

@@ -80,7 +80,7 @@ public sealed class AdminReportsRepository : IAdminReportsRepository
 
         var pendingRequests = await query.Select(c => c.CreatedAtUtc).ToListAsync(cancellationToken);
         double averageDaysPending = 0;
-        
+
         if (pendingRequests.Count > 0)
         {
             var now = DateTime.UtcNow;
@@ -112,7 +112,7 @@ public sealed class AdminReportsRepository : IAdminReportsRepository
         }
 
         var totalRegistered = await query.CountAsync(cancellationToken);
-        
+
         var pendingReview = await query.CountAsync(u => u.NurseProfile != null && !u.NurseProfile.IsActive, cancellationToken);
         var active = await query.CountAsync(u => u.IsActive && u.NurseProfile != null && u.NurseProfile.IsActive, cancellationToken);
         var inactive = await query.CountAsync(u => !u.IsActive, cancellationToken);
@@ -305,8 +305,8 @@ public sealed class AdminReportsRepository : IAdminReportsRepository
             .ToDictionaryAsync(x => x.Category, x => x.Count, cancellationToken);
 
         // Pending action items: unread notifications roughly estimate but we don't have a separate ActionItem table, it's notifications
-        int pendingActions = unread; 
-        
+        int pendingActions = unread;
+
         return new NotificationVolumeReport(
             TotalNotificationsCount: total,
             UnreadNotificationsCount: unread,

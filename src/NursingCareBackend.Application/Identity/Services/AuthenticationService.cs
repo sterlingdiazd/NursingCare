@@ -341,10 +341,10 @@ public sealed class AuthenticationService : IAuthenticationService
                     throw new InvalidOperationException("Google sign-in is already linked to a different account.");
                 }
 
-        if (!existingUser.IsActive && !UserAccountStateEvaluator.RequiresProfileCompletion(existingUser))
-        {
-            throw new InvalidOperationException("User account is not active.");
-        }
+                if (!existingUser.IsActive && !UserAccountStateEvaluator.RequiresProfileCompletion(existingUser))
+                {
+                    throw new InvalidOperationException("User account is not active.");
+                }
 
                 existingUser.GoogleSubjectId = googleUser.Subject;
                 if (string.IsNullOrWhiteSpace(existingUser.DisplayName))
