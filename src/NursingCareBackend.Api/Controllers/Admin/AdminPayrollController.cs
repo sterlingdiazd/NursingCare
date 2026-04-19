@@ -346,7 +346,7 @@ public sealed class AdminPayrollController : ControllerBase
     {
         var adminId = GetAdminUserId();
         if (adminId == Guid.Empty)
-            return this.ProblemResponse(StatusCodes.Status400BadRequest, "Sin identidad", "No se pudo determinar el usuario administrador.");
+            return Unauthorized();
 
         var result = await _recalculationService.RecalculateAsync(adminId, request, cancellationToken);
         return Ok(result);
@@ -364,7 +364,7 @@ public sealed class AdminPayrollController : ControllerBase
     {
         var adminId = GetAdminUserId();
         if (adminId == Guid.Empty)
-            return this.ProblemResponse(StatusCodes.Status400BadRequest, "Sin identidad", "No se pudo determinar el usuario administrador.");
+            return Unauthorized();
 
         var requestWithLineId = request with { LineId = lineId };
 
@@ -395,7 +395,7 @@ public sealed class AdminPayrollController : ControllerBase
     {
         var adminId = GetAdminUserId();
         if (adminId == Guid.Empty)
-            return this.ProblemResponse(StatusCodes.Status400BadRequest, "Sin identidad", "No se pudo determinar el usuario administrador.");
+            return Unauthorized();
 
         try
         {

@@ -248,15 +248,18 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
 
     public async Task<Guid> CreateDeductionAsync(CreateDeductionRequest request, CancellationToken cancellationToken)
     {
-        // Payroll immutability guard: reject writes to closed periods
+        // Payroll immutability guard: enforce via domain method (ADR-005)
         if (request.PayrollPeriodId != Guid.Empty)
         {
             var period = await _dbContext.PayrollPeriods
                 .AsNoTracking()
                 .FirstOrDefaultAsync(p => p.Id == request.PayrollPeriodId, cancellationToken);
 
-            if (period is not null && period.IsClosed)
-                throw new PayrollPeriodClosedException(period.Id);
+            if (period is not null)
+            {
+                try { period.EnsureOpen(); }
+                catch (InvalidOperationException) { throw new PayrollPeriodClosedException(period.Id); }
+            }
         }
 
         if (!Enum.TryParse<DeductionType>(request.DeductionType, ignoreCase: true, out var deductionType))
@@ -284,15 +287,18 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
 
         if (deduction is null) return false;
 
-        // Payroll immutability guard: reject deletes from closed periods
+        // Payroll immutability guard: enforce via domain method (ADR-005)
         if (deduction.PayrollPeriodId != Guid.Empty)
         {
             var period = await _dbContext.PayrollPeriods
                 .AsNoTracking()
                 .FirstOrDefaultAsync(p => p.Id == deduction.PayrollPeriodId, cancellationToken);
 
-            if (period is not null && period.IsClosed)
-                throw new PayrollPeriodClosedException(period.Id);
+            if (period is not null)
+            {
+                try { period.EnsureOpen(); }
+                catch (InvalidOperationException) { throw new PayrollPeriodClosedException(period.Id); }
+            }
         }
 
         _dbContext.DeductionRecords.Remove(deduction);

@@ -1,5 +1,6 @@
 using NursingCareBackend.Application.CareRequests;
 using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
+using NursingCareBackend.Application.Identity.Repositories;
 using NursingCareBackend.Domain.CareRequests;
 
 namespace NursingCareBackend.Application.CareRequests.Commands.GenerateReceipt;
@@ -16,17 +17,20 @@ public sealed class GenerateReceiptHandler
     private readonly IReceiptRepository _receiptRepository;
     private readonly IPaymentValidationRepository _paymentValidationRepository;
     private readonly IReceiptPdfService _receiptPdfService;
+    private readonly IUserRepository _userRepository;
 
     public GenerateReceiptHandler(
         ICareRequestRepository repository,
         IReceiptRepository receiptRepository,
         IPaymentValidationRepository paymentValidationRepository,
-        IReceiptPdfService receiptPdfService)
+        IReceiptPdfService receiptPdfService,
+        IUserRepository userRepository)
     {
         _repository = repository;
         _receiptRepository = receiptRepository;
         _paymentValidationRepository = paymentValidationRepository;
         _receiptPdfService = receiptPdfService;
+        _userRepository = userRepository;
     }
 
     public async Task<GenerateReceiptResponse> Handle(
@@ -62,6 +66,13 @@ public sealed class GenerateReceiptHandler
         var paymentValidation = await _paymentValidationRepository.GetByCareRequestIdAsync(
             command.CareRequestId, cancellationToken);
 
+        var clientUser = await _userRepository.GetByIdAsync(careRequest.UserID, cancellationToken);
+        var clientDisplayName = clientUser is not null
+            ? (string.IsNullOrWhiteSpace(clientUser.DisplayName)
+                ? (string.Join(" ", new[] { clientUser.Name, clientUser.LastName }.Where(v => !string.IsNullOrWhiteSpace(v))) is { Length: > 0 } fullName ? fullName : clientUser.Email)
+                : clientUser.DisplayName)
+            : string.Empty;
+
         var generatedAtUtc = DateTime.UtcNow;
         var date = DateOnly.FromDateTime(generatedAtUtc);
         var seq = await _receiptRepository.CountByDateAsync(date, cancellationToken) + 1;
@@ -70,7 +81,7 @@ public sealed class GenerateReceiptHandler
         var pdfData = new ReceiptPdfData(
             CareRequestId: careRequest.Id,
             ReceiptNumber: receiptNumber,
-            ClientDisplayName: string.Empty, // populated by service via join if needed
+            ClientDisplayName: clientDisplayName,
             ClientIdentificationNumber: null,
             CareRequestType: careRequest.CareRequestType,
             Unit: careRequest.Unit,

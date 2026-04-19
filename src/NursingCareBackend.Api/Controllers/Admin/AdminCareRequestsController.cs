@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using System.Text;
 using Microsoft.AspNetCore.Authorization;
@@ -232,7 +233,7 @@ public sealed class AdminCareRequestsController : ControllerBase
   {
     var adminId = GetAdminUserId();
     if (adminId == Guid.Empty)
-      return this.ProblemResponse(StatusCodes.Status400BadRequest, "Sin identidad", "No se pudo determinar el usuario administrador.");
+      return Unauthorized();
 
     try
     {
@@ -262,7 +263,7 @@ public sealed class AdminCareRequestsController : ControllerBase
   {
     var adminId = GetAdminUserId();
     if (adminId == Guid.Empty)
-      return this.ProblemResponse(StatusCodes.Status400BadRequest, "Sin identidad", "No se pudo determinar el usuario administrador.");
+      return Unauthorized();
 
     try
     {
@@ -292,12 +293,12 @@ public sealed class AdminCareRequestsController : ControllerBase
   {
     var adminId = GetAdminUserId();
     if (adminId == Guid.Empty)
-      return this.ProblemResponse(StatusCodes.Status400BadRequest, "Sin identidad", "No se pudo determinar el usuario administrador.");
+      return Unauthorized();
 
     try
     {
       var result = await _voidHandler.Handle(
-        new VoidCareRequestCommand(id, request.VoidReason, adminId),
+        new VoidCareRequestCommand(id, request.VoidReason, adminId, DateTime.UtcNow),
         cancellationToken);
       return Ok(result);
     }
@@ -321,7 +322,7 @@ public sealed class AdminCareRequestsController : ControllerBase
   {
     var adminId = GetAdminUserId();
     if (adminId == Guid.Empty)
-      return this.ProblemResponse(StatusCodes.Status400BadRequest, "Sin identidad", "No se pudo determinar el usuario administrador.");
+      return Unauthorized();
 
     try
     {
@@ -391,18 +392,24 @@ public sealed class AdminCareRequestsController : ControllerBase
 
 public sealed class InvoiceCareRequestRequest
 {
+  [Required]
+  [MaxLength(50)]
   public string InvoiceNumber { get; set; } = default!;
   public DateTime? InvoiceDate { get; set; }
 }
 
 public sealed class PayCareRequestRequest
 {
+  [Required]
+  [MaxLength(100)]
   public string BankReference { get; set; } = default!;
   public DateTime? PaymentDate { get; set; }
 }
 
 public sealed class VoidCareRequestRequest
 {
+  [Required]
+  [MaxLength(500)]
   public string VoidReason { get; set; } = default!;
 }
 

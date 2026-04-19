@@ -28,13 +28,16 @@ public sealed class AdminPayrollOverrideRepository : IAdminPayrollOverrideReposi
         if (line is null)
             throw new ArgumentException($"PayrollLine '{request.LineId}' not found.");
 
-        // Payroll immutability guard: reject override submissions for closed periods
+        // Payroll immutability guard: enforce via domain method (ADR-005)
         var periodForLine = await _dbContext.PayrollPeriods
             .AsNoTracking()
             .FirstOrDefaultAsync(p => p.Id == line.PayrollPeriodId, cancellationToken);
 
-        if (periodForLine is not null && periodForLine.IsClosed)
-            throw new PayrollPeriodClosedException(periodForLine.Id);
+        if (periodForLine is not null)
+        {
+            try { periodForLine.EnsureOpen(); }
+            catch (InvalidOperationException) { throw new PayrollPeriodClosedException(periodForLine.Id); }
+        }
 
         // Cancel any existing pending override for this line
         var existingPending = await _dbContext.PayrollLineOverrides
@@ -77,13 +80,16 @@ public sealed class AdminPayrollOverrideRepository : IAdminPayrollOverrideReposi
         if (lineForApprove is null)
             return (false, null);
 
-        // Payroll immutability guard: reject approval for closed periods
+        // Payroll immutability guard: enforce via domain method (ADR-005)
         var periodForApprove = await _dbContext.PayrollPeriods
             .AsNoTracking()
             .FirstOrDefaultAsync(p => p.Id == lineForApprove.PayrollPeriodId, cancellationToken);
 
-        if (periodForApprove is not null && periodForApprove.IsClosed)
-            throw new PayrollPeriodClosedException(periodForApprove.Id);
+        if (periodForApprove is not null)
+        {
+            try { periodForApprove.EnsureOpen(); }
+            catch (InvalidOperationException) { throw new PayrollPeriodClosedException(periodForApprove.Id); }
+        }
 
         try
         {
