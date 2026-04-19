@@ -250,6 +250,14 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
         if (!Enum.TryParse<DeductionType>(request.DeductionType, ignoreCase: true, out var deductionType))
             throw new ArgumentException($"Tipo de deducción invalido: {request.DeductionType}");
 
+        if (request.PayrollPeriodId.HasValue)
+        {
+            var period = await _dbContext.PayrollPeriods
+                .FirstOrDefaultAsync(p => p.Id == request.PayrollPeriodId.Value, cancellationToken)
+                ?? throw new KeyNotFoundException($"PayrollPeriod '{request.PayrollPeriodId.Value}' not found.");
+            period.EnsureOpen();
+        }
+
         var deduction = DeductionRecord.Create(
             request.NurseUserId,
             request.PayrollPeriodId,
@@ -271,6 +279,14 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
             .FirstOrDefaultAsync(d => d.Id == deductionId, cancellationToken);
 
         if (deduction is null) return false;
+
+        if (deduction.PayrollPeriodId.HasValue)
+        {
+            var period = await _dbContext.PayrollPeriods
+                .FirstOrDefaultAsync(p => p.Id == deduction.PayrollPeriodId.Value, cancellationToken)
+                ?? throw new KeyNotFoundException($"PayrollPeriod '{deduction.PayrollPeriodId.Value}' not found.");
+            period.EnsureOpen();
+        }
 
         _dbContext.DeductionRecords.Remove(deduction);
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -307,6 +323,20 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
 
     public async Task<Guid> CreateAdjustmentAsync(CreateCompensationAdjustmentRequest request, CancellationToken cancellationToken)
     {
+        var line = await _dbContext.PayrollLines
+            .AsNoTracking()
+            .FirstOrDefaultAsync(l => l.ServiceExecutionId == request.ServiceExecutionId, cancellationToken);
+
+        if (line is not null)
+        {
+            var period = await _dbContext.PayrollPeriods
+                .FirstOrDefaultAsync(p => p.Id == line.PayrollPeriodId, cancellationToken)
+                ?? throw new KeyNotFoundException($"PayrollPeriod '{line.PayrollPeriodId}' not found.");
+            period.EnsureOpen();
+        }
+        // Note: When serviceExecutionId has no matching PayrollLine, there is no period context to guard against.
+        // Orphan adjustments do not affect closed-period payroll calculations.
+
         var adjustment = CompensationAdjustment.Create(
             request.ServiceExecutionId,
             request.Label,
@@ -325,6 +355,18 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
             .FirstOrDefaultAsync(a => a.Id == adjustmentId, cancellationToken);
 
         if (adjustment is null) return false;
+
+        var line = await _dbContext.PayrollLines
+            .AsNoTracking()
+            .FirstOrDefaultAsync(l => l.ServiceExecutionId == adjustment.ServiceExecutionId, cancellationToken);
+
+        if (line is not null)
+        {
+            var period = await _dbContext.PayrollPeriods
+                .FirstOrDefaultAsync(p => p.Id == line.PayrollPeriodId, cancellationToken)
+                ?? throw new KeyNotFoundException($"PayrollPeriod '{line.PayrollPeriodId}' not found.");
+            period.EnsureOpen();
+        }
 
         _dbContext.CompensationAdjustments.Remove(adjustment);
         await _dbContext.SaveChangesAsync(cancellationToken);

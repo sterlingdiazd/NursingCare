@@ -21,6 +21,9 @@ internal static class JwtTestTokens
   public static string CreateAdminToken(IServiceProvider services)
     => CreateToken(services, userId: Guid.Parse("00000000-0000-0000-0000-000000000001"), includeUserId: true, "ADMIN");
 
+  public static string CreateAdminTokenForUser(IServiceProvider services, Guid userId)
+    => CreateToken(services, userId: userId, includeUserId: true, "ADMIN");
+
   public static string CreateTokenWithoutUserId(IServiceProvider services, params string[] roles)
     => CreateToken(services, userId: null, includeUserId: false, roles);
 

@@ -40,6 +40,13 @@ app.LogDatabaseConfiguration();
 app.ApplyMigrations();
 // --- End automatic migration ---
 
+// --migrate-only: apply migrations + seed data, then exit without starting HTTP listener.
+if (args.Contains("--migrate-only"))
+{
+    app.Logger.LogInformation("--migrate-only flag detected. Migrations and seeding complete. Exiting.");
+    return;
+}
+
 app.UseApiMiddleware();
 
 app.Run();

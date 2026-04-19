@@ -34,6 +34,16 @@ public sealed class PayrollPeriod
 
     public bool Contains(DateOnly date) => date >= StartDate && date <= EndDate;
 
+    public bool IsClosed => Status == PayrollPeriodStatus.Closed;
+
+    public void EnsureOpen()
+    {
+        if (Status != PayrollPeriodStatus.Open)
+        {
+            throw new PayrollPeriodClosedException(Id);
+        }
+    }
+
     public void Close(DateTime closedAtUtc)
     {
         if (Status == PayrollPeriodStatus.Closed)

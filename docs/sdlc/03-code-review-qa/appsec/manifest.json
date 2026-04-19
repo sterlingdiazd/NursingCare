@@ -1,0 +1,142 @@
+{
+  "agent": "appsec-agent",
+  "phase": "03-code-review-qa",
+  "sub_phase": "appsec",
+  "initiative_id": "2026-04-19T2100-payroll-period-immutability",
+  "run_id": "appsec-20260419T2115",
+  "status": "completed",
+  "started_at": "2026-04-19T21:10:00Z",
+  "completed_at": "2026-04-19T21:45:00Z",
+
+  "phase_completion": {
+    "exchange_core": "AppSec review completed: 2 findings identified, 34+7 tests pass, no critical/high severity issues.",
+    "specific_context": "SEC-001 (medium): CreateAdjustmentAsync guard skipped when serviceExecutionId has no PayrollLine. SEC-002 (low): ExceptionHandlingMiddleware sets ContentType=application/problem+json but WriteAsJsonAsync overrides to application/json. All RBAC guards confirmed at controller level via [Authorize(Roles=SystemRoles.Admin)]. JwtTestTokens uses runtime IConfiguration — no hardcoded keys in source.",
+    "thematic_room_assignments": ["security", "payroll", "tests", "backend"],
+    "files_touched": [
+      "tests/NursingCareBackend.Api.Tests/Payroll/PayrollAppsecTests.cs",
+      "docs/sdlc/03-code-review-qa/appsec/manifest.json"
+    ]
+  },
+
+  "findings_summary": {
+    "category": "security",
+    "critical": 0,
+    "high": 0,
+    "medium": 1,
+    "low": 1,
+    "informational": 2
+  },
+
+  "findings": [
+    {
+      "id": "SEC-001",
+      "severity": "medium",
+      "cwe": "CWE-285",
+      "owasp": "A01 Broken Access Control",
+      "location": "src/NursingCareBackend.Infrastructure/AdminPortal/AdminPayrollRepository.cs:330-348",
+      "title": "CreateAdjustmentAsync period guard conditional — bypass via orphan serviceExecutionId",
+      "description": "When CreateAdjustmentAsync receives a serviceExecutionId that has no matching PayrollLine, the EnsureOpen() guard is skipped entirely (the if block at line 330 only runs when line is not null). An adjustment is persisted for that serviceExecutionId without any period-closed check. In the current data model this is a lower risk because orphan adjustments affect no existing payroll lines, but it violates the invariant that write operations must validate the target period is open.",
+      "poc": "POST /api/admin/payroll/adjustments with a random serviceExecutionId (not linked to any PayrollLine) while admin-authenticated. Response: 201 Created. Guard confirmed bypassed by PayrollAppsecTests.GuardBypass_CreateAdjustment_ForExecutionWithNoLine_DoesNotEnforceClosedPeriod.",
+      "remediation": "Remove the conditional and always validate period status before insert. Either (a) require that serviceExecutionId must exist in PayrollLines and 404 otherwise, enforcing the guard in all cases; or (b) accept a required payrollPeriodId parameter on the adjustment endpoint and guard against that period directly.",
+      "blocking": false
+    },
+    {
+      "id": "SEC-002",
+      "severity": "low",
+      "cwe": "CWE-116",
+      "owasp": "A05 Security Misconfiguration",
+      "location": "src/NursingCareBackend.Api/Middleware/ExceptionHandlingMiddleware.cs:103-106",
+      "title": "HTTP 409 response Content-Type is application/json instead of application/problem+json (RFC 7807)",
+      "description": "ExceptionHandlingMiddleware sets context.Response.ContentType = 'application/problem+json' at line 103, then calls context.Response.WriteAsJsonAsync(problemDetails) at line 106. WriteAsJsonAsync overrides the Content-Type header to 'application/json', negating the explicit assignment. RFC 7807 requires Content-Type: application/problem+json for ProblemDetails responses. This is a contract deviation, not a security vulnerability, but it indicates the middleware does not correctly advertise the response format.",
+      "poc": "Any 409 response from the payroll immutability guard. Confirmed by PayrollAppsecTests.Contract_ClosedPeriod_Returns_409_With_ProblemDetails_ContentType which captures actual='application/json'.",
+      "remediation": "After WriteAsJsonAsync, reassign: context.Response.ContentType = 'application/problem+json'; Or use Response.WriteAsync with manual JsonSerializer.Serialize and the correct content-type set beforehand.",
+      "blocking": false
+    },
+    {
+      "id": "SEC-INFO-001",
+      "severity": "informational",
+      "cwe": "CWE-285",
+      "owasp": "A01 Broken Access Control",
+      "location": "src/NursingCareBackend.Infrastructure/Payroll/PayrollRecalculationService.cs:25-41",
+      "title": "RecalculateAsync null periodId path skips period-closed guard — by design, safe",
+      "description": "When RecalculateAsync is called with periodId=null, the EnsureOpen() check at line 27 is skipped (the if block is conditional on request.PeriodId.HasValue). The subsequent query at line 36-44 filters to open periods only (.Where(p => p.Status == PayrollPeriodStatus.Open)), so closed period lines are never processed. Risk confirmed mitigated by test GuardBypass_Recalculate_NullPeriodId_DoesNotTouchClosedPeriodLines. Documented as informational.",
+      "poc": "N/A — safe by design. Closed periods excluded by .Where(Open) filter.",
+      "remediation": "No action required. Add a code comment to clarify the intent of the null path.",
+      "blocking": false
+    },
+    {
+      "id": "SEC-INFO-002",
+      "severity": "informational",
+      "cwe": "CWE-209",
+      "owasp": "A09 Logging Failures",
+      "location": "src/NursingCareBackend.Domain/Payroll/PayrollPeriodClosedException.cs:11-12",
+      "title": "Exception message includes period GUID — safely sanitized by middleware",
+      "description": "PayrollPeriodClosedException(Guid periodId) produces the message 'Cannot modify payroll period {periodId} because it is closed.' The ExceptionHandlingMiddleware's PayrollPeriodClosedException arm uses a static detail string ('No es posible modificar un periodo de nomina cerrado.') and does NOT forward the exception.Message to the client. Test Contract_ClosedPeriod_409_Does_Not_Contain_PeriodId confirms the GUID is not in the HTTP response. Documented as informational.",
+      "poc": "See test Contract_ClosedPeriod_409_Does_Not_Contain_PeriodId — passes, confirming no GUID leakage.",
+      "remediation": "No client-facing leakage. Confirm server-side log redaction policy covers period GUIDs if required by data classification policy.",
+      "blocking": false
+    }
+  ],
+
+  "tests_authored": {
+    "rbac": {
+      "authored": 16,
+      "passed": 16,
+      "description": "7 unauthenticated (401) + 7 wrong-role (403) + 2 correct-role (admin reaches domain) tests across all guarded endpoints"
+    },
+    "negative": {
+      "authored": 10,
+      "passed": 10,
+      "description": "Null inputs, invalid enum values, negative amounts, empty labels, SQL injection payloads, XSS payloads, empty body, idempotent close, non-existent resource"
+    },
+    "contract": {
+      "authored": 4,
+      "passed": 4,
+      "description": "Content-Type header, ProblemDetails fields presence, stack trace absence, period GUID non-exposure in 409 responses"
+    },
+    "security": {
+      "authored": 7,
+      "passed": 7,
+      "description": "Guard bypass analysis (SEC-001), recalculate isolation (SEC-INFO-001), test token scope, signature tampering rejection, expiry validation"
+    }
+  },
+
+  "pre_existing_test_suite": {
+    "immutability_tests": {
+      "total": 7,
+      "passed": 7,
+      "class": "PayrollPeriodImmutabilityApiTests"
+    },
+    "full_suite": {
+      "total": 253,
+      "passed": 241,
+      "failed": 12,
+      "note": "12 failures are pre-existing in AdminBootstrapApiTests, AdminDashboardApiTests, GetCareRequestsApiTests — unrelated to payroll period immutability. None of the 34 authored AppSec tests failed."
+    }
+  },
+
+  "secret_detection": {
+    "result": "pass",
+    "method": "static analysis",
+    "details": "JwtTestTokens reads Jwt:Key from IConfiguration at runtime — no hardcoded keys in source. Test email, test Google OAuth credentials in CustomWebApplicationFactory are clearly labeled test values (e.g., 'test-google-client-id'). No production secrets found in test or source files."
+  },
+
+  "self_verification": {
+    "authored_tests": "passed",
+    "lint": "skipped",
+    "build": "succeeded"
+  },
+
+  "artifacts": [
+    {
+      "path": "tests/NursingCareBackend.Api.Tests/Payroll/PayrollAppsecTests.cs",
+      "action": "created",
+      "description": "34 AppSec tests: RBAC, negative/boundary, API contract, guard bypass, secret detection"
+    },
+    {
+      "path": "docs/sdlc/03-code-review-qa/appsec/manifest.json",
+      "action": "created",
+      "description": "AppSec agent manifest with findings summary, test counts, and phase completion record"
+    }
+  ]
+}

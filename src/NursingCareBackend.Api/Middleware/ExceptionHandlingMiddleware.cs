@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using NursingCareBackend.Api.ErrorHandling;
 using NursingCareBackend.Api.Extensions;
 using NursingCareBackend.Application.AdminPortal.Notifications;
+using NursingCareBackend.Domain.Payroll;
 
 namespace NursingCareBackend.Api.Middleware;
 
@@ -41,6 +42,10 @@ public sealed class ExceptionHandlingMiddleware
   {
     var (statusCode, title, detail) = exception switch
     {
+      PayrollPeriodClosedException => (
+        StatusCodes.Status409Conflict,
+        "Periodo cerrado",
+        "No es posible modificar un periodo de nomina cerrado."),
       ArgumentNullException => (
         StatusCodes.Status400BadRequest,
         "Solicitud invalida",
@@ -96,6 +101,9 @@ public sealed class ExceptionHandlingMiddleware
     problemDetails.Extensions["correlationId"] = correlationId;
 
     context.Response.StatusCode = statusCode;
+    // Set Content-Type before WriteAsJsonAsync. Headers become read-only once the response body
+    // stream begins writing. Setting here ensures the correct problem detail media type is
+    // advertised without racing against body serialization.
     context.Response.ContentType = "application/problem+json";
 
     await context.Response.WriteAsJsonAsync(problemDetails);

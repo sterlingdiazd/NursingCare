@@ -21,7 +21,20 @@ public sealed class PayrollRecalculationService : IPayrollRecalculationService
     {
         var now = DateTime.UtcNow;
 
-        // Load open periods matching optional periodId filter
+        // When a specific period is requested, verify it exists and is open
+        if (request.PeriodId.HasValue)
+        {
+            var requestedPeriod = await _dbContext.PayrollPeriods
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Id == request.PeriodId.Value, cancellationToken);
+
+            if (requestedPeriod is not null)
+                requestedPeriod.EnsureOpen();
+        }
+
+        // Load open periods matching optional periodId filter.
+        // When periodId is null, recalculation targets all Open periods only (filtered by Status == Open query).
+        // Closed periods are structurally excluded — no explicit EnsureOpen() guard needed for this path.
         var periodsQuery = _dbContext.PayrollPeriods
             .Where(p => p.Status == PayrollPeriodStatus.Open);
 

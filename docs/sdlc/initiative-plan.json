@@ -1,58 +1,136 @@
 {
-  "initiative_id": "20260417-care-request-lifecycle",
-  "user_request_summary": "Care request lifecycle transitions - approve, reject, complete, cancel with role-based permissions, audit trail, web and mobile UI, and tests",
-  "analysis": {
-    "already_implemented": [
-      "Backend: CareRequest domain entity has Approve(), Reject(), Complete() methods with full state-machine validation",
-      "Backend: CareRequestStatus enum (Pending, Approved, Rejected, Completed)",
-      "Backend: TransitionCareRequestHandler with approve/reject/complete logic, notifications, payroll integration",
-      "Backend: CareRequestsController with POST {id}/approve, POST {id}/reject, POST {id}/complete endpoints",
-      "Backend: Authorization policies (CareRequestApprover for approve/reject, CareRequestCompleter for complete)",
-      "Backend: Nurse assignment endpoint (PUT {id}/assignment, Admin-only)",
-      "Backend: AuditLog entity exists for audit trail",
-      "Backend: Admin notifications on reject and complete",
-      "Backend: Integration tests (CareRequestTransitionsApiTests.cs) and domain tests (CareRequestTests.cs) and handler tests (TransitionCareRequestHandlerTests.cs)",
-      "Web: transitionCareRequest() API function in careRequests.ts",
-      "Web: AdminCareRequestDetailPage with approve/reject buttons and transition logic",
-      "Web: Full admin care request list, detail, export functionality",
-      "Mobile: transitionCareRequest() service function in careRequestService.ts",
-      "Mobile: CareRequestTransitionAction type defined"
+  "initiative_id": "2026-04-19T2100-payroll-period-immutability",
+  "created_at": "2026-04-19T21:00:00Z",
+  "user_request_summary": "Enforce Master Spec Rule #7 — closed payroll periods cannot be modified. Add domain EnsureOpen() method, PayrollPeriodClosedException, 7 write guards across repositories/services, unit tests for guards, and integration tests for HTTP 409.",
+  "scope": {
+    "included": [
+      {
+        "phase": "02-implementation",
+        "rationale": "Core work: domain method, exception class, 7 guard insertions, unit tests, integration tests"
+      },
+      {
+        "phase": "03-code-review-qa",
+        "rationale": "Verify guard completeness, test coverage, exception handling consistency, no regressions"
+      }
     ],
-    "not_implemented": [
-      "Cancel action - no Cancel status in enum, no Cancel() method on domain entity, no cancel endpoint",
-      "Mobile UI screen for nurse to mark requests as complete (service layer exists, but no screen/button)",
-      "Rejection reason field - Reject() method has no reason parameter, no RejectionReason property on CareRequest",
-      "Audit trail logging for transitions - AuditLog entity exists but TransitionCareRequestHandler does not write AuditLog entries"
-    ],
-    "partially_implemented": [
-      "Audit trail: Admin notifications are sent on reject/complete, but no formal AuditLog record is created for transitions"
+    "excluded": [
+      {
+        "phase": "01-architecture",
+        "rationale": "Simple domain pattern (EnsureOpen guard + custom exception). No new APIs, no data model changes, no ADRs needed. Pattern already established by VoucherNotFoundException."
+      },
+      {
+        "phase": "04-devops-security",
+        "rationale": "No infrastructure changes. No new dependencies, Dockerfile changes, CI pipeline steps, or deployment configs."
+      },
+      {
+        "phase": "05-documentation",
+        "rationale": "Internal domain enforcement rule. No new user-facing features, API endpoints, or UI screens."
+      }
     ]
   },
-  "proposed_scope": {
-    "included": [],
-    "excluded": [
-      "01-architecture",
-      "02-implementation",
-      "03-code-review-qa",
-      "04-devops-security",
-      "05-documentation"
-    ],
-    "rationale": "The vast majority of the requested features are already fully implemented across backend, web, and mobile. The initiative as described is essentially complete. Only 3-4 incremental gaps remain (Cancel action, rejection reason, mobile completion screen, audit log writes). These are small enough to be individual tasks rather than a full pipeline initiative."
-  },
-  "unresolved_decisions": [
-    {
-      "id": "scope-001",
-      "question": "Most of the care request lifecycle (approve, reject, complete) is already fully implemented with endpoints, validation, authorization, web UI, and tests. Only these gaps remain: (1) Cancel action not implemented, (2) no rejection reason field, (3) no mobile screen for nurse to complete requests (service layer exists), (4) transition handler does not write AuditLog records. Do you want to proceed with a pipeline initiative for just these gaps, or handle them as individual tasks outside the pipeline?",
-      "category": "scoping",
-      "options": [
-        "Run pipeline for the 4 gaps (Cancel, rejection reason, mobile complete screen, audit log writes)",
-        "Handle gaps as individual tasks outside the pipeline",
-        "Skip - the current implementation is sufficient for now",
-        "Expand scope - tell me what additional features to include"
-      ],
-      "recommended": 1,
-      "rationale": "The gaps are small, well-defined tasks. A full 5-phase pipeline would be overhead for changes this size. Individual tasks with targeted implementation would be more efficient."
+  "splitting_decision": {
+    "total_estimated_hours": 1.5,
+    "split_recommendation": "keep",
+    "keep_rationale": "Single-layer cohesion — all changes are in NursingCareBackend (Domain, Infrastructure, Application, Tests). Single test harness (xUnit). Estimated under 4 hours. No cross-repo or cross-deployment-artifact concerns.",
+    "parallel_execution_plan": {
+      "implementation_parallel": false,
+      "parallel_scopes": ["backend"]
+    },
+    "git_operations": {
+      "combine_commit_push": true
+    },
+    "build_optimization": {
+      "pass_build_status": true,
+      "parallel_test_threads": 4
+    },
+    "use_case_quality": {
+      "require_data_testid_in_architecture": false
     }
-  ],
+  },
+  "implementation_coverage": "15%",
+  "implementation_details": {
+    "what_exists": [
+      "PayrollPeriod entity with Status property (Open/Closed enum)",
+      "PayrollRecalculationService filters Open periods but does not throw on Closed",
+      "VoucherNotFoundException establishes exception pattern in Application/Exceptions"
+    ],
+    "what_needs_building": [
+      "PayrollPeriod.EnsureOpen() domain method",
+      "PayrollPeriodClosedException (Domain/Payroll/)",
+      "Guard in AdminPayrollRepository.CreateDeductionAsync (~line 248)",
+      "Guard in AdminPayrollRepository.DeleteDeductionAsync (~line 268)",
+      "Guard in AdminPayrollRepository.CreateAdjustmentAsync (~line 308)",
+      "Guard in AdminPayrollRepository.DeleteAdjustmentAsync (~line 322)",
+      "Guard in AdminPayrollOverrideRepository.SubmitOverrideAsync (~line 17)",
+      "Guard in AdminPayrollOverrideRepository.ApproveOverrideAsync (~line 50)",
+      "Explicit throw in PayrollRecalculationService.RecalculateAsync (~line 17)",
+      "Unit tests for EnsureOpen() and each guard",
+      "Integration tests verifying HTTP 409 Conflict on closed-period write attempts"
+    ]
+  },
+  "infrastructure_status": {
+    "docker": "RUNNING",
+    "sql_server": "RUNNING (nursingcare-sql healthy)",
+    "seed_data": "SYNCED — Closed period exists with 10 payroll lines",
+    "infra_level": "L2",
+    "connection_string_note": "Encrypt=False required (infra-decision-graph.json P004)"
+  },
+  "file_inventory": {
+    "domain": [
+      "NursingCareBackend/src/NursingCareBackend.Domain/Payroll/PayrollPeriod.cs",
+      "NursingCareBackend/src/NursingCareBackend.Domain/Payroll/PayrollPeriodClosedException.cs (CREATE)"
+    ],
+    "infrastructure": [
+      "NursingCareBackend/src/NursingCareBackend.Infrastructure/AdminPortal/AdminPayrollRepository.cs",
+      "NursingCareBackend/src/NursingCareBackend.Infrastructure/AdminPortal/AdminPayrollOverrideRepository.cs"
+    ],
+    "application": [
+      "NursingCareBackend/src/NursingCareBackend.Application/Payroll/Services/PayrollRecalculationService.cs"
+    ],
+    "tests_unit": [
+      "NursingCareBackend/tests/NursingCareBackend.Domain.Tests/Payroll/PayrollPeriodTests.cs (CREATE)"
+    ],
+    "tests_integration": [
+      "NursingCareBackend/tests/NursingCareBackend.Api.Tests/Payroll/PayrollPeriodImmutabilityTests.cs (CREATE)"
+    ],
+    "exception_pattern_reference": [
+      "NursingCareBackend/src/NursingCareBackend.Application/Exceptions/VoucherNotFoundException.cs"
+    ]
+  },
+  "decisions": {
+    "resolved_from_config": [
+      {
+        "id": "stack-001",
+        "question": "Backend framework?",
+        "answer": ".NET 10, ASP.NET Core, clean architecture",
+        "source": "project-stack-defaults"
+      },
+      {
+        "id": "test-001",
+        "question": "Test framework?",
+        "answer": "xUnit + WebApplicationFactory with real SQL Server",
+        "source": "project-stack-defaults"
+      },
+      {
+        "id": "infra-001",
+        "question": "Infrastructure available?",
+        "answer": "Docker + SQL Server running, seed data synced with Closed period",
+        "source": "pre-context from parent"
+      },
+      {
+        "id": "exception-location-001",
+        "question": "Where to place PayrollPeriodClosedException?",
+        "answer": "Domain/Payroll/ — it is a domain invariant violation, not an application-layer exception",
+        "source": "domain-driven-design convention"
+      },
+      {
+        "id": "http-status-001",
+        "question": "HTTP status code for closed-period write attempt?",
+        "answer": "409 Conflict — represents a state conflict (period is closed)",
+        "source": "REST convention for state conflicts"
+      }
+    ],
+    "unresolved_decisions": []
+  },
   "status": "proposed"
 }

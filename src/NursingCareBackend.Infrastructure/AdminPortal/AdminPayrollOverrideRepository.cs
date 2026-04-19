@@ -20,12 +20,18 @@ public sealed class AdminPayrollOverrideRepository : IAdminPayrollOverrideReposi
         DateTime now,
         CancellationToken cancellationToken)
     {
-        // Validate line exists
-        var lineExists = await _dbContext.PayrollLines
-            .AnyAsync(l => l.Id == request.LineId, cancellationToken);
+        // Validate line exists and period is open
+        var line = await _dbContext.PayrollLines
+            .AsNoTracking()
+            .FirstOrDefaultAsync(l => l.Id == request.LineId, cancellationToken);
 
-        if (!lineExists)
+        if (line is null)
             throw new ArgumentException($"PayrollLine '{request.LineId}' not found.");
+
+        var linePeriod = await _dbContext.PayrollPeriods
+            .FirstOrDefaultAsync(p => p.Id == line.PayrollPeriodId, cancellationToken)
+            ?? throw new KeyNotFoundException($"PayrollPeriod '{line.PayrollPeriodId}' not found.");
+        linePeriod.EnsureOpen();
 
         // Cancel any existing pending override for this line
         var existingPending = await _dbContext.PayrollLineOverrides
@@ -67,6 +73,11 @@ public sealed class AdminPayrollOverrideRepository : IAdminPayrollOverrideReposi
 
         if (line is null)
             return (false, null);
+
+        var approvePeriod = await _dbContext.PayrollPeriods
+            .FirstOrDefaultAsync(p => p.Id == line.PayrollPeriodId, cancellationToken)
+            ?? throw new KeyNotFoundException($"PayrollPeriod '{line.PayrollPeriodId}' not found.");
+        approvePeriod.EnsureOpen();
 
         try
         {
