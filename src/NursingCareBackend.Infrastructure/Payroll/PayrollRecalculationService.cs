@@ -32,6 +32,14 @@ public sealed class PayrollRecalculationService : IPayrollRecalculationService
             .Select(p => p.Id)
             .ToListAsync(cancellationToken);
 
+        // SEC-002: If a specific periodId was requested but no matching open period exists,
+        // throw so the controller can return 400 instead of a silent HTTP 200 with zero lines.
+        if (openPeriodIds.Count == 0 && request.PeriodId.HasValue)
+        {
+            throw new ArgumentException(
+                $"El período '{request.PeriodId.Value}' no existe o no está abierto. Solo se pueden recalcular períodos con estado 'Open'.");
+        }
+
         if (openPeriodIds.Count == 0)
         {
             var emptyAudit = PayrollRecalculationAudit.Create(triggeredByUserId, now, request.PeriodId, request.RuleId, 0, 0m, 0m);

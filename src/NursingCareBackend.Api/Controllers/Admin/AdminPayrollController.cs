@@ -6,6 +6,7 @@ using NursingCareBackend.Api.Extensions;
 using NursingCareBackend.Application.AdminPortal.Payroll;
 using NursingCareBackend.Application.Exceptions;
 using NursingCareBackend.Application.Payroll;
+using NursingCareBackend.Api.Security;
 using NursingCareBackend.Domain.Identity;
 
 namespace NursingCareBackend.Api.Controllers.Admin;
@@ -19,17 +20,20 @@ public sealed class AdminPayrollController : ControllerBase
     private readonly IPayrollRecalculationService _recalculationService;
     private readonly IAdminPayrollOverrideRepository _overrideRepository;
     private readonly IPayrollVoucherService _voucherService;
+    private readonly IAuthRateLimiter _rateLimiter;
 
     public AdminPayrollController(
         IAdminPayrollRepository repository,
         IPayrollRecalculationService recalculationService,
         IAdminPayrollOverrideRepository overrideRepository,
-        IPayrollVoucherService voucherService)
+        IPayrollVoucherService voucherService,
+        IAuthRateLimiter rateLimiter)
     {
         _repository = repository;
         _recalculationService = recalculationService;
         _overrideRepository = overrideRepository;
         _voucherService = voucherService;
+        _rateLimiter = rateLimiter;
     }
 
     private Guid GetAdminUserId()
@@ -350,8 +354,25 @@ public sealed class AdminPayrollController : ControllerBase
         if (adminId == Guid.Empty)
             return Unauthorized();
 
-        var result = await _recalculationService.RecalculateAsync(adminId, request, cancellationToken);
-        return Ok(result);
+        // SEC-001: Rate-limit recalculation — 5 requests per minute per admin user
+        var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        var rateCheck = _rateLimiter.Check($"recalculate:{adminId}", clientIp, 5, TimeSpan.FromMinutes(1));
+        if (!rateCheck.IsAllowed)
+        {
+            HttpContext.Response.Headers.Append("Retry-After", Math.Max(1, (int)Math.Ceiling(rateCheck.RetryAfter.TotalSeconds)).ToString());
+            return this.ProblemResponse(StatusCodes.Status429TooManyRequests, "Limite de solicitudes excedido",
+                $"Ha excedido el limite de recalculos. Intente nuevamente en {Math.Max(1, (int)Math.Ceiling(rateCheck.RetryAfter.TotalSeconds))} segundos.");
+        }
+
+        try
+        {
+            var result = await _recalculationService.RecalculateAsync(adminId, request, cancellationToken);
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return this.ProblemResponse(StatusCodes.Status400BadRequest, "Datos invalidos", ex.Message);
+        }
     }
 
     // POST /api/admin/payroll/lines/{lineId}/override
