@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using NursingCareBackend.Application.AdminPortal.Payroll;
+using NursingCareBackend.Application.Exceptions;
 using NursingCareBackend.Application.Payroll;
 using NursingCareBackend.Domain.Payroll;
 using NursingCareBackend.Infrastructure.Persistence;
@@ -247,6 +248,20 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
 
     public async Task<Guid> CreateDeductionAsync(CreateDeductionRequest request, CancellationToken cancellationToken)
     {
+        // Payroll immutability guard: enforce via domain method (ADR-005)
+        if (request.PayrollPeriodId != Guid.Empty)
+        {
+            var period = await _dbContext.PayrollPeriods
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Id == request.PayrollPeriodId, cancellationToken);
+
+            if (period is not null)
+            {
+                try { period.EnsureOpen(); }
+                catch (InvalidOperationException) { throw new PayrollPeriodClosedException(period.Id); }
+            }
+        }
+
         if (!Enum.TryParse<DeductionType>(request.DeductionType, ignoreCase: true, out var deductionType))
             throw new ArgumentException($"Tipo de deducción invalido: {request.DeductionType}");
 
@@ -271,6 +286,20 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
             .FirstOrDefaultAsync(d => d.Id == deductionId, cancellationToken);
 
         if (deduction is null) return false;
+
+        // Payroll immutability guard: enforce via domain method (ADR-005)
+        if (deduction.PayrollPeriodId != Guid.Empty)
+        {
+            var period = await _dbContext.PayrollPeriods
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Id == deduction.PayrollPeriodId, cancellationToken);
+
+            if (period is not null)
+            {
+                try { period.EnsureOpen(); }
+                catch (InvalidOperationException) { throw new PayrollPeriodClosedException(period.Id); }
+            }
+        }
 
         _dbContext.DeductionRecords.Remove(deduction);
         await _dbContext.SaveChangesAsync(cancellationToken);

@@ -5,8 +5,13 @@ using NursingCareBackend.Application.AdminPortal.Shifts;
 using NursingCareBackend.Application.AdminPortal.Users;
 using NursingCareBackend.Application.CareRequests.Commands.AssignCareRequestNurse;
 using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
+using NursingCareBackend.Application.CareRequests.Commands.GenerateReceipt;
+using NursingCareBackend.Application.CareRequests.Commands.InvoiceCareRequest;
+using NursingCareBackend.Application.CareRequests.Commands.PayCareRequest;
 using NursingCareBackend.Application.CareRequests.Commands.TransitionCareRequest;
+using NursingCareBackend.Application.CareRequests.Commands.VoidCareRequest;
 using NursingCareBackend.Application.CareRequests.Queries;
+using NursingCareBackend.Application.CareRequests.Queries.GetReceipt;
 
 namespace NursingCareBackend.Application;
 
@@ -31,6 +36,11 @@ public static class DependencyInjection
     services.AddScoped<GetAdminClientDetailHandler>();
     services.AddScoped<GetAdminUsersHandler>();
     services.AddScoped<GetAdminUserDetailHandler>();
+    services.AddScoped<InvoiceCareRequestHandler>();
+    services.AddScoped<PayCareRequestHandler>();
+    services.AddScoped<VoidCareRequestHandler>();
+    services.AddScoped<GenerateReceiptHandler>();
+    services.AddScoped<GetReceiptHandler>();
     services.AddScoped<IAdminAccountProvisioningService, AdminAccountProvisioningService>();
     services.AddScoped<IAdminClientManagementService, AdminClientManagementService>();
     services.AddScoped<IAdminUserManagementService, AdminUserManagementService>();

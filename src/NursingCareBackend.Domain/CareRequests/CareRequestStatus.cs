@@ -6,5 +6,8 @@ public enum CareRequestStatus
     Approved = 1,
     Rejected = 2,
     Completed = 3,
-    Cancelled = 4
+    Cancelled = 4,
+    Invoiced = 5,
+    Paid = 6,
+    Voided = 7
 }

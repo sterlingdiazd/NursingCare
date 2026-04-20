@@ -32,7 +32,18 @@ public sealed class PayrollPeriod
         };
     }
 
+    public bool IsClosed => Status == PayrollPeriodStatus.Closed;
+
     public bool Contains(DateOnly date) => date >= StartDate && date <= EndDate;
+
+    public void EnsureOpen()
+    {
+        if (IsClosed)
+        {
+            throw new InvalidOperationException(
+                $"Payroll period {Id} is closed and cannot be modified.");
+        }
+    }
 
     public void Close(DateTime closedAtUtc)
     {
