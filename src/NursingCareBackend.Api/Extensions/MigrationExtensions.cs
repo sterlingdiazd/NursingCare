@@ -54,23 +54,32 @@ namespace NursingCareBackend.Api.Extensions
 
         EnsureSystemRoles(db);
         EnsureSystemSettings(db);
-        CatalogSeeding
-          .EnsureSeededAsync(db)
-          .GetAwaiter()
-          .GetResult();
-        CareRequestSeeding
-          .EnsureSeededAsync(db)
-          .GetAwaiter()
-          .GetResult();
-        FullLifecycleSeeding
-          .SeedWithContextAsync(db)
-          .GetAwaiter()
-          .GetResult();
+
+        try
+        {
+          CatalogSeeding
+            .EnsureSeededAsync(db)
+            .GetAwaiter()
+            .GetResult();
+          CareRequestSeeding
+            .EnsureSeededAsync(db)
+            .GetAwaiter()
+            .GetResult();
+          FullLifecycleSeeding
+            .SeedWithContextAsync(db)
+            .GetAwaiter()
+            .GetResult();
+        }
+        catch (Exception seedEx)
+        {
+          logger.LogWarning(seedEx, "Seeding failed (non-fatal). Application will start with existing data.");
+        }
+
         logger.LogInformation("Database startup sequence complete.");
       }
       catch (Exception ex)
       {
-        logger.LogError(ex, "FATAL: Failed to complete database startup sequence. Application cannot start.");
+        logger.LogError(ex, "FATAL: Failed to complete database startup sequence.");
         throw new InvalidOperationException($"Database startup failed: {ex.Message}", ex);
       }
     }
