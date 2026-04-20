@@ -38,23 +38,42 @@ jobs:
       - name: Restore
         run: dotnet restore src/src.sln
 
+      - name: Install sqlcmd
+        run: |
+          curl -sSL https://packages.microsoft.com/keys/microsoft.asc | sudo tee /etc/apt/trusted.gpg.d/microsoft.asc > /dev/null
+          sudo add-apt-repository "$(curl -sSL https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/prod.list)" 2>/dev/null || true
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq mssql-tools18 unixodbc-dev 2>/dev/null || true
+          echo "sqlcmd location: $(which sqlcmd 2>/dev/null || echo 'not in PATH')"
+          ls /opt/mssql-tools*/bin/sqlcmd 2>/dev/null || echo "No sqlcmd found in /opt"
+
       - name: Wait for SQL Server (poll)
         timeout-minutes: 4
         env:
           SA_PWD: ${{ secrets.SA_PASSWORD }}
         run: |
+          # Find sqlcmd
+          SQLCMD="/opt/mssql-tools18/bin/sqlcmd"
+          [ -f "$SQLCMD" ] || SQLCMD="/opt/mssql-tools/bin/sqlcmd"
+          [ -f "$SQLCMD" ] || SQLCMD="$(which sqlcmd 2>/dev/null || true)"
+          if [ -z "$SQLCMD" ] || [ ! -f "$SQLCMD" ]; then
+            echo "ERROR: sqlcmd not found. Skipping SQL Server wait."
+            exit 1
+          fi
+          echo "Using sqlcmd at: $SQLCMD"
           echo "Waiting for SQL Server to be ready..."
           for i in $(seq 1 48); do
-            if /opt/mssql-tools18/bin/sqlcmd \
-                -S localhost,1433 \
-                -U sa \
-                -P "${SA_PWD}" \
-                -C \
-                -Q "SELECT 1" > /dev/null 2>&1; then
+            if "$SQLCMD" -S localhost,1433 -U sa -P "${SA_PWD}" -C -Q "SELECT 1" > /dev/null 2>&1; then
               echo "SQL Server is ready (attempt $i)."
               exit 0
             fi
-            echo "Attempt $i: SQL Server not ready yet, waiting 5 s..."
+            # Show error on first and every 10th attempt for debugging
+            if [ "$i" = "1" ] || [ $((i % 10)) -eq 0 ]; then
+              echo "Attempt $i debug output:"
+              "$SQLCMD" -S localhost,1433 -U sa -P "${SA_PWD}" -C -Q "SELECT 1" 2>&1 || true
+            else
+              echo "Attempt $i: SQL Server not ready yet, waiting 5 s..."
+            fi
             sleep 5
           done
           echo "ERROR: SQL Server did not become ready within 4 minutes."
