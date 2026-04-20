@@ -62,6 +62,10 @@ namespace NursingCareBackend.Api.Extensions
           .EnsureSeededAsync(db)
           .GetAwaiter()
           .GetResult();
+        FullLifecycleSeeding
+          .SeedWithContextAsync(db)
+          .GetAwaiter()
+          .GetResult();
         logger.LogInformation("Database migrations applied successfully.");
       }
       catch (Exception ex)
