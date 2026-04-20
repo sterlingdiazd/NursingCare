@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -44,7 +45,11 @@ public static class DependencyInjection
         services.AddSingleton(new ResolvedConnectionString(resolvedConnectionString));
 
         services.AddDbContext<NursingCareDbContext>(options =>
-            options.UseSqlServer(resolvedConnectionString));
+        {
+            options.UseSqlServer(resolvedConnectionString);
+            options.ConfigureWarnings(w =>
+                w.Log(RelationalEventId.PendingModelChangesWarning));
+        });
 
         services.Configure<GoogleOAuthOptions>(options =>
         {

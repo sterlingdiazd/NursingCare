@@ -35,7 +35,9 @@ public sealed class AdminPayrollController : ControllerBase
     private Guid GetAdminUserId()
     {
         var claim = User.FindFirst(ClaimTypes.NameIdentifier);
-        return claim != null ? Guid.Parse(claim.Value) : Guid.Empty;
+        return claim != null && Guid.TryParse(claim.Value, out var adminUserId)
+            ? adminUserId
+            : Guid.Empty;
     }
 
     // GET /api/admin/payroll/periods

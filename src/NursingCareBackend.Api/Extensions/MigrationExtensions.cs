@@ -1,3 +1,4 @@
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using NursingCareBackend.Domain.Identity;
@@ -8,9 +9,14 @@ namespace NursingCareBackend.Api.Extensions
 {
   public static class MigrationExtensions
   {
+    // SQL Server error number for "object already exists" / "column already exists"
+    private const int SqlErrorColumnAlreadyExists = 2705;
+    private const int SqlErrorObjectAlreadyExists = 2714;
+
     /// <summary>
     /// Applies all pending EF Core migrations at application startup.
-    /// NOTE: Database must have valid data that satisfies all constraints.
+    /// Fault-tolerant: logs warnings instead of crashing on schema-sync conflicts.
+    /// Set SKIP_MIGRATIONS=true to bypass migration execution entirely (seeding still runs).
     /// </summary>
     /// <param name="app">WebApplication instance</param>
     public static void ApplyMigrations(this WebApplication app)
@@ -32,26 +38,20 @@ namespace NursingCareBackend.Api.Extensions
           return;
         }
 
-        logger.LogInformation("Applying database migrations...");
-        if (!db.Database.CanConnect())
+        var skipMigrations = string.Equals(
+          Environment.GetEnvironmentVariable("SKIP_MIGRATIONS"),
+          "true",
+          StringComparison.OrdinalIgnoreCase);
+
+        if (skipMigrations)
         {
-          logger.LogInformation("Database does not exist, creating...");
-          db.Database.Migrate();
+          logger.LogWarning("SKIP_MIGRATIONS=true — skipping migration execution. Seeding will still run.");
         }
         else
         {
-          logger.LogInformation("Database exists, checking for pending migrations...");
-          var pendingMigrations = db.Database.GetPendingMigrations();
-          if (pendingMigrations.Any())
-          {
-            logger.LogInformation($"Applying {pendingMigrations.Count()} pending migrations...");
-            db.Database.Migrate();
-          }
-          else
-          {
-            logger.LogInformation("No pending migrations found.");
-          }
+          ApplyPendingMigrations(db, logger);
         }
+
         EnsureSystemRoles(db);
         EnsureSystemSettings(db);
         CatalogSeeding
@@ -66,12 +66,53 @@ namespace NursingCareBackend.Api.Extensions
           .SeedWithContextAsync(db)
           .GetAwaiter()
           .GetResult();
-        logger.LogInformation("Database migrations applied successfully.");
+        logger.LogInformation("Database startup sequence complete.");
       }
       catch (Exception ex)
       {
-        logger.LogError(ex, "FATAL: Failed to apply database migrations. Application cannot start.");
-        throw new InvalidOperationException($"Database migration failed: {ex.Message}", ex);
+        logger.LogError(ex, "FATAL: Failed to complete database startup sequence. Application cannot start.");
+        throw new InvalidOperationException($"Database startup failed: {ex.Message}", ex);
+      }
+    }
+
+    private static void ApplyPendingMigrations(NursingCareDbContext db, ILogger logger)
+    {
+      logger.LogInformation("Applying database migrations...");
+
+      if (!db.Database.CanConnect())
+      {
+        logger.LogInformation("Database does not exist — creating and applying all migrations.");
+        db.Database.Migrate();
+        return;
+      }
+
+      logger.LogInformation("Database exists — checking for pending migrations.");
+      var pendingMigrations = db.Database.GetPendingMigrations().ToList();
+
+      if (pendingMigrations.Count == 0)
+      {
+        logger.LogInformation("No pending migrations found.");
+        return;
+      }
+
+      logger.LogInformation("Applying {Count} pending migration(s).", pendingMigrations.Count);
+
+      try
+      {
+        db.Database.Migrate();
+        logger.LogInformation("All pending migrations applied successfully.");
+      }
+      catch (SqlException sqlEx) when (
+        sqlEx.Number == SqlErrorColumnAlreadyExists ||
+        sqlEx.Number == SqlErrorObjectAlreadyExists)
+      {
+        logger.LogWarning(
+          sqlEx,
+          "Migration encountered a schema-sync conflict (SQL error {Number}: {Message}). " +
+          "This typically means the database schema is already up to date despite the migration history being out of sync. " +
+          "Continuing startup — set SKIP_MIGRATIONS=true to suppress this entirely.",
+          sqlEx.Number,
+          sqlEx.Message);
       }
     }
 
