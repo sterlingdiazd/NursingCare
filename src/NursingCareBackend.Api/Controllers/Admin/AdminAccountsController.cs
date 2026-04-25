@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NursingCareBackend.Api.Extensions;
+using NursingCareBackend.Api.Localization;
 using NursingCareBackend.Application.AdminPortal.Users;
 using NursingCareBackend.Domain.Identity;
 
@@ -31,8 +32,8 @@ public sealed class AdminAccountsController : ControllerBase
     {
       return this.ProblemResponse(
         StatusCodes.Status401Unauthorized,
-        "No autorizado",
-        "La sesion actual no incluye un identificador administrativo valido.");
+        Messages.Get("errors.no_autorizado"),
+        Messages.Get("errors.sesion_sin_admin"));
     }
 
     var detail = await _adminAccountProvisioningService.CreateAsync(

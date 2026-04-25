@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
 using NursingCareBackend.Api.ErrorHandling;
 using NursingCareBackend.Api.Extensions;
+using NursingCareBackend.Api.Localization;
 using NursingCareBackend.Api.Security;
 using NursingCareBackend.Application.Identity.Commands;
 using NursingCareBackend.Application.Identity.OAuth;
@@ -77,8 +78,8 @@ public sealed class AuthController : ControllerBase
         {
             return this.ProblemResponse(
                 StatusCodes.Status401Unauthorized,
-                "No autorizado",
-                "La sesion actual no incluye un identificador de usuario valido.");
+                Messages.Get("errors.no_autorizado"),
+                Messages.Get("errors.sesion_sin_usuario"));
         }
 
         var response = await _authenticationService.CompleteProfileAsync(
@@ -122,7 +123,7 @@ public sealed class AuthController : ControllerBase
         {
             return this.ProblemResponse(
                 StatusCodes.Status401Unauthorized,
-                "Inicio de sesion fallido",
+                Messages.Get("errors.inicio_sesion_fallido"),
                 UserFacingMessageTranslator.Translate(ex.Message));
         }
     }
@@ -145,7 +146,7 @@ public sealed class AuthController : ControllerBase
         {
             return this.ProblemResponse(
                 StatusCodes.Status400BadRequest,
-                "Google OAuth no esta configurado",
+                Messages.Get("errors.google_oauth_no_configurado"),
                 ex.Message);
         }
     }
@@ -246,7 +247,7 @@ public sealed class AuthController : ControllerBase
         {
             return this.ProblemResponse(
                 StatusCodes.Status401Unauthorized,
-                "Actualizacion de sesion fallida",
+                Messages.Get("errors.actualizacion_sesion_fallida"),
                 UserFacingMessageTranslator.Translate(ex.Message));
         }
     }
@@ -275,12 +276,12 @@ public sealed class AuthController : ControllerBase
         {
             return this.ProblemResponse(
                 StatusCodes.Status400BadRequest,
-                "Solicitud invalida",
-                "El identificador del usuario no tiene un formato valido.");
+                Messages.Get("errors.solicitud_invalida"),
+                Messages.Get("errors.usuario_id_formato_invalido"));
         }
 
         await _authenticationService.AssignRoleAsync(userId, request.RoleName, cancellationToken);
-        return Ok(new { message = "El rol se asigno correctamente." });
+        return Ok(new { message = Messages.Get("messages.rol_asignado") });
     }
 
     /// <summary>
@@ -330,12 +331,12 @@ public sealed class AuthController : ControllerBase
         {
             return this.ProblemResponse(
                 StatusCodes.Status400BadRequest,
-                "Solicitud invalida",
-                "El identificador del usuario no tiene un formato valido.");
+                Messages.Get("errors.solicitud_invalida"),
+                Messages.Get("errors.usuario_id_formato_invalido"));
         }
 
         await _authenticationService.ActivateUserAsync(userId, cancellationToken);
-        return Ok(new { message = "La cuenta se activo correctamente." });
+        return Ok(new { message = Messages.Get("messages.cuenta_activada") });
     }
 
     /// <summary>
@@ -579,7 +580,7 @@ public sealed class AuthController : ControllerBase
         Response.Headers.RetryAfter = Math.Max(1, (int)Math.Ceiling(retryAfter.TotalSeconds)).ToString(CultureInfo.InvariantCulture);
         return this.ProblemResponse(
             StatusCodes.Status429TooManyRequests,
-            "Demasiadas solicitudes",
+            Messages.Get("errors.demasiadas_solicitudes"),
             detail);
     }
 

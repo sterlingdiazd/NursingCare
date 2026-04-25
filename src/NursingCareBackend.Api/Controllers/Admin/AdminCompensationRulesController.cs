@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NursingCareBackend.Api.Extensions;
+using NursingCareBackend.Api.Localization;
 using NursingCareBackend.Application.AdminPortal.Payroll;
 using NursingCareBackend.Domain.Identity;
 
@@ -39,8 +40,8 @@ public sealed class AdminCompensationRulesController : ControllerBase
         {
             return this.ProblemResponse(
                 StatusCodes.Status404NotFound,
-                "Regla no encontrada",
-                $"No se encontro la regla de compensacion con id '{id}'.");
+                Messages.Get("errors.regla_no_encontrada"),
+                $"No se encontró la regla de compensación con id '{id}'.");
         }
 
         return Ok(detail);
@@ -59,7 +60,7 @@ public sealed class AdminCompensationRulesController : ControllerBase
         }
         catch (ArgumentException ex)
         {
-            return this.ProblemResponse(StatusCodes.Status400BadRequest, "Datos invalidos", ex.Message);
+            return this.ProblemResponse(StatusCodes.Status400BadRequest, Messages.Get("errors.datos_invalidos"), ex.Message);
         }
     }
 
@@ -75,8 +76,8 @@ public sealed class AdminCompensationRulesController : ControllerBase
         {
             return this.ProblemResponse(
                 StatusCodes.Status404NotFound,
-                "Regla no encontrada",
-                $"No se encontro la regla de compensacion con id '{id}'.");
+                Messages.Get("errors.regla_no_encontrada"),
+                $"No se encontró la regla de compensación con id '{id}'.");
         }
 
         return NoContent();
@@ -94,8 +95,8 @@ public sealed class AdminCompensationRulesController : ControllerBase
         {
             return this.ProblemResponse(
                 StatusCodes.Status404NotFound,
-                "Regla no encontrada",
-                $"No se encontro la regla de compensacion con id '{id}'.");
+                Messages.Get("errors.regla_no_encontrada"),
+                $"No se encontró la regla de compensación con id '{id}'.");
         }
 
         return NoContent();

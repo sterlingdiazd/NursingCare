@@ -3,6 +3,7 @@ using System.Globalization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NursingCareBackend.Api.Extensions;
+using NursingCareBackend.Api.Localization;
 using NursingCareBackend.Application.AdminPortal.Reports;
 using NursingCareBackend.Domain.Identity;
 
@@ -48,7 +49,7 @@ public sealed class AdminReportsController : ControllerBase
         {
             return this.ProblemResponse(
                 404,
-                "Reporte no encontrado.",
+                Messages.Get("errors.reporte_no_encontrado"),
                 $"El reporte solicitado '{reportKey}' no existe.");
         }
 
@@ -62,8 +63,8 @@ public sealed class AdminReportsController : ControllerBase
             _logger.LogError(ex, "Error processing report {ReportKey}", reportKey);
             return this.ProblemResponse(
                 500,
-                "Error al procesar el reporte",
-                "Ocurrió un error al procesar la solicitud.");
+                Messages.Get("errors.error_reporte"),
+                Messages.Get("errors.error_reporte_detalle"));
         }
     }
 
@@ -80,7 +81,7 @@ public sealed class AdminReportsController : ControllerBase
         {
             return this.ProblemResponse(
                 404,
-                "Reporte no encontrado.",
+                Messages.Get("errors.reporte_no_encontrado"),
                 $"El reporte solicitado '{reportKey}' no existe.");
         }
 
@@ -104,8 +105,8 @@ public sealed class AdminReportsController : ControllerBase
             _logger.LogError(ex, "Error exporting report {ReportKey}", reportKey);
             return this.ProblemResponse(
                 500,
-                "Error al exportar el reporte",
-                "Ocurrió un error al procesar la solicitud.");
+                Messages.Get("errors.error_exportar_reporte"),
+                Messages.Get("errors.error_reporte_detalle"));
         }
     }
 

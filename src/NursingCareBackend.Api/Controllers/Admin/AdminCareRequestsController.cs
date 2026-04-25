@@ -4,6 +4,7 @@ using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NursingCareBackend.Api.Extensions;
+using NursingCareBackend.Api.Localization;
 using NursingCareBackend.Application.AdminPortal.Queries;
 using NursingCareBackend.Application.AdminPortal.Shifts;
 using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
@@ -148,8 +149,8 @@ public sealed class AdminCareRequestsController : ControllerBase
     {
       return this.ProblemResponse(
         StatusCodes.Status404NotFound,
-        "Solicitud no encontrada",
-        "No se encontro la solicitud administrativa.");
+        Messages.Get("errors.solicitud_no_encontrada"),
+        Messages.Get("errors.solicitud_admin_no_encontrada_detalle"));
     }
 
     return Ok(detail);
@@ -175,8 +176,8 @@ public sealed class AdminCareRequestsController : ControllerBase
     {
       return this.ProblemResponse(
         StatusCodes.Status400BadRequest,
-        "Cliente invalido",
-        "Debes seleccionar un cliente activo y valido para crear la solicitud.");
+        Messages.Get("errors.cliente_invalido"),
+        Messages.Get("errors.cliente_invalido_detalle"));
     }
 
     var id = await _createHandler.Handle(
@@ -248,7 +249,7 @@ public sealed class AdminCareRequestsController : ControllerBase
     }
     catch (InvalidOperationException ex)
     {
-      return this.ProblemResponse(StatusCodes.Status400BadRequest, "Transicion invalida", ex.Message);
+      return this.ProblemResponse(StatusCodes.Status400BadRequest, Messages.Get("errors.transicion_invalida"), ex.Message);
     }
   }
 
@@ -278,7 +279,7 @@ public sealed class AdminCareRequestsController : ControllerBase
     }
     catch (InvalidOperationException ex)
     {
-      return this.ProblemResponse(StatusCodes.Status400BadRequest, "Transicion invalida", ex.Message);
+      return this.ProblemResponse(StatusCodes.Status400BadRequest, Messages.Get("errors.transicion_invalida"), ex.Message);
     }
   }
 
@@ -308,7 +309,7 @@ public sealed class AdminCareRequestsController : ControllerBase
     }
     catch (InvalidOperationException ex)
     {
-      return this.ProblemResponse(StatusCodes.Status400BadRequest, "Transicion invalida", ex.Message);
+      return this.ProblemResponse(StatusCodes.Status400BadRequest, Messages.Get("errors.transicion_invalida"), ex.Message);
     }
   }
 
@@ -337,7 +338,7 @@ public sealed class AdminCareRequestsController : ControllerBase
     }
     catch (InvalidOperationException ex)
     {
-      return this.ProblemResponse(StatusCodes.Status400BadRequest, "Estado invalido", ex.Message);
+      return this.ProblemResponse(StatusCodes.Status400BadRequest, Messages.Get("errors.estado_invalido"), ex.Message);
     }
   }
 
@@ -351,7 +352,7 @@ public sealed class AdminCareRequestsController : ControllerBase
     var result = await _getReceiptHandler.Handle(id, cancellationToken);
 
     if (result is null)
-      return this.ProblemResponse(StatusCodes.Status404NotFound, "Recibo no encontrado", $"No existe recibo para la solicitud '{id}'.");
+      return this.ProblemResponse(StatusCodes.Status404NotFound, Messages.Get("errors.recibo_no_encontrado"), $"No existe recibo para la solicitud '{id}'.");
 
     return Ok(result);
   }

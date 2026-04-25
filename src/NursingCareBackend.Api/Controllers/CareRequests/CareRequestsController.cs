@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using NursingCareBackend.Api.Localization;
 using NursingCareBackend.Application.CareRequests;
 using NursingCareBackend.Application.CareRequests.Commands.AssignCareRequestNurse;
 using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
@@ -49,8 +50,8 @@ public sealed class CareRequestsController : ControllerBase
         {
             return this.ProblemResponse(
                 StatusCodes.Status401Unauthorized,
-                "No autorizado",
-                "La sesion actual no incluye un identificador de usuario valido.");
+                Messages.Get("errors.no_autorizado"),
+                Messages.Get("errors.sesion_sin_usuario"));
         }
 
         var command = new CreateCareRequestCommand
@@ -84,8 +85,8 @@ public sealed class CareRequestsController : ControllerBase
         {
             return this.ProblemResponse(
                 StatusCodes.Status401Unauthorized,
-                "No autorizado",
-                "La sesion actual no incluye un identificador de usuario valido.");
+                Messages.Get("errors.no_autorizado"),
+                Messages.Get("errors.sesion_sin_usuario"));
         }
 
         var careRequests = await _getAllHandler.Handle(accessScope, cancellationToken);
@@ -107,8 +108,8 @@ public sealed class CareRequestsController : ControllerBase
         {
             return this.ProblemResponse(
                 StatusCodes.Status401Unauthorized,
-                "No autorizado",
-                "La sesion actual no incluye un identificador de usuario valido.");
+                Messages.Get("errors.no_autorizado"),
+                Messages.Get("errors.sesion_sin_usuario"));
         }
 
         var careRequest = await _getByIdHandler.Handle(id, accessScope, cancellationToken);
@@ -117,8 +118,8 @@ public sealed class CareRequestsController : ControllerBase
         {
             return this.ProblemResponse(
                 StatusCodes.Status404NotFound,
-                "Solicitud no encontrada",
-                "No se encontro la solicitud.");
+                Messages.Get("errors.solicitud_no_encontrada"),
+                Messages.Get("errors.solicitud_no_encontrada_detalle"));
         }
 
         return Ok(CareRequestResponse.FromDomain(careRequest));
@@ -159,8 +160,8 @@ public sealed class CareRequestsController : ControllerBase
         {
             return this.ProblemResponse(
                 StatusCodes.Status404NotFound,
-                "Solicitud no encontrada",
-                "No se encontro la solicitud de cuidado.");
+                Messages.Get("errors.solicitud_no_encontrada"),
+                Messages.Get("errors.solicitud_cuidado_no_encontrada_detalle"));
         }
 
         if (result.FieldComparisons.Count == 0 && !result.Matches)

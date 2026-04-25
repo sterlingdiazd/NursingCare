@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NursingCareBackend.Api.Extensions;
+using NursingCareBackend.Api.Localization;
 using NursingCareBackend.Application.AdminPortal.Catalog;
 using NursingCareBackend.Application.Catalogs;
 using NursingCareBackend.Domain.Identity;
@@ -66,7 +67,7 @@ public sealed class AdminCatalogController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            return this.ProblemResponse(StatusCodes.Status400BadRequest, "Solicitud invalida.", ex.Message);
+            return this.ProblemResponse(StatusCodes.Status400BadRequest, Messages.Get("errors.solicitud_invalida_punto"), ex.Message);
         }
     }
 
@@ -101,7 +102,7 @@ public sealed class AdminCatalogController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            return this.ProblemResponse(StatusCodes.Status400BadRequest, "Solicitud invalida.", ex.Message);
+            return this.ProblemResponse(StatusCodes.Status400BadRequest, Messages.Get("errors.solicitud_invalida_punto"), ex.Message);
         }
     }
 
@@ -125,7 +126,7 @@ public sealed class AdminCatalogController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            return this.ProblemResponse(StatusCodes.Status400BadRequest, "Solicitud invalida.", ex.Message);
+            return this.ProblemResponse(StatusCodes.Status400BadRequest, Messages.Get("errors.solicitud_invalida_punto"), ex.Message);
         }
     }
 
@@ -169,7 +170,7 @@ public sealed class AdminCatalogController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            return this.ProblemResponse(StatusCodes.Status400BadRequest, "Solicitud invalida.", ex.Message);
+            return this.ProblemResponse(StatusCodes.Status400BadRequest, Messages.Get("errors.solicitud_invalida_punto"), ex.Message);
         }
     }
 
@@ -220,7 +221,7 @@ public sealed class AdminCatalogController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            return this.ProblemResponse(StatusCodes.Status400BadRequest, "Solicitud invalida.", ex.Message);
+            return this.ProblemResponse(StatusCodes.Status400BadRequest, Messages.Get("errors.solicitud_invalida_punto"), ex.Message);
         }
     }
 
@@ -271,7 +272,7 @@ public sealed class AdminCatalogController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            return this.ProblemResponse(StatusCodes.Status400BadRequest, "Solicitud invalida.", ex.Message);
+            return this.ProblemResponse(StatusCodes.Status400BadRequest, Messages.Get("errors.solicitud_invalida_punto"), ex.Message);
         }
     }
 
@@ -365,7 +366,7 @@ public sealed class AdminCatalogController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            return this.ProblemResponse(StatusCodes.Status400BadRequest, "Solicitud invalida.", ex.Message);
+            return this.ProblemResponse(StatusCodes.Status400BadRequest, Messages.Get("errors.solicitud_invalida_punto"), ex.Message);
         }
     }
 
@@ -416,7 +417,7 @@ public sealed class AdminCatalogController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            return this.ProblemResponse(StatusCodes.Status400BadRequest, "Solicitud invalida.", ex.Message);
+            return this.ProblemResponse(StatusCodes.Status400BadRequest, Messages.Get("errors.solicitud_invalida_punto"), ex.Message);
         }
     }
 
@@ -432,11 +433,11 @@ public sealed class AdminCatalogController : ControllerBase
         }
         catch (ArgumentException ex)
         {
-            return this.ProblemResponse(StatusCodes.Status400BadRequest, "Solicitud invalida.", ex.Message);
+            return this.ProblemResponse(StatusCodes.Status400BadRequest, Messages.Get("errors.solicitud_invalida_punto"), ex.Message);
         }
         catch (InvalidOperationException ex)
         {
-            return this.ProblemResponse(StatusCodes.Status400BadRequest, "Calculo invalido.", ex.Message);
+            return this.ProblemResponse(StatusCodes.Status400BadRequest, Messages.Get("errors.calculo_invalido"), ex.Message);
         }
     }
 

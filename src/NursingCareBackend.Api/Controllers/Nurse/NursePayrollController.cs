@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NursingCareBackend.Api.Extensions;
+using NursingCareBackend.Api.Localization;
 using NursingCareBackend.Application.AdminPortal.Payroll;
 using NursingCareBackend.Application.Exceptions;
 using NursingCareBackend.Application.Payroll;
@@ -118,8 +119,8 @@ public sealed class NursePayrollController : ControllerBase
         {
             return this.ProblemResponse(
                 StatusCodes.Status400BadRequest,
-                "Sin identidad",
-                "No se pudo determinar el usuario enfermera.");
+                Messages.Get("errors.sin_identidad"),
+                Messages.Get("errors.sin_identidad_detalle"));
         }
 
         try
@@ -134,8 +135,8 @@ public sealed class NursePayrollController : ControllerBase
         {
             return this.ProblemResponse(
                 StatusCodes.Status404NotFound,
-                "Periodo no encontrado",
-                "No se encontraron datos de nomina para el periodo especificado.");
+                Messages.Get("errors.periodo_zip_no_encontrado"),
+                Messages.Get("errors.periodo_zip_no_encontrado_detalle"));
         }
     }
 

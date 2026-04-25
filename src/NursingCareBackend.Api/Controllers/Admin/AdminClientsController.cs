@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NursingCareBackend.Api.Extensions;
+using NursingCareBackend.Api.Localization;
 using NursingCareBackend.Application.AdminPortal.Clients;
 using NursingCareBackend.Domain.Identity;
 
@@ -56,8 +57,8 @@ public sealed class AdminClientsController : ControllerBase
     {
       return this.ProblemResponse(
         StatusCodes.Status404NotFound,
-        "Cliente no encontrado",
-        "No se encontro el cliente solicitado.");
+        Messages.Get("errors.cliente_no_encontrado"),
+        Messages.Get("errors.cliente_no_encontrado_detalle"));
     }
 
     return Ok(detail);
@@ -142,8 +143,8 @@ public sealed class AdminClientsController : ControllerBase
   {
     return this.ProblemResponse(
       StatusCodes.Status401Unauthorized,
-      "No autorizado",
-      "La sesion actual no incluye un identificador administrativo valido.");
+      Messages.Get("errors.no_autorizado"),
+      Messages.Get("errors.sesion_sin_admin"));
   }
 
   private Guid? ResolveActorUserId()

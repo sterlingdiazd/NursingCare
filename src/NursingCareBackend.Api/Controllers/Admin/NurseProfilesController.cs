@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NursingCareBackend.Api.Extensions;
+using NursingCareBackend.Api.Localization;
 using NursingCareBackend.Application.Identity.Commands;
 using NursingCareBackend.Application.Identity.Services;
 
@@ -165,8 +166,8 @@ public sealed class NurseProfilesController : ControllerBase
     {
         return this.ProblemResponse(
             StatusCodes.Status401Unauthorized,
-            "No autorizado",
-            "La sesion actual no incluye un identificador administrativo valido.");
+            Messages.Get("errors.no_autorizado"),
+            Messages.Get("errors.sesion_sin_admin"));
     }
 
     private Guid? ResolveActorUserId()

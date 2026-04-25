@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NursingCareBackend.Api.ErrorHandling;
 using NursingCareBackend.Api.Extensions;
+using NursingCareBackend.Api.Localization;
 using NursingCareBackend.Application.AdminPortal.Users;
 using NursingCareBackend.Domain.Identity;
 
@@ -56,7 +57,7 @@ public sealed class AdminUsersController : ControllerBase
     {
       return this.ProblemResponse(
         StatusCodes.Status404NotFound,
-        "Usuario no encontrado",
+        Messages.Get("errors.usuario_no_encontrado"),
         UserFacingMessageTranslator.Translate($"User with ID {userId} not found."));
     }
 

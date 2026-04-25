@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NursingCareBackend.Api.Extensions;
+using NursingCareBackend.Api.Localization;
 using NursingCareBackend.Application.AdminPortal.Payroll;
 using NursingCareBackend.Domain.Identity;
 
@@ -63,8 +64,8 @@ public sealed class AdminShiftsController : ControllerBase
         {
             return this.ProblemResponse(
                 StatusCodes.Status404NotFound,
-                "Turno no encontrado",
-                $"No se encontro el turno con id '{id}'.");
+                Messages.Get("errors.turno_no_encontrado"),
+                $"No se encontró el turno con id '{id}'.");
         }
 
         return Ok(detail);

@@ -3,6 +3,7 @@ using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NursingCareBackend.Api.Extensions;
+using NursingCareBackend.Api.Localization;
 using NursingCareBackend.Application.AdminPortal.Payroll;
 using NursingCareBackend.Application.Exceptions;
 using NursingCareBackend.Application.Payroll;
@@ -77,8 +78,8 @@ public sealed class AdminPayrollController : ControllerBase
         {
             return this.ProblemResponse(
                 StatusCodes.Status404NotFound,
-                "Periodo no encontrado",
-                $"No se encontro el periodo de nomina con id '{id}'.");
+                Messages.Get("errors.periodo_no_encontrado"),
+                $"No se encontró el período de nómina con id '{id}'.");
         }
 
         return Ok(detail);
@@ -96,8 +97,8 @@ public sealed class AdminPayrollController : ControllerBase
         {
             return this.ProblemResponse(
                 StatusCodes.Status400BadRequest,
-                "Rango de fechas invalido",
-                "La fecha de fin debe ser igual o posterior a la fecha de inicio.");
+                Messages.Get("errors.rango_fechas_invalido"),
+                Messages.Get("errors.rango_fechas_detalle"));
         }
 
         try
@@ -113,7 +114,7 @@ public sealed class AdminPayrollController : ControllerBase
         }
         catch (ArgumentException ex)
         {
-            return this.ProblemResponse(StatusCodes.Status400BadRequest, "Datos invalidos", ex.Message);
+            return this.ProblemResponse(StatusCodes.Status400BadRequest, Messages.Get("errors.datos_invalidos"), ex.Message);
         }
     }
 
@@ -129,8 +130,8 @@ public sealed class AdminPayrollController : ControllerBase
         {
             return this.ProblemResponse(
                 StatusCodes.Status404NotFound,
-                "Periodo no encontrado",
-                $"No se encontro el periodo de nomina con id '{id}'.");
+                Messages.Get("errors.periodo_no_encontrado"),
+                $"No se encontró el período de nómina con id '{id}'.");
         }
 
         return NoContent();
@@ -209,11 +210,11 @@ public sealed class AdminPayrollController : ControllerBase
         }
         catch (PayrollPeriodClosedException ex)
         {
-            return this.ProblemResponse(StatusCodes.Status409Conflict, "Periodo cerrado", ex.Message);
+            return this.ProblemResponse(StatusCodes.Status409Conflict, Messages.Get("errors.periodo_cerrado"), ex.Message);
         }
         catch (ArgumentException ex)
         {
-            return this.ProblemResponse(StatusCodes.Status400BadRequest, "Datos invalidos", ex.Message);
+            return this.ProblemResponse(StatusCodes.Status400BadRequest, Messages.Get("errors.datos_invalidos"), ex.Message);
         }
     }
 
@@ -232,15 +233,15 @@ public sealed class AdminPayrollController : ControllerBase
             {
                 return this.ProblemResponse(
                     StatusCodes.Status404NotFound,
-                    "Deduccion no encontrada",
-                    $"No se encontro la deduccion con id '{id}'.");
+                    Messages.Get("errors.deduccion_no_encontrada"),
+                    $"No se encontró la deducción con id '{id}'.");
             }
 
             return NoContent();
         }
         catch (PayrollPeriodClosedException ex)
         {
-            return this.ProblemResponse(StatusCodes.Status409Conflict, "Periodo cerrado", ex.Message);
+            return this.ProblemResponse(StatusCodes.Status409Conflict, Messages.Get("errors.periodo_cerrado"), ex.Message);
         }
     }
 
@@ -269,11 +270,11 @@ public sealed class AdminPayrollController : ControllerBase
         }
         catch (PayrollPeriodClosedException ex)
         {
-            return this.ProblemResponse(StatusCodes.Status409Conflict, "Periodo cerrado", ex.Message);
+            return this.ProblemResponse(StatusCodes.Status409Conflict, Messages.Get("errors.periodo_cerrado"), ex.Message);
         }
         catch (ArgumentException ex)
         {
-            return this.ProblemResponse(StatusCodes.Status400BadRequest, "Datos invalidos", ex.Message);
+            return this.ProblemResponse(StatusCodes.Status400BadRequest, Messages.Get("errors.datos_invalidos"), ex.Message);
         }
     }
 
@@ -289,8 +290,8 @@ public sealed class AdminPayrollController : ControllerBase
         {
             return this.ProblemResponse(
                 StatusCodes.Status404NotFound,
-                "Ajuste no encontrado",
-                $"No se encontro el ajuste de compensacion con id '{id}'.");
+                Messages.Get("errors.ajuste_no_encontrado"),
+                $"No se encontró el ajuste de compensación con id '{id}'.");
         }
 
         return NoContent();
@@ -360,8 +361,8 @@ public sealed class AdminPayrollController : ControllerBase
         if (!rateCheck.IsAllowed)
         {
             HttpContext.Response.Headers.Append("Retry-After", Math.Max(1, (int)Math.Ceiling(rateCheck.RetryAfter.TotalSeconds)).ToString());
-            return this.ProblemResponse(StatusCodes.Status429TooManyRequests, "Limite de solicitudes excedido",
-                $"Ha excedido el limite de recalculos. Intente nuevamente en {Math.Max(1, (int)Math.Ceiling(rateCheck.RetryAfter.TotalSeconds))} segundos.");
+            return this.ProblemResponse(StatusCodes.Status429TooManyRequests, Messages.Get("errors.rate_limit_recalculo"),
+                $"Ha excedido el límite de recálculos. Intente nuevamente en {Math.Max(1, (int)Math.Ceiling(rateCheck.RetryAfter.TotalSeconds))} segundos.");
         }
 
         try
@@ -371,7 +372,7 @@ public sealed class AdminPayrollController : ControllerBase
         }
         catch (ArgumentException ex)
         {
-            return this.ProblemResponse(StatusCodes.Status400BadRequest, "Datos invalidos", ex.Message);
+            return this.ProblemResponse(StatusCodes.Status400BadRequest, Messages.Get("errors.datos_invalidos"), ex.Message);
         }
     }
 
@@ -398,11 +399,11 @@ public sealed class AdminPayrollController : ControllerBase
         }
         catch (PayrollPeriodClosedException ex)
         {
-            return this.ProblemResponse(StatusCodes.Status409Conflict, "Periodo cerrado", ex.Message);
+            return this.ProblemResponse(StatusCodes.Status409Conflict, Messages.Get("errors.periodo_cerrado"), ex.Message);
         }
         catch (ArgumentException ex)
         {
-            return this.ProblemResponse(StatusCodes.Status400BadRequest, "Datos invalidos", ex.Message);
+            return this.ProblemResponse(StatusCodes.Status400BadRequest, Messages.Get("errors.datos_invalidos"), ex.Message);
         }
     }
 
@@ -425,7 +426,7 @@ public sealed class AdminPayrollController : ControllerBase
             var (found, error) = await _overrideRepository.ApproveOverrideAsync(lineId, adminId, DateTime.UtcNow, cancellationToken);
 
             if (!found)
-                return this.ProblemResponse(StatusCodes.Status404NotFound, "Override no encontrado", $"No hay una solicitud de compensacion pendiente para la linea '{lineId}'.");
+                return this.ProblemResponse(StatusCodes.Status404NotFound, Messages.Get("errors.override_no_encontrado"), $"No hay una solicitud de compensación pendiente para la línea '{lineId}'.");
 
             if (error is not null)
                 return this.ProblemResponse(StatusCodes.Status403Forbidden, "No autorizado", "Not authorized to approve this override.");
@@ -434,7 +435,7 @@ public sealed class AdminPayrollController : ControllerBase
         }
         catch (PayrollPeriodClosedException ex)
         {
-            return this.ProblemResponse(StatusCodes.Status409Conflict, "Periodo cerrado", ex.Message);
+            return this.ProblemResponse(StatusCodes.Status409Conflict, Messages.Get("errors.periodo_cerrado"), ex.Message);
         }
     }
 
@@ -464,8 +465,8 @@ public sealed class AdminPayrollController : ControllerBase
         {
             return this.ProblemResponse(
                 StatusCodes.Status404NotFound,
-                "Periodo o enfermera no encontrado",
-                "No se encontraron datos de nomina para el periodo y la enfermera especificados.");
+                Messages.Get("errors.periodo_enfermera_no_encontrado"),
+                Messages.Get("errors.periodo_enfermera_no_encontrado_detalle"));
         }
     }
 
@@ -494,8 +495,8 @@ public sealed class AdminPayrollController : ControllerBase
         {
             return this.ProblemResponse(
                 StatusCodes.Status404NotFound,
-                "Periodo no encontrado",
-                "No se encontraron datos de nomina para el periodo especificado.");
+                Messages.Get("errors.periodo_zip_no_encontrado"),
+                Messages.Get("errors.periodo_zip_no_encontrado_detalle"));
         }
     }
 
@@ -514,8 +515,8 @@ public sealed class AdminPayrollController : ControllerBase
         {
             return this.ProblemResponse(
                 StatusCodes.Status404NotFound,
-                "Detalle no encontrado",
-                $"No se encontraron datos de nomina para el periodo '{periodId}' y la enfermera '{nurseUserId}'.");
+                Messages.Get("errors.detalle_no_encontrado"),
+                $"No se encontraron datos de nómina para el período '{periodId}' y la enfermera '{nurseUserId}'.");
         }
 
         return Ok(detail);
