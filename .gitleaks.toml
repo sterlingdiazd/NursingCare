@@ -1,0 +1,20 @@
+[allowlist]
+description = "Documentation and sample fingerprints — false positives"
+
+paths = [
+  '''README_SETUP\.md$''',
+  '''TESTING_SCENARIOS\.md$''',
+  '''.*\.md$''',
+]
+
+regexes = [
+  # Generic REDACTED placeholder used throughout documentation
+  '''REDACTED''',
+  # Sample JWT tokens in documentation and curl examples
+  '''eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+''',
+  # Sample passwords used in setup documentation (YourStrong!Passw0rd pattern)
+  '''YourStrong!Passw0rd''',
+  # Placeholder JWT_KEY values in documentation examples
+  '''dev-secret-key''',
+  '''secret-key-min-32-chars''',
+]

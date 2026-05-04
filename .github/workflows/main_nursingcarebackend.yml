@@ -3,10 +3,9 @@
 
 name: Build and deploy ASP.Net Core app to Azure Web App - NursingCareBackend
 
+# Azure subscription disabled - re-enable push trigger when restored.
+# See initiative 2026-05-04-cicd-trivy-vitest-azure-disable.
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 jobs:
@@ -47,7 +46,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: .net-app
-      
+
       - name: Login to Azure
         uses: azure/login@v2
         with:
@@ -62,4 +61,3 @@ jobs:
           app-name: 'NursingCareBackend'
           slot-name: 'Production'
           package: .
-          
