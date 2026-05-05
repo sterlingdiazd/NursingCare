@@ -12,9 +12,19 @@ regexes = [
   '''REDACTED''',
   # Sample JWT tokens in documentation and curl examples
   '''eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+''',
-  # Sample passwords used in setup documentation (YourStrong!Passw0rd pattern)
+  # Sample passwords used in setup documentation
   '''YourStrong!Passw0rd''',
+  '''SecurePass123!''',
+  '''Pass123!''',
   # Placeholder JWT_KEY values in documentation examples
   '''dev-secret-key''',
   '''secret-key-min-32-chars''',
+  '''your-super-secret-key-change-in-production''',
+  '''ChangeThisDevelopmentKeyToARealSecret''',
+  '''dev-key''',
+  # Documentation placeholders
+  '''your-token-from-login''',
+  '''your-jwt-token-from-login-response''',
+  # Static backend secret key found in report
+  '''NursingCareBackendSecretKey12345678901234567890''',
 ]
