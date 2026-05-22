@@ -31,6 +31,35 @@ public sealed class ExceptionHandlingMiddleware
     {
       await _next(context);
     }
+    catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+    {
+      // Client closed the connection mid-request (e.g. user navigated away).
+      // Don't surface as 500 / log as ERR. Use 499 (client closed request).
+      _logger.LogDebug(
+        "Request aborted by client for {Method} {Path}",
+        context.Request.Method,
+        context.Request.Path);
+      if (!context.Response.HasStarted)
+      {
+        context.Response.StatusCode = 499;
+      }
+    }
+    catch (Microsoft.AspNetCore.Http.BadHttpRequestException ex)
+    {
+      // Kestrel surfaces malformed/truncated requests (e.g. client closed mid-body)
+      // as BadHttpRequestException. Honor the carried status code (typically 4xx)
+      // instead of laundering them as 500s.
+      _logger.LogDebug(
+        ex,
+        "Bad HTTP request for {Method} {Path}: {Message}",
+        context.Request.Method,
+        context.Request.Path,
+        ex.Message);
+      if (!context.Response.HasStarted)
+      {
+        context.Response.StatusCode = ex.StatusCode == 0 ? StatusCodes.Status400BadRequest : ex.StatusCode;
+      }
+    }
     catch (Exception ex)
     {
       await HandleExceptionAsync(context, ex);
