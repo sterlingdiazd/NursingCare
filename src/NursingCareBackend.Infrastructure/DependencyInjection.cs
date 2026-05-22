@@ -103,6 +103,7 @@ public static class DependencyInjection
         services.AddScoped<IPaymentProofRepository, PaymentProofRepository>();
         services.AddScoped<IReceiptPdfService, ReceiptPdfService>();
         services.AddScoped<IAdminDashboardRepository, AdminDashboardRepository>();
+        services.AddScoped<NursingCareBackend.Application.AdminPortal.Finance.IAdminFinanceRepository, AdminFinanceRepository>();
         services.AddScoped<IAdminActionQueueRepository, AdminActionQueueRepository>();
         services.AddScoped<IAdminCareRequestRepository, AdminCareRequestRepository>();
         services.AddScoped<IShiftRecordAdminRepository, ShiftRecordAdminRepository>();
