@@ -13,10 +13,9 @@ public sealed class AdminNotificationService : IAdminNotificationService
     _dbContext = dbContext;
   }
 
-  public async Task<IReadOnlyList<AdminNotificationListItem>> ListForAdminAsync(
+  public async Task<AdminNotificationListPage> ListForAdminAsync(
     Guid adminUserId,
-    bool includeArchived,
-    bool unreadOnly,
+    AdminNotificationListFilter filter,
     CancellationToken cancellationToken = default)
   {
     EnsureValidAdminUserId(adminUserId);
@@ -25,18 +24,22 @@ public sealed class AdminNotificationService : IAdminNotificationService
       .AsNoTracking()
       .Where(item => item.RecipientUserId == adminUserId);
 
-    if (!includeArchived)
+    query = filter.Status switch
     {
-      query = query.Where(item => item.ArchivedAtUtc == null);
-    }
+      AdminNotificationStatus.Active => query.Where(item => item.ArchivedAtUtc == null),
+      AdminNotificationStatus.Unread => query.Where(item => item.ArchivedAtUtc == null && item.ReadAtUtc == null),
+      AdminNotificationStatus.ActionRequired => query.Where(item => item.ArchivedAtUtc == null && item.RequiresAction),
+      AdminNotificationStatus.Archived => query.Where(item => item.ArchivedAtUtc != null),
+      AdminNotificationStatus.All => query,
+      _ => query.Where(item => item.ArchivedAtUtc == null),
+    };
 
-    if (unreadOnly)
-    {
-      query = query.Where(item => item.ReadAtUtc == null);
-    }
+    var totalCount = await query.CountAsync(cancellationToken);
 
-    return await query
+    var items = await query
       .OrderByDescending(item => item.CreatedAtUtc)
+      .Skip((filter.Page - 1) * filter.PageSize)
+      .Take(filter.PageSize)
       .Select(item => new AdminNotificationListItem(
         item.Id,
         item.Category,
@@ -54,6 +57,8 @@ public sealed class AdminNotificationService : IAdminNotificationService
         item.ArchivedAtUtc,
         item.CreatedBySystem))
       .ToListAsync(cancellationToken);
+
+    return new AdminNotificationListPage(items, totalCount, filter.Page, filter.PageSize);
   }
 
   public async Task<AdminNotificationSummary> GetSummaryAsync(
