@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using NursingCareBackend.Application.AdminPortal.Finance;
 using NursingCareBackend.Domain.CareRequests;
@@ -32,6 +33,143 @@ public sealed class AdminFinanceRepository : IAdminFinanceRepository
         "medicos" => "Servicios médicos",
         _ => "Otros",
     };
+
+    private static readonly CultureInfo Es = new("es-DO");
+    private static string M(decimal v) => $"RD$ {v.ToString("N2", Es)}";
+    private static string PctStr(decimal v) => $"{v.ToString("0.0", Es)}%";
+
+    private async Task<Func<Guid, string>> NameResolverAsync(IEnumerable<Guid> ids, CancellationToken cancellationToken)
+    {
+        var idList = ids.Distinct().ToList();
+        var users = await _dbContext.Users.AsNoTracking()
+            .Where(u => idList.Contains(u.Id))
+            .Select(u => new { u.Id, u.DisplayName, u.Name, u.LastName, u.Email })
+            .ToListAsync(cancellationToken);
+        return id =>
+        {
+            var u = users.FirstOrDefault(x => x.Id == id);
+            if (u is null) return "—";
+            if (!string.IsNullOrWhiteSpace(u.DisplayName)) return u.DisplayName!;
+            var full = string.Join(" ", new[] { u.Name, u.LastName }.Where(s => !string.IsNullOrWhiteSpace(s)));
+            return string.IsNullOrWhiteSpace(full) ? u.Email : full;
+        };
+    }
+
+    public async Task<FinanceDetail?> GetDetailAsync(string metric, DateOnly from, DateOnly to, CancellationToken cancellationToken)
+    {
+        if (to < from) (from, to) = (to, from);
+        // Plain locals (not local functions) so they can sit inside an EF expression tree.
+        var fromStart = from.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var toEndEx = to.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        string Dt(DateTime? dt) => dt?.ToString("dd/MM/yyyy") ?? "—";
+
+        switch ((metric ?? string.Empty).ToLowerInvariant())
+        {
+            case "collected":
+            {
+                var rows = await _dbContext.CareRequests.AsNoTracking()
+                    .Where(c => c.VoidedAtUtc == null && c.PaidAtUtc >= fromStart && c.PaidAtUtc < toEndEx)
+                    .Select(c => new { c.UserID, c.InvoiceNumber, c.PaidAtUtc, c.Total })
+                    .ToListAsync(cancellationToken);
+                var name = await NameResolverAsync(rows.Select(r => r.UserID), cancellationToken);
+                var detail = rows.OrderByDescending(r => r.PaidAtUtc)
+                    .Select(r => new FinanceDetailRow(new[] { name(r.UserID), r.InvoiceNumber ?? "—", Dt(r.PaidAtUtc), M(r.Total) }))
+                    .ToList();
+                return new FinanceDetail("Cobrado", "Pagos confirmados por ti en el período.",
+                    new[] { "Cliente", "Factura", "Fecha de pago", "Monto" }, detail,
+                    new[] { "Total", "", "", M(rows.Sum(r => r.Total)) }, null);
+            }
+            case "pending":
+            {
+                var rows = await _dbContext.CareRequests.AsNoTracking()
+                    .Where(c => c.VoidedAtUtc == null && c.InvoicedAtUtc != null && c.PaidAtUtc == null)
+                    .Select(c => new { c.UserID, c.InvoiceNumber, c.InvoicedAtUtc, c.Total })
+                    .ToListAsync(cancellationToken);
+                var name = await NameResolverAsync(rows.Select(r => r.UserID), cancellationToken);
+                var detail = rows.OrderByDescending(r => r.InvoicedAtUtc)
+                    .Select(r => new FinanceDetailRow(new[] { name(r.UserID), r.InvoiceNumber ?? "—", Dt(r.InvoicedAtUtc), M(r.Total) }))
+                    .ToList();
+                return new FinanceDetail("Pendiente de cobro", "Servicios facturados que aún no se han confirmado como pagados.",
+                    new[] { "Cliente", "Factura", "Fecha factura", "Monto" }, detail,
+                    new[] { "Total", "", "", M(rows.Sum(r => r.Total)) }, null);
+            }
+            case "services":
+            case "revenue":
+            case "margin":
+            case "labor":
+            {
+                var execs = await _dbContext.ServiceExecutions.AsNoTracking()
+                    .Where(e => e.ServiceDate >= from && e.ServiceDate <= to)
+                    .Select(e => new { e.NurseUserId, e.ServiceDate, e.PricingCategoryCode, e.SubtotalBeforeSupplies, e.NetCompensation })
+                    .ToListAsync(cancellationToken);
+                var name = await NameResolverAsync(execs.Select(e => e.NurseUserId), cancellationToken);
+                var detail = execs.OrderByDescending(e => e.ServiceDate)
+                    .Select(e => new FinanceDetailRow(new[]
+                    {
+                        e.ServiceDate.ToString("dd/MM/yyyy"),
+                        name(e.NurseUserId),
+                        ServiceLineOf(e.PricingCategoryCode),
+                        M(e.SubtotalBeforeSupplies),
+                        M(e.NetCompensation),
+                        M(e.SubtotalBeforeSupplies - e.NetCompensation),
+                    }))
+                    .ToList();
+                var rev = execs.Sum(e => e.SubtotalBeforeSupplies);
+                var lab = execs.Sum(e => e.NetCompensation);
+                return new FinanceDetail("Servicios del período", "Cada servicio entregado: lo facturado al cliente, lo pagado a la enfermera y el margen.",
+                    new[] { "Fecha", "Enfermera", "Categoría", "Ingreso", "Pago", "Margen" }, detail,
+                    new[] { "Total", "", "", M(rev), M(lab), M(rev - lab) }, null);
+            }
+            case "category":
+            {
+                var ov = await GetOverviewAsync(from, to, cancellationToken);
+                var detail = ov.ByCategory
+                    .Select(c => new FinanceDetailRow(new[] { c.DisplayName, M(c.Revenue), M(c.Labor), M(c.Margin), PctStr(c.MarginPercent) }))
+                    .ToList();
+                return new FinanceDetail("Por categoría", "Ingresos y margen por categoría de servicio.",
+                    new[] { "Categoría", "Ingreso", "Nómina", "Margen", "Margen %" }, detail, null, null);
+            }
+            case "line":
+            {
+                var ov = await GetOverviewAsync(from, to, cancellationToken);
+                var detail = ov.ByServiceLine
+                    .Select(l => new FinanceDetailRow(new[] { l.ServiceLine, M(l.Revenue), M(l.Labor), M(l.Margin), PctStr(l.MarginPercent) }))
+                    .ToList();
+                return new FinanceDetail("Por línea de servicio", "Domicilio vs Casa hogar: cuál deja más margen.",
+                    new[] { "Línea", "Ingreso", "Nómina", "Margen", "Margen %" }, detail, null, null);
+            }
+            case "clients":
+            {
+                var ov = await GetOverviewAsync(from, to, cancellationToken);
+                var detail = ov.TopClients
+                    .Select(c => new FinanceDetailRow(new[] { c.ClientName, $"{c.ServicesCount}", M(c.Billed), M(c.Collected), M(c.Pending), M(c.Margin) }))
+                    .ToList();
+                return new FinanceDetail("Por cliente", "Facturación y margen por cliente.",
+                    new[] { "Cliente", "Serv.", "Facturado", "Cobrado", "Pendiente", "Margen" }, detail, null, null);
+            }
+            case "nurses":
+            {
+                var ov = await GetOverviewAsync(from, to, cancellationToken);
+                var detail = ov.NurseParticipation
+                    .Select(n => new FinanceDetailRow(new[] { n.NurseName, $"{n.ServicesCount}", $"{n.DaysWorked}", M(n.RevenueGenerated), M(n.NetPay), PctStr(n.ParticipationPercent), M(n.MarginContributed) }))
+                    .ToList();
+                return new FinanceDetail("Participación por enfermera", "Lo que genera y se le paga a cada enfermera.",
+                    new[] { "Enfermera", "Serv.", "Días", "Ingreso", "Pago", "Part. %", "Margen" }, detail, null, null);
+            }
+            case "loans":
+            {
+                var ov = await GetOverviewAsync(from, to, cancellationToken);
+                var detail = ov.Loans
+                    .Select(l => new FinanceDetailRow(new[] { l.NurseName, M(l.OutstandingBalance) }))
+                    .ToList();
+                return new FinanceDetail("Préstamos a enfermeras", "Saldo pendiente de préstamos/adelantos por enfermera.",
+                    new[] { "Enfermera", "Saldo" }, detail,
+                    new[] { "Total", M(ov.TotalLoansOutstanding) }, null);
+            }
+            default:
+                return null;
+        }
+    }
 
     public async Task<FinanceOverview> GetOverviewAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken)
     {

@@ -53,3 +53,14 @@ public sealed record HealthIndicator(
 
 /// <summary>A proactive insight ("things she might want to know") with a plain-language explanation.</summary>
 public sealed record Insight(string Key, string Severity, string Title, string Detail, string? DeepLinkPath);
+
+/// <summary>Source-record detail behind a dashboard metric: a report-style table with pre-formatted cells.</summary>
+public sealed record FinanceDetail(
+    string Title,
+    string? Explanation,
+    IReadOnlyList<string> Columns,
+    IReadOnlyList<FinanceDetailRow> Rows,
+    IReadOnlyList<string>? TotalsRow,
+    string? Footnote);
+
+public sealed record FinanceDetailRow(IReadOnlyList<string> Cells, bool Emphasize = false);

@@ -31,4 +31,25 @@ public sealed class AdminFinanceController : ControllerBase
         var overview = await _repository.GetOverviewAsync(f, t, cancellationToken);
         return Ok(overview);
     }
+
+    // GET /api/admin/finance/detail?metric=&from=&to=  (source records behind a dashboard metric)
+    [HttpGet("detail")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<FinanceDetail>> GetDetail(
+        [FromQuery] string metric,
+        [FromQuery] DateOnly? from,
+        [FromQuery] DateOnly? to,
+        CancellationToken cancellationToken)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var f = from ?? new DateOnly(today.Year, today.Month, 1);
+        var t = to ?? today;
+        var detail = await _repository.GetDetailAsync(metric, f, t, cancellationToken);
+        if (detail is null)
+        {
+            return Problem(title: "Métrica desconocida", detail: $"No se reconoce la métrica '{metric}'.", statusCode: StatusCodes.Status400BadRequest);
+        }
+        return Ok(detail);
+    }
 }
