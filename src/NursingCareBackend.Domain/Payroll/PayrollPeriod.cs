@@ -15,10 +15,7 @@ public sealed class PayrollPeriod
 
     public static PayrollPeriod Create(DateOnly startDate, DateOnly endDate, DateOnly cutoffDate, DateOnly paymentDate, DateTime createdAtUtc)
     {
-        if (endDate < startDate)
-        {
-            throw new ArgumentException("Payroll period end date must be on or after the start date.", nameof(endDate));
-        }
+        ValidateSchedule(startDate, endDate, cutoffDate, paymentDate);
 
         return new PayrollPeriod
         {
@@ -35,6 +32,38 @@ public sealed class PayrollPeriod
     public bool IsClosed => Status == PayrollPeriodStatus.Closed;
 
     public bool Contains(DateOnly date) => date >= StartDate && date <= EndDate;
+
+    public void UpdateSchedule(DateOnly startDate, DateOnly endDate, DateOnly cutoffDate, DateOnly paymentDate)
+    {
+        EnsureOpen();
+        ValidateSchedule(startDate, endDate, cutoffDate, paymentDate);
+
+        StartDate = startDate;
+        EndDate = endDate;
+        CutoffDate = cutoffDate;
+        PaymentDate = paymentDate;
+    }
+
+    // Standard period date rules: a coherent timeline of start ≤ end, start ≤ cutoff,
+    // and cutoff ≤ payment. Cutoff may fall inside the period (before end); payment is
+    // settled on or after the cutoff.
+    private static void ValidateSchedule(DateOnly startDate, DateOnly endDate, DateOnly cutoffDate, DateOnly paymentDate)
+    {
+        if (endDate < startDate)
+        {
+            throw new ArgumentException("Payroll period end date must be on or after the start date.", nameof(endDate));
+        }
+
+        if (cutoffDate < startDate)
+        {
+            throw new ArgumentException("Payroll period cutoff date must be on or after the start date.", nameof(cutoffDate));
+        }
+
+        if (paymentDate < cutoffDate)
+        {
+            throw new ArgumentException("Payroll period payment date must be on or after the cutoff date.", nameof(paymentDate));
+        }
+    }
 
     public void EnsureOpen()
     {
