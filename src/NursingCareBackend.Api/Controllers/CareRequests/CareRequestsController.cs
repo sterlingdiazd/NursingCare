@@ -7,6 +7,7 @@ using NursingCareBackend.Application.CareRequests.Commands.AssignCareRequestNurs
 using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
 using NursingCareBackend.Application.CareRequests.Commands.TransitionCareRequest;
 using NursingCareBackend.Application.CareRequests.Queries;
+using NursingCareBackend.Application.Identity.Repositories;
 using NursingCareBackend.Api.Extensions;
 using NursingCareBackend.Domain.Identity;
 
@@ -22,6 +23,7 @@ public sealed class CareRequestsController : ControllerBase
     private readonly GetCareRequestsHandler _getAllHandler;
     private readonly GetCareRequestByIdHandler _getByIdHandler;
     private readonly VerifyPricingHandler _verifyPricingHandler;
+    private readonly IUserRepository _userRepository;
 
     public CareRequestsController(
         AssignCareRequestNurseHandler assignNurseHandler,
@@ -29,7 +31,8 @@ public sealed class CareRequestsController : ControllerBase
         TransitionCareRequestHandler transitionHandler,
         GetCareRequestsHandler getAllHandler,
         GetCareRequestByIdHandler getByIdHandler,
-        VerifyPricingHandler verifyPricingHandler)
+        VerifyPricingHandler verifyPricingHandler,
+        IUserRepository userRepository)
     {
         _assignNurseHandler = assignNurseHandler;
         _createHandler = createHandler;
@@ -37,6 +40,7 @@ public sealed class CareRequestsController : ControllerBase
         _getAllHandler = getAllHandler;
         _getByIdHandler = getByIdHandler;
         _verifyPricingHandler = verifyPricingHandler;
+        _userRepository = userRepository;
     }
 
     [HttpPost]
@@ -46,7 +50,7 @@ public sealed class CareRequestsController : ControllerBase
         CancellationToken cancellationToken)
     {
         var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (!Guid.TryParse(userIdClaim, out var userId))
+        if (!Guid.TryParse(userIdClaim, out var callerUserId))
         {
             return this.ProblemResponse(
                 StatusCodes.Status401Unauthorized,
@@ -54,9 +58,52 @@ public sealed class CareRequestsController : ControllerBase
                 Messages.Get("errors.sesion_sin_usuario"));
         }
 
+        var callerIsAdmin = User.IsInRole(SystemRoles.Admin);
+
+        // Resolve the client (the user the care request is FOR).
+        // - Admin caller: must specify ClientUserId in the body. The selected
+        //   user must exist and have ProfileType=CLIENT.
+        // - Client caller: ClientUserId is ignored; the JWT subject is the client.
+        Guid clientUserId;
+        if (callerIsAdmin)
+        {
+            if (request.ClientUserId is null || request.ClientUserId.Value == Guid.Empty)
+            {
+                return this.ProblemResponse(
+                    StatusCodes.Status400BadRequest,
+                    Messages.Get("errors.cliente_requerido"),
+                    Messages.Get("errors.cliente_requerido_detalle"));
+            }
+
+            var targetClient = await _userRepository.GetByIdAsync(request.ClientUserId.Value, cancellationToken);
+            if (targetClient is null
+                || targetClient.ProfileType != UserProfileType.CLIENT
+                || !targetClient.UserRoles.Any(ur => ur.Role.Name == SystemRoles.Client))
+            {
+                return this.ProblemResponse(
+                    StatusCodes.Status400BadRequest,
+                    Messages.Get("errors.cliente_no_valido"),
+                    Messages.Get("errors.cliente_no_valido_detalle"));
+            }
+
+            clientUserId = targetClient.Id;
+        }
+        else
+        {
+            // Non-admin caller cannot impersonate another user.
+            if (request.ClientUserId.HasValue && request.ClientUserId.Value != callerUserId)
+            {
+                return this.ProblemResponse(
+                    StatusCodes.Status403Forbidden,
+                    Messages.Get("errors.acceso_denegado"),
+                    Messages.Get("errors.acceso_denegado_detalle"));
+            }
+            clientUserId = callerUserId;
+        }
+
         var command = new CreateCareRequestCommand
         {
-            UserID = userId,
+            UserID = clientUserId,
             Description = request.CareRequestDescription,
             CareRequestReason = null,
             CareRequestType = request.CareRequestType,
