@@ -127,6 +127,17 @@ public sealed class AdminPayrollApiTests : IClassFixture<CustomWebApplicationFac
         var created = await createResp.Content.ReadFromJsonAsync<JsonElement>();
         var periodId = created.GetProperty("id").GetGuid();
 
+        // A period needs payroll activity before it can be closed — add a deduction.
+        var deductionResp = await adminClient.PostAsJsonAsync("/api/admin/payroll/deductions", new
+        {
+            nurseUserId = JwtTestTokens.TestNurseUserId,
+            payrollPeriodId = periodId,
+            deductionType = "Other",
+            label = "Activity",
+            amount = 10.00m
+        });
+        deductionResp.EnsureSuccessStatusCode();
+
         var closeResp = await adminClient.PatchAsync($"/api/admin/payroll/periods/{periodId}/close", null);
         Assert.Equal(HttpStatusCode.NoContent, closeResp.StatusCode);
 
@@ -136,11 +147,224 @@ public sealed class AdminPayrollApiTests : IClassFixture<CustomWebApplicationFac
     }
 
     [Fact]
+    public async Task PATCH_ClosePeriod_Empty_Returns_409()
+    {
+        var adminClient = CreateAdminClient();
+        var (start, end) = UniqueMonthRange();
+        var createResp = await adminClient.PostAsJsonAsync("/api/admin/payroll/periods", new
+        {
+            startDate = start.ToString("yyyy-MM-dd"),
+            endDate = end.ToString("yyyy-MM-dd"),
+            cutoffDate = end.ToString("yyyy-MM-dd"),
+            paymentDate = end.ToString("yyyy-MM-dd")
+        });
+        var periodId = (await createResp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        await ClearPeriodDeductionsAsync(adminClient, periodId);
+
+        var closeResp = await adminClient.PatchAsync($"/api/admin/payroll/periods/{periodId}/close", null);
+        Assert.Equal(HttpStatusCode.Conflict, closeResp.StatusCode);
+    }
+
+    [Fact]
     public async Task PATCH_ClosePeriod_Missing_Returns_404()
     {
         var adminClient = CreateAdminClient();
         var response = await adminClient.PatchAsync($"/api/admin/payroll/periods/{Guid.NewGuid()}/close", null);
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PUT_UpdatePeriod_Open_Unused_Changes_Dates()
+    {
+        var adminClient = CreateAdminClient();
+        var (start, end) = UniqueMonthRange();
+
+        var createResp = await adminClient.PostAsJsonAsync("/api/admin/payroll/periods", new
+        {
+            startDate = start.ToString("yyyy-MM-dd"),
+            endDate = end.ToString("yyyy-MM-dd"),
+            cutoffDate = end.ToString("yyyy-MM-dd"),
+            paymentDate = end.ToString("yyyy-MM-dd")
+        });
+        createResp.EnsureSuccessStatusCode();
+        var periodId = (await createResp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        var (newStart, newEnd) = UniqueMonthRange();
+        var updateResp = await adminClient.PutAsJsonAsync($"/api/admin/payroll/periods/{periodId}", new
+        {
+            startDate = newStart.ToString("yyyy-MM-dd"),
+            endDate = newEnd.ToString("yyyy-MM-dd"),
+            cutoffDate = newEnd.ToString("yyyy-MM-dd"),
+            paymentDate = newEnd.ToString("yyyy-MM-dd")
+        });
+        Assert.Equal(HttpStatusCode.NoContent, updateResp.StatusCode);
+
+        var getResp = await adminClient.GetAsync($"/api/admin/payroll/periods/{periodId}");
+        var detail = await getResp.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(newStart.ToString("yyyy-MM-dd"), detail.GetProperty("startDate").GetString());
+        Assert.Equal("Open", detail.GetProperty("status").GetString());
+    }
+
+    [Fact]
+    public async Task PUT_UpdatePeriod_Missing_Returns_404()
+    {
+        var adminClient = CreateAdminClient();
+        var (start, end) = UniqueMonthRange();
+        var resp = await adminClient.PutAsJsonAsync($"/api/admin/payroll/periods/{Guid.NewGuid()}", new
+        {
+            startDate = start.ToString("yyyy-MM-dd"),
+            endDate = end.ToString("yyyy-MM-dd"),
+            cutoffDate = end.ToString("yyyy-MM-dd"),
+            paymentDate = end.ToString("yyyy-MM-dd")
+        });
+        Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task PUT_UpdatePeriod_Closed_Returns_409()
+    {
+        var adminClient = CreateAdminClient();
+        var (start, end) = UniqueMonthRange();
+        var createResp = await adminClient.PostAsJsonAsync("/api/admin/payroll/periods", new
+        {
+            startDate = start.ToString("yyyy-MM-dd"),
+            endDate = end.ToString("yyyy-MM-dd"),
+            cutoffDate = end.ToString("yyyy-MM-dd"),
+            paymentDate = end.ToString("yyyy-MM-dd")
+        });
+        var periodId = (await createResp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        await adminClient.PostAsJsonAsync("/api/admin/payroll/deductions", new
+        {
+            nurseUserId = JwtTestTokens.TestNurseUserId,
+            payrollPeriodId = periodId,
+            deductionType = "Other",
+            label = "Activity",
+            amount = 10.00m
+        });
+        await adminClient.PatchAsync($"/api/admin/payroll/periods/{periodId}/close", null);
+
+        var updateResp = await adminClient.PutAsJsonAsync($"/api/admin/payroll/periods/{periodId}", new
+        {
+            startDate = start.ToString("yyyy-MM-dd"),
+            endDate = end.ToString("yyyy-MM-dd"),
+            cutoffDate = end.ToString("yyyy-MM-dd"),
+            paymentDate = end.ToString("yyyy-MM-dd")
+        });
+        Assert.Equal(HttpStatusCode.Conflict, updateResp.StatusCode);
+    }
+
+    [Fact]
+    public async Task DELETE_Period_Open_Unused_Returns_204_Then_Gone()
+    {
+        var adminClient = CreateAdminClient();
+        var (start, end) = UniqueMonthRange();
+        var createResp = await adminClient.PostAsJsonAsync("/api/admin/payroll/periods", new
+        {
+            startDate = start.ToString("yyyy-MM-dd"),
+            endDate = end.ToString("yyyy-MM-dd"),
+            cutoffDate = end.ToString("yyyy-MM-dd"),
+            paymentDate = end.ToString("yyyy-MM-dd")
+        });
+        var periodId = (await createResp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        await ClearPeriodDeductionsAsync(adminClient, periodId);
+
+        var deleteResp = await adminClient.DeleteAsync($"/api/admin/payroll/periods/{periodId}");
+        Assert.Equal(HttpStatusCode.NoContent, deleteResp.StatusCode);
+
+        var getResp = await adminClient.GetAsync($"/api/admin/payroll/periods/{periodId}");
+        Assert.Equal(HttpStatusCode.NotFound, getResp.StatusCode);
+    }
+
+    [Fact]
+    public async Task DELETE_Period_Missing_Returns_404()
+    {
+        var adminClient = CreateAdminClient();
+        var resp = await adminClient.DeleteAsync($"/api/admin/payroll/periods/{Guid.NewGuid()}");
+        Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task DELETE_Period_Closed_Returns_409()
+    {
+        var adminClient = CreateAdminClient();
+        var (start, end) = UniqueMonthRange();
+        var createResp = await adminClient.PostAsJsonAsync("/api/admin/payroll/periods", new
+        {
+            startDate = start.ToString("yyyy-MM-dd"),
+            endDate = end.ToString("yyyy-MM-dd"),
+            cutoffDate = end.ToString("yyyy-MM-dd"),
+            paymentDate = end.ToString("yyyy-MM-dd")
+        });
+        var periodId = (await createResp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        await adminClient.PostAsJsonAsync("/api/admin/payroll/deductions", new
+        {
+            nurseUserId = JwtTestTokens.TestNurseUserId,
+            payrollPeriodId = periodId,
+            deductionType = "Other",
+            label = "Activity",
+            amount = 10.00m
+        });
+        await adminClient.PatchAsync($"/api/admin/payroll/periods/{periodId}/close", null);
+
+        var deleteResp = await adminClient.DeleteAsync($"/api/admin/payroll/periods/{periodId}");
+        Assert.Equal(HttpStatusCode.Conflict, deleteResp.StatusCode);
+    }
+
+    [Fact]
+    public async Task DELETE_Period_With_Deduction_Returns_409()
+    {
+        var adminClient = CreateAdminClient();
+        var (start, end) = UniqueMonthRange();
+        var createResp = await adminClient.PostAsJsonAsync("/api/admin/payroll/periods", new
+        {
+            startDate = start.ToString("yyyy-MM-dd"),
+            endDate = end.ToString("yyyy-MM-dd"),
+            cutoffDate = end.ToString("yyyy-MM-dd"),
+            paymentDate = end.ToString("yyyy-MM-dd")
+        });
+        var periodId = (await createResp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        var deductionResp = await adminClient.PostAsJsonAsync("/api/admin/payroll/deductions", new
+        {
+            nurseUserId = JwtTestTokens.TestNurseUserId,
+            payrollPeriodId = periodId,
+            deductionType = "Other",
+            label = "In use",
+            amount = 25.00m
+        });
+        deductionResp.EnsureSuccessStatusCode();
+
+        var deleteResp = await adminClient.DeleteAsync($"/api/admin/payroll/periods/{periodId}");
+        Assert.Equal(HttpStatusCode.Conflict, deleteResp.StatusCode);
+    }
+
+    [Fact]
+    public async Task GET_PeriodDetail_CanModify_False_When_Deduction_Present()
+    {
+        var adminClient = CreateAdminClient();
+        var (start, end) = UniqueMonthRange();
+        var createResp = await adminClient.PostAsJsonAsync("/api/admin/payroll/periods", new
+        {
+            startDate = start.ToString("yyyy-MM-dd"),
+            endDate = end.ToString("yyyy-MM-dd"),
+            cutoffDate = end.ToString("yyyy-MM-dd"),
+            paymentDate = end.ToString("yyyy-MM-dd")
+        });
+        var periodId = (await createResp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        await adminClient.PostAsJsonAsync("/api/admin/payroll/deductions", new
+        {
+            nurseUserId = JwtTestTokens.TestNurseUserId,
+            payrollPeriodId = periodId,
+            deductionType = "Other",
+            label = "Blocks modify",
+            amount = 10.00m
+        });
+
+        // A deduction (or scheduled-deduction installment) on the period blocks edit/delete.
+        var detail = await (await adminClient.GetAsync($"/api/admin/payroll/periods/{periodId}"))
+            .Content.ReadFromJsonAsync<JsonElement>();
+        Assert.False(detail.GetProperty("canModify").GetBoolean());
     }
 
     // ── Lines ──────────────────────────────────────────────────────────────────
@@ -276,6 +500,61 @@ public sealed class AdminPayrollApiTests : IClassFixture<CustomWebApplicationFac
         Assert.Equal(HttpStatusCode.NotFound, delete404.StatusCode);
     }
 
+    [Fact]
+    public async Task PUT_Deduction_Updates_Label_Amount_And_Type()
+    {
+        var adminClient = CreateAdminClient();
+        var (start, end) = UniqueMonthRange();
+        var nurseId = JwtTestTokens.TestNurseUserId;
+
+        var createPeriodResp = await adminClient.PostAsJsonAsync("/api/admin/payroll/periods", new
+        {
+            startDate = start.ToString("yyyy-MM-dd"),
+            endDate = end.ToString("yyyy-MM-dd"),
+            cutoffDate = end.ToString("yyyy-MM-dd"),
+            paymentDate = end.ToString("yyyy-MM-dd")
+        });
+        var periodId = (await createPeriodResp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        var deductionResp = await adminClient.PostAsJsonAsync("/api/admin/payroll/deductions", new
+        {
+            nurseUserId = nurseId,
+            payrollPeriodId = periodId,
+            deductionType = "Other",
+            label = "Antes",
+            amount = 100.00m
+        });
+        var id = (await deductionResp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        var putResp = await adminClient.PutAsJsonAsync($"/api/admin/payroll/deductions/{id}", new
+        {
+            label = "Después",
+            amount = 250.00m,
+            deductionType = "Loan"
+        });
+        Assert.Equal(HttpStatusCode.NoContent, putResp.StatusCode);
+
+        var list = await (await adminClient.GetAsync($"/api/admin/payroll/deductions?nurseId={nurseId}&periodId={periodId}"))
+            .Content.ReadFromJsonAsync<JsonElement>();
+        var updated = list.GetProperty("items").EnumerateArray().First(d => d.GetProperty("id").GetGuid() == id);
+        Assert.Equal("Después", updated.GetProperty("label").GetString());
+        Assert.Equal(250.00m, updated.GetProperty("amount").GetDecimal());
+        Assert.Equal("Loan", updated.GetProperty("deductionType").GetString());
+    }
+
+    [Fact]
+    public async Task PUT_Deduction_Returns_404_For_Unknown_Id()
+    {
+        var adminClient = CreateAdminClient();
+        var resp = await adminClient.PutAsJsonAsync($"/api/admin/payroll/deductions/{Guid.NewGuid()}", new
+        {
+            label = "x",
+            amount = 10m,
+            deductionType = "Other"
+        });
+        Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
+    }
+
     // ── Adjustments ───────────────────────────────────────────────────────────
 
     [Fact]
@@ -374,5 +653,18 @@ public sealed class AdminPayrollApiTests : IClassFixture<CustomWebApplicationFac
         var start = new DateOnly(2099, 1, 1).AddDays(offset * 30);
         var end = start.AddDays(13);
         return (start, end);
+    }
+
+    // Active scheduled-deduction plans in the shared test DB auto-generate an installment
+    // into every newly created open period, so a fresh period is not guaranteed empty.
+    // Clear its deductions to make "empty period" assertions deterministic.
+    private static async Task ClearPeriodDeductionsAsync(HttpClient client, Guid periodId)
+    {
+        var list = await (await client.GetAsync($"/api/admin/payroll/deductions?periodId={periodId}"))
+            .Content.ReadFromJsonAsync<JsonElement>();
+        foreach (var d in list.GetProperty("items").EnumerateArray())
+        {
+            await client.DeleteAsync($"/api/admin/payroll/deductions/{d.GetProperty("id").GetGuid()}");
+        }
     }
 }
