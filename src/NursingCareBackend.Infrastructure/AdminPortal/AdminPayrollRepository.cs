@@ -89,6 +89,14 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
         var nurseIds = lines.Select(l => l.NurseUserId).Distinct().ToList();
         var nurseLookup = await BuildNurseLookupAsync(nurseIds, cancellationToken);
 
+        // Deductions are period-level per nurse, subtracted once — not summed across service lines.
+        var deductionsByNurse = await _dbContext.DeductionRecords
+            .AsNoTracking()
+            .Where(d => d.PayrollPeriodId == periodId)
+            .GroupBy(d => d.NurseUserId)
+            .Select(g => new { NurseUserId = g.Key, Total = g.Sum(d => d.Amount) })
+            .ToDictionaryAsync(x => x.NurseUserId, x => x.Total, cancellationToken);
+
         var lineItems = lines
             .Select(l => new AdminPayrollLineItem(
                 l.Id,
@@ -109,18 +117,28 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
 
         var staffSummary = lines
             .GroupBy(l => l.NurseUserId)
-            .Select(g => new AdminPayrollStaffSummary(
-                g.Key,
-                nurseLookup.GetValueOrDefault(g.Key, g.Key.ToString()),
-                g.Count(),
-                g.Sum(l => l.BaseCompensation + l.TransportIncentive + l.ComplexityBonus + l.MedicalSuppliesCompensation + l.AdjustmentsTotal),
-                g.Sum(l => l.TransportIncentive),
-                g.Sum(l => l.AdjustmentsTotal),
-                g.Sum(l => l.DeductionsTotal),
-                g.Sum(l => l.NetCompensation)))
+            .Select(g =>
+            {
+                var gross = g.Sum(l => l.BaseCompensation + l.TransportIncentive + l.ComplexityBonus + l.MedicalSuppliesCompensation + l.AdjustmentsTotal);
+                var deductions = deductionsByNurse.GetValueOrDefault(g.Key, 0m);
+                return new AdminPayrollStaffSummary(
+                    g.Key,
+                    nurseLookup.GetValueOrDefault(g.Key, g.Key.ToString()),
+                    g.Count(),
+                    gross,
+                    g.Sum(l => l.TransportIncentive),
+                    g.Sum(l => l.AdjustmentsTotal),
+                    deductions,
+                    gross - deductions);
+            })
             .OrderByDescending(s => s.NetCompensation)
             .ToList()
             .AsReadOnly();
+
+        // Editable/deletable only while Open with no lines and no deductions
+        // (installments are deductions too). Mirrors PeriodHasActivityAsync so the
+        // UI can hide edit/delete instead of letting the action fail server-side.
+        var canModify = !period.IsClosed && lines.Count == 0 && deductionsByNurse.Count == 0;
 
         return new AdminPayrollPeriodDetail(
             period.Id,
@@ -132,7 +150,8 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
             period.CreatedAtUtc,
             period.ClosedAtUtc,
             lineItems,
-            staffSummary);
+            staffSummary,
+            canModify);
     }
 
     public async Task<Guid> CreatePeriodAsync(
@@ -148,16 +167,73 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
         return period.Id;
     }
 
-    public async Task<bool> ClosePeriodAsync(Guid periodId, CancellationToken cancellationToken)
+    public async Task<PeriodCloseResult> ClosePeriodAsync(Guid periodId, CancellationToken cancellationToken)
     {
         var period = await _dbContext.PayrollPeriods
             .FirstOrDefaultAsync(p => p.Id == periodId, cancellationToken);
 
-        if (period is null) return false;
+        if (period is null) return PeriodCloseResult.NotFound;
+
+        // Closing is idempotent — re-closing a closed period is a no-op success.
+        if (period.IsClosed) return PeriodCloseResult.Success;
+
+        // A period with zero values (no calculated lines and no deductions) has nothing
+        // to settle and must not be closed.
+        if (!await PeriodHasActivityAsync(periodId, cancellationToken))
+        {
+            return PeriodCloseResult.Empty;
+        }
 
         period.Close(DateTime.UtcNow);
         await _dbContext.SaveChangesAsync(cancellationToken);
-        return true;
+        return PeriodCloseResult.Success;
+    }
+
+    public async Task<PeriodMutationResult> UpdatePeriodAsync(
+        Guid periodId,
+        DateOnly startDate,
+        DateOnly endDate,
+        DateOnly cutoffDate,
+        DateOnly paymentDate,
+        CancellationToken cancellationToken)
+    {
+        var period = await _dbContext.PayrollPeriods
+            .FirstOrDefaultAsync(p => p.Id == periodId, cancellationToken);
+
+        if (period is null) return PeriodMutationResult.NotFound;
+        if (period.IsClosed) return PeriodMutationResult.Closed;
+        if (await PeriodHasActivityAsync(periodId, cancellationToken)) return PeriodMutationResult.InUse;
+
+        period.UpdateSchedule(startDate, endDate, cutoffDate, paymentDate);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return PeriodMutationResult.Success;
+    }
+
+    public async Task<PeriodMutationResult> DeletePeriodAsync(Guid periodId, CancellationToken cancellationToken)
+    {
+        var period = await _dbContext.PayrollPeriods
+            .FirstOrDefaultAsync(p => p.Id == periodId, cancellationToken);
+
+        if (period is null) return PeriodMutationResult.NotFound;
+        if (period.IsClosed) return PeriodMutationResult.Closed;
+        if (await PeriodHasActivityAsync(periodId, cancellationToken)) return PeriodMutationResult.InUse;
+
+        _dbContext.PayrollPeriods.Remove(period);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return PeriodMutationResult.Success;
+    }
+
+    // A period is "in use" once payroll has been calculated for it (lines) or any
+    // deduction/scheduled-deduction installment targets it. Installments are stored as
+    // DeductionRecords carrying the period id, so the deduction check covers them too.
+    private async Task<bool> PeriodHasActivityAsync(Guid periodId, CancellationToken cancellationToken)
+    {
+        if (await _dbContext.PayrollLines.AnyAsync(l => l.PayrollPeriodId == periodId, cancellationToken))
+        {
+            return true;
+        }
+
+        return await _dbContext.DeductionRecords.AnyAsync(d => d.PayrollPeriodId == periodId, cancellationToken);
     }
 
     public async Task<IReadOnlyList<AdminPayrollLineItem>> GetPeriodLinesAsync(
@@ -280,6 +356,44 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
         return deduction.Id;
     }
 
+    public async Task<bool> UpdateDeductionAsync(Guid deductionId, UpdateDeductionRequest request, CancellationToken cancellationToken)
+    {
+        var deduction = await _dbContext.DeductionRecords
+            .FirstOrDefaultAsync(d => d.Id == deductionId, cancellationToken);
+
+        if (deduction is null) return false;
+
+        // Generated installments belong to a scheduled deduction; edit the plan, not the cuota.
+        if (deduction.ScheduledDeductionId is not null)
+        {
+            throw new InvalidOperationException(
+                "No se puede editar una cuota generada automáticamente; gestiona el descuento fijo.");
+        }
+
+        // Payroll immutability guard: can't edit a deduction inside a closed period.
+        if (deduction.PayrollPeriodId != Guid.Empty)
+        {
+            var period = await _dbContext.PayrollPeriods
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Id == deduction.PayrollPeriodId, cancellationToken);
+
+            if (period is not null)
+            {
+                try { period.EnsureOpen(); }
+                catch (InvalidOperationException) { throw new PayrollPeriodClosedException(period.Id); }
+            }
+        }
+
+        if (!Enum.TryParse<DeductionType>(request.DeductionType, ignoreCase: true, out var deductionType))
+        {
+            throw new ArgumentException($"Tipo de deducción invalido: {request.DeductionType}");
+        }
+
+        deduction.Update(deductionType, request.Label, request.Amount, deduction.Notes);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     public async Task<bool> DeleteDeductionAsync(Guid deductionId, CancellationToken cancellationToken)
     {
         var deduction = await _dbContext.DeductionRecords
@@ -375,11 +489,19 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
             {
                 PeriodId = g.Key,
                 ServiceCount = g.Count(),
-                TotalCompensation = g.Sum(l => l.NetCompensation)
+                // Deduction-free compensation; period deductions are subtracted once below.
+                GrossNet = g.Sum(l => l.BaseCompensation + l.TransportIncentive + l.ComplexityBonus + l.MedicalSuppliesCompensation + l.AdjustmentsTotal)
             })
             .ToListAsync(cancellationToken);
 
         var periodIds = linesByPeriod.Select(x => x.PeriodId).ToList();
+
+        var deductionsByPeriod = await _dbContext.DeductionRecords
+            .AsNoTracking()
+            .Where(d => d.NurseUserId == nurseId && d.PayrollPeriodId != null && periodIds.Contains(d.PayrollPeriodId.Value))
+            .GroupBy(d => d.PayrollPeriodId!.Value)
+            .Select(g => new { PeriodId = g.Key, Total = g.Sum(d => d.Amount) })
+            .ToDictionaryAsync(x => x.PeriodId, x => x.Total, cancellationToken);
 
         var periods = await _dbContext.PayrollPeriods
             .AsNoTracking()
@@ -395,13 +517,14 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
             .Select(p =>
             {
                 var summary = linesByPeriodDict.GetValueOrDefault(p.Id);
+                var deductions = deductionsByPeriod.GetValueOrDefault(p.Id, 0m);
                 return new NursePeriodHistoryItem(
                     p.Id,
                     p.StartDate,
                     p.EndDate,
                     p.Status.ToString(),
                     summary?.ServiceCount ?? 0,
-                    summary?.TotalCompensation ?? 0m);
+                    (summary?.GrossNet ?? 0m) - deductions);
             })
             .ToList()
             .AsReadOnly();
@@ -446,6 +569,11 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
             .Where(l => l.PayrollPeriodId == periodId && l.NurseUserId == nurseId)
             .ToListAsync(cancellationToken);
 
+        var periodDeductions = await _dbContext.DeductionRecords
+            .AsNoTracking()
+            .Where(d => d.NurseUserId == nurseId && d.PayrollPeriodId == periodId)
+            .SumAsync(d => (decimal?)d.Amount, cancellationToken) ?? 0m;
+
         var executionIds = lines
             .Where(l => l.ServiceExecutionId.HasValue)
             .Select(l => l.ServiceExecutionId!.Value)
@@ -489,9 +617,9 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
             period.CutoffDate,
             period.PaymentDate,
             lines.Sum(l => l.BaseCompensation + l.TransportIncentive + l.ComplexityBonus + l.MedicalSuppliesCompensation),
-            lines.Sum(l => l.DeductionsTotal),
+            periodDeductions,
             lines.Sum(l => l.AdjustmentsTotal),
-            lines.Sum(l => l.NetCompensation),
+            lines.Sum(l => l.BaseCompensation + l.TransportIncentive + l.ComplexityBonus + l.MedicalSuppliesCompensation + l.AdjustmentsTotal) - periodDeductions,
             serviceRows);
     }
 
@@ -578,8 +706,8 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
             TotalComplexity = lines.Sum(l => l.ComplexityBonus),
             TotalSupplies = lines.Sum(l => l.MedicalSuppliesCompensation),
             TotalAdjustments = lines.Sum(l => l.AdjustmentsTotal),
-            TotalDeductions = lines.Sum(l => l.DeductionsTotal),
-            NetCompensation = lines.Sum(l => l.NetCompensation),
+            TotalDeductions = deductions.Sum(d => d.Amount),
+            NetCompensation = lines.Sum(l => l.BaseCompensation + l.TransportIncentive + l.ComplexityBonus + l.MedicalSuppliesCompensation + l.AdjustmentsTotal) - deductions.Sum(d => d.Amount),
         };
     }
 
@@ -684,8 +812,8 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
                 TotalComplexity = lines.Sum(l => l.ComplexityBonus),
                 TotalSupplies = lines.Sum(l => l.MedicalSuppliesCompensation),
                 TotalAdjustments = lines.Sum(l => l.AdjustmentsTotal),
-                TotalDeductions = lines.Sum(l => l.DeductionsTotal),
-                NetCompensation = lines.Sum(l => l.NetCompensation),
+                TotalDeductions = nurseDeductions.Sum(d => d.Amount),
+                NetCompensation = lines.Sum(l => l.BaseCompensation + l.TransportIncentive + l.ComplexityBonus + l.MedicalSuppliesCompensation + l.AdjustmentsTotal) - nurseDeductions.Sum(d => d.Amount),
             });
         }
 
