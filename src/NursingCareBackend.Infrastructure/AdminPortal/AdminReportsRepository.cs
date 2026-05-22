@@ -246,33 +246,39 @@ public sealed class AdminReportsRepository : IAdminReportsRepository
     {
         var query = FilterCareRequestsByDate(_dbContext.CareRequests.AsNoTracking(), from, to);
 
-        var typeStats = await query
+        // EF can translate GroupBy + aggregate projection, but NOT GroupBy().OrderBy(g => g.Count()).
+        // Materialize the grouped aggregates, then order/take/shape in memory.
+        var typeGroups = await query
             .GroupBy(c => c.CareRequestType)
-            .Select(g => new PriceUsageSummaryRow(
-                g.Key,
-                g.Count(),
-                g.Average(c => c.Total),
-                g.Sum(c => c.Total)
-            ))
-            .OrderByDescending(r => r.Count)
-            .Take(10)
+            .Select(g => new { Key = g.Key, Count = g.Count(), Average = g.Average(c => c.Total), Sum = g.Sum(c => c.Total) })
             .ToListAsync(cancellationToken);
+        var typeStats = typeGroups
+            .OrderByDescending(g => g.Count)
+            .Take(10)
+            .Select(g => new PriceUsageSummaryRow(g.Key, g.Count, g.Average, g.Sum))
+            .ToList();
 
-        var distanceFactors = await query
+        var distanceGroups = await query
             .Where(c => c.DistanceFactor != null)
             .GroupBy(c => c.DistanceFactor)
-            .OrderByDescending(g => g.Count())
-            .Select(g => g.Key!)
-            .Take(5)
+            .Select(g => new { Key = g.Key, Count = g.Count() })
             .ToListAsync(cancellationToken);
+        var distanceFactors = distanceGroups
+            .OrderByDescending(g => g.Count)
+            .Take(5)
+            .Select(g => g.Key!)
+            .ToList();
 
-        var complexityLevels = await query
+        var complexityGroups = await query
             .Where(c => c.ComplexityLevel != null)
             .GroupBy(c => c.ComplexityLevel)
-            .OrderByDescending(g => g.Count())
-            .Select(g => g.Key!)
-            .Take(5)
+            .Select(g => new { Key = g.Key, Count = g.Count() })
             .ToListAsync(cancellationToken);
+        var complexityLevels = complexityGroups
+            .OrderByDescending(g => g.Count)
+            .Take(5)
+            .Select(g => g.Key!)
+            .ToList();
 
         return new PriceUsageSummaryReport(
             TopRequestTypes: typeStats,
