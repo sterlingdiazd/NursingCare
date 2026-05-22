@@ -72,9 +72,11 @@ public sealed class PayrollRecalculateSecurityTests : IClassFixture<CustomWebApp
     // ═══════════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public async Task Recalculate_With_ClosedPeriodId_Returns_OK_With_Zero_Lines()
+    public async Task Recalculate_With_ClosedPeriodId_Returns_BadRequest()
     {
         // Use a random GUID — no open period with this ID exists, simulating a closed period.
+        // SEC-002: service now throws ArgumentException → 400 when a specific period
+        // is requested but is not open, instead of silently returning 200 with 0 lines.
         var closedPeriodId = Guid.NewGuid();
         var client = CreateAdminClient();
 
@@ -84,11 +86,7 @@ public sealed class PayrollRecalculateSecurityTests : IClassFixture<CustomWebApp
             ruleId = (Guid?)null
         });
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal(0, payload.GetProperty("linesAffected").GetInt32());
-        // Audit record must still be created
-        Assert.NotEqual(Guid.Empty, payload.GetProperty("auditId").GetGuid());
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════

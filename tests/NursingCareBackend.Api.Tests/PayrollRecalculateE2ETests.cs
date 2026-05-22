@@ -74,9 +74,11 @@ public sealed class PayrollRecalculateE2ETests : IClassFixture<CustomWebApplicat
     // ═══════════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public async Task Recalculate_With_Closed_Period_Returns_OK_With_Zero_Lines()
+    public async Task Recalculate_With_Closed_Period_Returns_BadRequest()
     {
         // Create a period and immediately close it before issuing recalculate.
+        // SEC-002: service now throws ArgumentException → 400 when a closed
+        // period is requested instead of silently returning 200 with 0 lines.
         var periodId = await SeedClosedPeriodAsync();
 
         var client = CreateAdminClient();
@@ -86,11 +88,7 @@ public sealed class PayrollRecalculateE2ETests : IClassFixture<CustomWebApplicat
             ruleId = (Guid?)null
         });
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
-        // Service only processes Open periods; closed period must yield 0.
-        Assert.Equal(0, result.GetProperty("linesAffected").GetInt32());
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════

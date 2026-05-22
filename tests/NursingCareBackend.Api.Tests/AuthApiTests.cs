@@ -267,7 +267,13 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
 
     Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
     Assert.NotNull(response.Headers.Location);
-    Assert.Contains("state=mobile", response.Headers.Location!.ToString(), StringComparison.Ordinal);
+    var locationUrl = response.Headers.Location!.ToString();
+    var stateParam = QueryHelpers.ParseQuery(new Uri(locationUrl).Query)["state"].ToString();
+    Assert.False(string.IsNullOrEmpty(stateParam), "state parameter is missing from the redirect URL");
+    var stateBytes = WebEncoders.Base64UrlDecode(stateParam);
+    var stateObj = System.Text.Json.JsonSerializer.Deserialize<GoogleStateTestDto>(stateBytes);
+    Assert.NotNull(stateObj);
+    Assert.Equal("mobile", stateObj.Target);
   }
 
   [Fact]
@@ -326,7 +332,12 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
       AllowAutoRedirect = false
     });
 
-    var response = await client.GetAsync("/api/auth/google/callback?code=google-success-mobile&state=mobile");
+    var mobileStateJson = System.Text.Json.JsonSerializer.Serialize(
+      new GoogleStateTestDto { Target = "mobile", MobileRedirectUrl = null });
+    var mobileState = WebEncoders.Base64UrlEncode(System.Text.Encoding.UTF8.GetBytes(mobileStateJson));
+
+    var response = await client.GetAsync(
+      $"/api/auth/google/callback?code=google-success-mobile&state={mobileState}");
 
     Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
     Assert.NotNull(response.Headers.Location);
@@ -848,5 +859,11 @@ public sealed class AuthApiTests : IClassFixture<CustomWebApplicationFactory>
   {
     public string? Title { get; set; }
     public string? Detail { get; set; }
+  }
+
+  private sealed class GoogleStateTestDto
+  {
+    public string Target { get; set; } = string.Empty;
+    public string? MobileRedirectUrl { get; set; }
   }
 }

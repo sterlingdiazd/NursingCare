@@ -209,18 +209,17 @@ public sealed class PayrollRbacAndBoundaryTests : IClassFixture<CustomWebApplica
     // ═══════════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public async Task Recalculate_With_NonExistent_PeriodId_Returns_OK_With_Zero_Lines()
+    public async Task Recalculate_With_NonExistent_PeriodId_Returns_BadRequest()
     {
+        // SEC-002: sending a PeriodId that doesn't match an open period now
+        // returns 400 BadRequest instead of silently returning 200 with 0 lines.
         var client = CreateAdminClient();
         var response = await client.PostAsJsonAsync("/api/admin/payroll/recalculate", new
         {
             periodId = Guid.NewGuid(),
             ruleId = (Guid?)null
         });
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal(0, result.GetProperty("linesAffected").GetInt32());
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
