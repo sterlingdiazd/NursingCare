@@ -638,16 +638,6 @@ public static class FullLifecycleSeeding
                 createdAtUtc: march31),
 
             DeductionRecord.Create(
-                nurseUserId: CatalogSeeding.NurseIds["Charleny"],
-                payrollPeriodId: marchPeriod.Id,
-                deductionType: DeductionType.Loan,
-                label: "Prestamo personal cuota 2 de 6",
-                amount: 1500m,
-                notes: "Prestamo aprobado en enero 2026. Segunda cuota mensual.",
-                effectiveAtUtc: march31,
-                createdAtUtc: march31),
-
-            DeductionRecord.Create(
                 nurseUserId: CatalogSeeding.NurseIds["Valentin"],
                 payrollPeriodId: marchPeriod.Id,
                 deductionType: DeductionType.Other,
@@ -679,6 +669,75 @@ public static class FullLifecycleSeeding
         };
 
         db.DeductionRecords.AddRange(deductions);
+        await db.SaveChangesAsync(cancellationToken);
+
+        await SeedScheduledDeductionsAsync(db, marchPeriod, march31, cancellationToken);
+    }
+
+    private static async Task SeedScheduledDeductionsAsync(
+        NursingCareDbContext db, PayrollPeriod marchPeriod, DateTime march31, CancellationToken cancellationToken)
+    {
+        var adminId = CatalogSeeding.SeededAdminId;
+        var janStart = new DateOnly(2026, 1, 16);
+
+        // Charleny: amortizing loan (9,000 over 6 monthly installments of 1,500). Its 2nd cuota
+        // lands in the March period; one prior cuota is already settled.
+        var loan = ScheduledDeduction.CreateAmortizing(
+            nurseUserId: CatalogSeeding.NurseIds["Charleny"],
+            deductionType: DeductionType.Loan,
+            label: "Préstamo personal",
+            principalAmount: 9000m,
+            interestRatePercent: 0m,
+            totalInstallments: 6,
+            cadence: DeductionCadence.Monthly,
+            startPeriodDate: janStart,
+            notes: "Préstamo aprobado en enero 2026, descontado en 6 cuotas mensuales.",
+            createdByUserId: adminId,
+            createdAtUtc: march31);
+        loan.SyncGeneratedCount(2);
+        loan.ApplySettlement(1, 1500m, march31); // first cuota already paid in a prior period
+
+        // Lorea: open-ended recurring health insurance (500 each month).
+        var insurance = ScheduledDeduction.CreateRecurring(
+            nurseUserId: CatalogSeeding.NurseIds["Lorea"],
+            deductionType: DeductionType.Insurance,
+            label: "Seguro Médico",
+            recurringAmount: 500m,
+            cadence: DeductionCadence.Monthly,
+            startPeriodDate: janStart,
+            endDate: null,
+            maxOccurrences: null,
+            notes: "Plan de seguro médico mensual.",
+            createdByUserId: adminId,
+            createdAtUtc: march31);
+        insurance.SyncGeneratedCount(3);
+
+        db.ScheduledDeductions.AddRange(loan, insurance);
+
+        db.DeductionRecords.AddRange(
+            DeductionRecord.Create(
+                nurseUserId: CatalogSeeding.NurseIds["Charleny"],
+                payrollPeriodId: marchPeriod.Id,
+                deductionType: DeductionType.Loan,
+                label: "Préstamo personal · cuota 2 de 6",
+                amount: 1500m,
+                notes: null,
+                effectiveAtUtc: march31,
+                createdAtUtc: march31,
+                scheduledDeductionId: loan.Id,
+                installmentSequence: 2),
+            DeductionRecord.Create(
+                nurseUserId: CatalogSeeding.NurseIds["Lorea"],
+                payrollPeriodId: marchPeriod.Id,
+                deductionType: DeductionType.Insurance,
+                label: "Seguro Médico",
+                amount: 500m,
+                notes: null,
+                effectiveAtUtc: march31,
+                createdAtUtc: march31,
+                scheduledDeductionId: insurance.Id,
+                installmentSequence: 3));
+
         await db.SaveChangesAsync(cancellationToken);
     }
 
