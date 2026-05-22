@@ -11,4 +11,5 @@ public enum PeriodMutationResult
     NotFound,
     Closed,
     InUse,
+    Overlap,
 }

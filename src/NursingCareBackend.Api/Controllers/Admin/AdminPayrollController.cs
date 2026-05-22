@@ -122,6 +122,11 @@ public sealed class AdminPayrollController : ControllerBase
         {
             return this.ProblemResponse(StatusCodes.Status400BadRequest, Messages.Get("errors.datos_invalidos"), ex.Message);
         }
+        catch (Microsoft.EntityFrameworkCore.DbUpdateException)
+        {
+            // Safety net for the (StartDate, EndDate) unique index under a race.
+            return this.ProblemResponse(StatusCodes.Status400BadRequest, Messages.Get("errors.periodo_solapado"), Messages.Get("errors.periodo_solapado_detalle"));
+        }
     }
 
     // PATCH /api/admin/payroll/periods/{id}/close
@@ -226,6 +231,10 @@ public sealed class AdminPayrollController : ControllerBase
             StatusCodes.Status409Conflict,
             Messages.Get("errors.periodo_en_uso"),
             Messages.Get("errors.periodo_en_uso_detalle")),
+        PeriodMutationResult.Overlap => this.ProblemResponse(
+            StatusCodes.Status400BadRequest,
+            Messages.Get("errors.periodo_solapado"),
+            Messages.Get("errors.periodo_solapado_detalle")),
         _ => null,
     };
 
