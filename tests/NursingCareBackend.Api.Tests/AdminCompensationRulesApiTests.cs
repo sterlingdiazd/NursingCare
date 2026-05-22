@@ -177,6 +177,51 @@ public sealed class AdminCompensationRulesApiTests : IClassFixture<CustomWebAppl
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    [Fact]
+    public async Task POST_ReactivateRule_Restores_Active_State()
+    {
+        var adminClient = CreateAdminClient();
+        var ruleName = $"Reactivate Rule {Guid.NewGuid():N}";
+
+        var createResp = await adminClient.PostAsJsonAsync("/api/admin/payroll/compensation-rules", new
+        {
+            name = ruleName,
+            employmentType = "PerService",
+            careRequestCategoryCode = (string?)null,
+            unitTypeCode = (string?)null,
+            nurseCategoryCode = (string?)null,
+            baseCompensationPercent = 50.0m,
+            fixedAmountPerUnit = 0m,
+            transportIncentivePercent = 10.0m,
+            complexityBonusPercent = 10.0m,
+            medicalSuppliesPercent = 5.0m,
+            partialServicePercent = 60.0m,
+            expressServicePercent = 110.0m,
+            suspendedServicePercent = 35.0m,
+            isActive = true,
+            priority = 320
+        });
+        var ruleId = (await createResp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        Assert.Equal(HttpStatusCode.NoContent,
+            (await adminClient.DeleteAsync($"/api/admin/payroll/compensation-rules/{ruleId}")).StatusCode);
+
+        var reactivateResp = await adminClient.PostAsync($"/api/admin/payroll/compensation-rules/{ruleId}/reactivate", null);
+        Assert.Equal(HttpStatusCode.NoContent, reactivateResp.StatusCode);
+
+        var detail = await (await adminClient.GetAsync($"/api/admin/payroll/compensation-rules/{ruleId}"))
+            .Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(detail.GetProperty("isActive").GetBoolean());
+    }
+
+    [Fact]
+    public async Task POST_ReactivateRule_Missing_Returns_404()
+    {
+        var adminClient = CreateAdminClient();
+        var response = await adminClient.PostAsync($"/api/admin/payroll/compensation-rules/{Guid.NewGuid()}/reactivate", null);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
     private HttpClient CreateAdminClient()
     {
         var client = _factory.CreateClient();
