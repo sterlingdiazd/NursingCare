@@ -33,4 +33,17 @@ public sealed class CompensationAdjustment
 
     public static CompensationAdjustment Create(Guid serviceExecutionId, string label, decimal amount, string? notes, DateTime createdAtUtc)
         => new(serviceExecutionId, label, amount, notes, createdAtUtc);
+
+    /// <summary>Edit the adjustment's label and amount (the target service execution is immutable).</summary>
+    public void Update(string label, decimal amount, string? notes)
+    {
+        if (string.IsNullOrWhiteSpace(label))
+        {
+            throw new ArgumentException("Adjustment label is required.", nameof(label));
+        }
+
+        Label = label.Trim();
+        Amount = decimal.Round(amount, 2, MidpointRounding.AwayFromZero);
+        Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+    }
 }

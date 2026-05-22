@@ -45,6 +45,7 @@ public interface IAdminPayrollRepository
 
     Task<AdminCompensationAdjustmentListResult> GetAdjustmentsAsync(Guid? executionId, CancellationToken cancellationToken);
     Task<Guid> CreateAdjustmentAsync(CreateCompensationAdjustmentRequest request, CancellationToken cancellationToken);
+    Task<bool> UpdateAdjustmentAsync(Guid adjustmentId, UpdateCompensationAdjustmentRequest request, CancellationToken cancellationToken);
     Task<bool> DeleteAdjustmentAsync(Guid adjustmentId, CancellationToken cancellationToken);
 
     // Nurse-scoped queries

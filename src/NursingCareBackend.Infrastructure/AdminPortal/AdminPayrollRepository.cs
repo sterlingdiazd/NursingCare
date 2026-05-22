@@ -567,6 +567,18 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
         return adjustment.Id;
     }
 
+    public async Task<bool> UpdateAdjustmentAsync(Guid adjustmentId, UpdateCompensationAdjustmentRequest request, CancellationToken cancellationToken)
+    {
+        var adjustment = await _dbContext.CompensationAdjustments
+            .FirstOrDefaultAsync(a => a.Id == adjustmentId, cancellationToken);
+
+        if (adjustment is null) return false;
+
+        adjustment.Update(request.Label, request.Amount, null);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     public async Task<bool> DeleteAdjustmentAsync(Guid adjustmentId, CancellationToken cancellationToken)
     {
         var adjustment = await _dbContext.CompensationAdjustments

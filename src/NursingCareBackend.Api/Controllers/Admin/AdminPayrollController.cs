@@ -539,6 +539,31 @@ public sealed class AdminPayrollController : ControllerBase
         }
     }
 
+    // PUT /api/admin/payroll/adjustments/{id}
+    [HttpPut("adjustments/{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateAdjustment(Guid id, [FromBody] UpdateCompensationAdjustmentRequest request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var found = await _repository.UpdateAdjustmentAsync(id, request, cancellationToken);
+            if (!found)
+            {
+                return this.ProblemResponse(
+                    StatusCodes.Status404NotFound,
+                    Messages.Get("errors.ajuste_no_encontrado"),
+                    $"No se encontró el ajuste de compensación con id '{id}'.");
+            }
+            return NoContent();
+        }
+        catch (ArgumentException ex)
+        {
+            return this.ProblemResponse(StatusCodes.Status400BadRequest, Messages.Get("errors.datos_invalidos"), ex.Message);
+        }
+    }
+
     // DELETE /api/admin/payroll/adjustments/{id}
     [HttpDelete("adjustments/{id:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
