@@ -326,10 +326,90 @@ public sealed class PayrollVoucherApiTests : IClassFixture<CustomWebApplicationF
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
+    // Regression: deductions are period-level, applied once (not multiplied per line)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public async Task PeriodDetail_Deduction_Applied_Once_Across_Multiple_Service_Lines()
+    {
+        // 3 service lines (gross 70 each = 210) and ONE deduction of 50 for the same nurse.
+        // The staff summary must net the deduction once: deductions = 50, net = 160 — never 150/60.
+        var (periodId, nurseId) = await SeedMultiLineWithDeductionAsync(lineCount: 3, grossPerLine: 70m, deduction: 50m);
+
+        var client = CreateAdminClient();
+        var response = await client.GetAsync($"/api/admin/payroll/periods/{periodId}");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var detail = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var staff = detail.GetProperty("staffSummary").EnumerateArray()
+            .First(s => s.GetProperty("nurseUserId").GetGuid() == nurseId);
+
+        Assert.Equal(210m, staff.GetProperty("grossCompensation").GetDecimal());
+        Assert.Equal(50m, staff.GetProperty("deductionsTotal").GetDecimal());
+        Assert.Equal(160m, staff.GetProperty("netCompensation").GetDecimal());
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
     // Data seeding helpers
     // ═══════════════════════════════════════════════════════════════════════════
 
     private static int _voucherPeriodCounter = 100;
+
+    private async Task<(Guid PeriodId, Guid NurseId)> SeedMultiLineWithDeductionAsync(
+        int lineCount, decimal grossPerLine, decimal deduction)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<NursingCareDbContext>();
+
+        var offset = System.Threading.Interlocked.Increment(ref _voucherPeriodCounter);
+        var start = new DateOnly(2096, 1, 1).AddDays(offset * 30);
+        var end = start.AddDays(14);
+
+        var period = PayrollPeriod.Create(start, end, end.AddDays(-2), end, DateTime.UtcNow);
+        db.PayrollPeriods.Add(period);
+
+        var user = new NursingCareBackend.Domain.Identity.User
+        {
+            Id = Guid.NewGuid(),
+            Email = $"dedup-test-{offset}@test.local",
+            Name = "Test",
+            LastName = "DeductionNurse",
+            PasswordHash = "not-a-real-hash",
+            IsActive = true,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        db.Users.Add(user);
+        var nurseId = user.Id;
+
+        for (var i = 0; i < lineCount; i++)
+        {
+            db.PayrollLines.Add(PayrollLine.Create(
+                payrollPeriodId: period.Id,
+                nurseUserId: nurseId,
+                serviceExecutionId: null,
+                description: $"Dedup test line {i}",
+                baseCompensation: grossPerLine,
+                transportIncentive: 0m,
+                complexityBonus: 0m,
+                medicalSuppliesCompensation: 0m,
+                adjustmentsTotal: 0m,
+                deductionsTotal: 0m,
+                createdAtUtc: DateTime.UtcNow));
+        }
+
+        db.DeductionRecords.Add(DeductionRecord.Create(
+            nurseUserId: nurseId,
+            payrollPeriodId: period.Id,
+            deductionType: DeductionType.Loan,
+            label: "Cuota prueba",
+            amount: deduction,
+            notes: null,
+            effectiveAtUtc: DateTime.UtcNow,
+            createdAtUtc: DateTime.UtcNow));
+
+        await db.SaveChangesAsync();
+        return (period.Id, nurseId);
+    }
 
     private async Task<(Guid PeriodId, Guid NurseId)> SeedVoucherDataAsync()
     {
