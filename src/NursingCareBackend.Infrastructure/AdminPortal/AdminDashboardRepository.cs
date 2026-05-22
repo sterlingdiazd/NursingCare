@@ -95,6 +95,20 @@ public sealed class AdminDashboardRepository : IAdminDashboardRepository
       .Where(item => item.ArchivedAtUtc == null && item.ReadAtUtc == null)
       .CountAsync(cancellationToken);
 
+    var pendingDashboardTasksCount =
+      overdueOrStaleCount
+      + waitingForAssignmentCount
+      + waitingForApprovalCount
+      + unreadAdminNotificationsCount;
+
+    var completedDashboardTasksTodayCount = await _dbContext.CareRequests
+      .AsNoTracking()
+      .Where(careRequest =>
+        careRequest.CompletedAtUtc.HasValue
+        && careRequest.CompletedAtUtc.Value >= utcToday
+        && careRequest.CompletedAtUtc.Value < utcToday.AddDays(1))
+      .CountAsync(cancellationToken);
+
     return new AdminDashboardSnapshot(
       PendingNurseProfilesCount: pendingNurseProfilesCount,
       CareRequestsWaitingForAssignmentCount: waitingForAssignmentCount,
@@ -105,6 +119,9 @@ public sealed class AdminDashboardRepository : IAdminDashboardRepository
       ActiveNursesCount: activeNursesCount,
       ActiveClientsCount: activeClientsCount,
       UnreadAdminNotificationsCount: unreadAdminNotificationsCount,
+      PendingDashboardTasksCount: pendingDashboardTasksCount,
+      CompletedDashboardTasksTodayCount: completedDashboardTasksTodayCount,
+      TotalDashboardTasksTodayCount: pendingDashboardTasksCount + completedDashboardTasksTodayCount,
       HighSeverityAlerts: PlaceholderAlerts,
       GeneratedAtUtc: utcNow);
   }
