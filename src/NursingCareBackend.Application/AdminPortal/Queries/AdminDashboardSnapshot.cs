@@ -10,5 +10,8 @@ public sealed record AdminDashboardSnapshot(
   int ActiveNursesCount,
   int ActiveClientsCount,
   int UnreadAdminNotificationsCount,
+  int PendingDashboardTasksCount,
+  int CompletedDashboardTasksTodayCount,
+  int TotalDashboardTasksTodayCount,
   IReadOnlyList<AdminDashboardAlert> HighSeverityAlerts,
   DateTime GeneratedAtUtc);
