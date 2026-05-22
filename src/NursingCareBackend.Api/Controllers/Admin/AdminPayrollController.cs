@@ -21,6 +21,8 @@ public sealed class AdminPayrollController : ControllerBase
     private readonly IPayrollRecalculationService _recalculationService;
     private readonly IAdminPayrollOverrideRepository _overrideRepository;
     private readonly IPayrollVoucherService _voucherService;
+    private readonly IPayrollReportExportService _reportExportService;
+    private readonly IScheduledDeductionService _scheduledDeductionService;
     private readonly IAuthRateLimiter _rateLimiter;
 
     public AdminPayrollController(
@@ -28,12 +30,16 @@ public sealed class AdminPayrollController : ControllerBase
         IPayrollRecalculationService recalculationService,
         IAdminPayrollOverrideRepository overrideRepository,
         IPayrollVoucherService voucherService,
+        IPayrollReportExportService reportExportService,
+        IScheduledDeductionService scheduledDeductionService,
         IAuthRateLimiter rateLimiter)
     {
         _repository = repository;
         _recalculationService = recalculationService;
         _overrideRepository = overrideRepository;
         _voucherService = voucherService;
+        _reportExportService = reportExportService;
+        _scheduledDeductionService = scheduledDeductionService;
         _rateLimiter = rateLimiter;
     }
 
@@ -93,12 +99,9 @@ public sealed class AdminPayrollController : ControllerBase
         [FromBody] CreatePayrollPeriodRequest request,
         CancellationToken cancellationToken)
     {
-        if (request.EndDate < request.StartDate)
+        if (ValidatePeriodDates(request) is { } dateError)
         {
-            return this.ProblemResponse(
-                StatusCodes.Status400BadRequest,
-                Messages.Get("errors.rango_fechas_invalido"),
-                Messages.Get("errors.rango_fechas_detalle"));
+            return dateError;
         }
 
         try
@@ -109,6 +112,9 @@ public sealed class AdminPayrollController : ControllerBase
                 request.CutoffDate,
                 request.PaymentDate,
                 cancellationToken);
+
+            // Generate any installments now due for active scheduled deductions in this new period.
+            await _scheduledDeductionService.EnsureInstallmentsForOpenPeriodsAsync(cancellationToken);
 
             return CreatedAtAction(nameof(GetPeriodById), new { id }, new { id });
         }
@@ -122,11 +128,12 @@ public sealed class AdminPayrollController : ControllerBase
     [HttpPatch("periods/{id:guid}/close")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> ClosePeriod(Guid id, CancellationToken cancellationToken)
     {
-        var found = await _repository.ClosePeriodAsync(id, cancellationToken);
+        var result = await _repository.ClosePeriodAsync(id, cancellationToken);
 
-        if (!found)
+        if (result == PeriodCloseResult.NotFound)
         {
             return this.ProblemResponse(
                 StatusCodes.Status404NotFound,
@@ -134,8 +141,93 @@ public sealed class AdminPayrollController : ControllerBase
                 $"No se encontró el período de nómina con id '{id}'.");
         }
 
+        if (result == PeriodCloseResult.Empty)
+        {
+            return this.ProblemResponse(
+                StatusCodes.Status409Conflict,
+                Messages.Get("errors.periodo_vacio"),
+                Messages.Get("errors.periodo_vacio_detalle"));
+        }
+
+        // Closing settles each scheduled-deduction installment that lived in this period.
+        await _scheduledDeductionService.SettlePeriodInstallmentsAsync(id, cancellationToken);
+
         return NoContent();
     }
+
+    // PUT /api/admin/payroll/periods/{id}
+    [HttpPut("periods/{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> UpdatePeriod(
+        Guid id,
+        [FromBody] CreatePayrollPeriodRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (ValidatePeriodDates(request) is { } dateError)
+        {
+            return dateError;
+        }
+
+        var result = await _repository.UpdatePeriodAsync(
+            id, request.StartDate, request.EndDate, request.CutoffDate, request.PaymentDate, cancellationToken);
+
+        return MapPeriodMutation(result, id) ?? NoContent();
+    }
+
+    // DELETE /api/admin/payroll/periods/{id}
+    [HttpDelete("periods/{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> DeletePeriod(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _repository.DeletePeriodAsync(id, cancellationToken);
+        return MapPeriodMutation(result, id) ?? NoContent();
+    }
+
+    // Standard period date rules (start ≤ end, start ≤ cutoff, cutoff ≤ payment).
+    // Returns a 400 problem-details response on violation, or null when the dates are valid.
+    private IActionResult? ValidatePeriodDates(CreatePayrollPeriodRequest request)
+    {
+        if (request.EndDate < request.StartDate)
+        {
+            return this.ProblemResponse(
+                StatusCodes.Status400BadRequest,
+                Messages.Get("errors.rango_fechas_invalido"),
+                Messages.Get("errors.rango_fechas_detalle"));
+        }
+
+        if (request.CutoffDate < request.StartDate || request.PaymentDate < request.CutoffDate)
+        {
+            return this.ProblemResponse(
+                StatusCodes.Status400BadRequest,
+                Messages.Get("errors.rango_fechas_invalido"),
+                Messages.Get("errors.fechas_periodo_detalle"));
+        }
+
+        return null;
+    }
+
+    // Maps a rejected period edit/delete to a problem-details response. Returns null on success.
+    private IActionResult? MapPeriodMutation(PeriodMutationResult result, Guid id) => result switch
+    {
+        PeriodMutationResult.NotFound => this.ProblemResponse(
+            StatusCodes.Status404NotFound,
+            Messages.Get("errors.periodo_no_encontrado"),
+            $"No se encontró el período de nómina con id '{id}'."),
+        PeriodMutationResult.Closed => this.ProblemResponse(
+            StatusCodes.Status409Conflict,
+            Messages.Get("errors.periodo_cerrado"),
+            Messages.Get("errors.periodo_cerrado_no_modificable")),
+        PeriodMutationResult.InUse => this.ProblemResponse(
+            StatusCodes.Status409Conflict,
+            Messages.Get("errors.periodo_en_uso"),
+            Messages.Get("errors.periodo_en_uso_detalle")),
+        _ => null,
+    };
 
     // GET /api/admin/payroll/periods/{id}/lines
     [HttpGet("periods/{id:guid}/lines")]
@@ -182,6 +274,75 @@ public sealed class AdminPayrollController : ControllerBase
         HttpContext.Response.Headers.Append("Access-Control-Expose-Headers", "Content-Disposition");
         var bytes = Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(sb.ToString())).ToArray();
         return File(bytes, "text/csv; charset=utf-8", $"nomina-periodo-{id:N}-{DateTime.UtcNow:yyyyMMdd}.csv");
+    }
+
+    // GET /api/admin/payroll/periods/{id}/report/pdf
+    [HttpGet("periods/{id:guid}/report/pdf")]
+    [Produces("application/pdf")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ExportProfessionalReportPdf(Guid id, CancellationToken cancellationToken)
+    {
+        var detail = await _repository.GetPeriodByIdAsync(id, cancellationToken);
+
+        if (detail is null)
+        {
+            return this.ProblemResponse(
+                StatusCodes.Status404NotFound,
+                "Periodo no encontrado",
+                $"No se encontro el periodo con id '{id}'.");
+        }
+
+        HttpContext.Response.Headers.Append("Access-Control-Expose-Headers", "Content-Disposition");
+        var bytes = _reportExportService.GeneratePdf(detail);
+        return File(bytes, "application/pdf", $"payroll-report-{id:N}.pdf");
+    }
+
+    // GET /api/admin/payroll/periods/{id}/report/xlsx
+    [HttpGet("periods/{id:guid}/report/xlsx")]
+    [Produces("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ExportProfessionalReportXlsx(Guid id, CancellationToken cancellationToken)
+    {
+        var detail = await _repository.GetPeriodByIdAsync(id, cancellationToken);
+
+        if (detail is null)
+        {
+            return this.ProblemResponse(
+                StatusCodes.Status404NotFound,
+                "Periodo no encontrado",
+                $"No se encontro el periodo con id '{id}'.");
+        }
+
+        HttpContext.Response.Headers.Append("Access-Control-Expose-Headers", "Content-Disposition");
+        var bytes = _reportExportService.GenerateXlsx(detail);
+        return File(
+            bytes,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            $"payroll-report-{id:N}.xlsx");
+    }
+
+    // GET /api/admin/payroll/periods/{id}/report/html
+    [HttpGet("periods/{id:guid}/report/html")]
+    [Produces("text/html")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ExportProfessionalReportHtml(Guid id, CancellationToken cancellationToken)
+    {
+        var detail = await _repository.GetPeriodByIdAsync(id, cancellationToken);
+
+        if (detail is null)
+        {
+            return this.ProblemResponse(
+                StatusCodes.Status404NotFound,
+                "Periodo no encontrado",
+                $"No se encontro el periodo con id '{id}'.");
+        }
+
+        HttpContext.Response.Headers.Append("Access-Control-Expose-Headers", "Content-Disposition");
+        var bytes = _reportExportService.GenerateHtml(detail);
+        return File(bytes, "text/html; charset=utf-8", $"payroll-report-{id:N}.html");
     }
 
     // GET /api/admin/payroll/deductions
@@ -242,6 +403,42 @@ public sealed class AdminPayrollController : ControllerBase
         catch (PayrollPeriodClosedException ex)
         {
             return this.ProblemResponse(StatusCodes.Status409Conflict, Messages.Get("errors.periodo_cerrado"), ex.Message);
+        }
+    }
+
+    // PUT /api/admin/payroll/deductions/{id}
+    [HttpPut("deductions/{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> UpdateDeduction(Guid id, [FromBody] UpdateDeductionRequest request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var found = await _repository.UpdateDeductionAsync(id, request, cancellationToken);
+
+            if (!found)
+            {
+                return this.ProblemResponse(
+                    StatusCodes.Status404NotFound,
+                    Messages.Get("errors.deduccion_no_encontrada"),
+                    $"No se encontró la deducción con id '{id}'.");
+            }
+
+            return NoContent();
+        }
+        catch (PayrollPeriodClosedException ex)
+        {
+            return this.ProblemResponse(StatusCodes.Status409Conflict, Messages.Get("errors.periodo_cerrado"), ex.Message);
+        }
+        catch (ArgumentException ex)
+        {
+            return this.ProblemResponse(StatusCodes.Status400BadRequest, Messages.Get("errors.datos_invalidos"), ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return this.ProblemResponse(StatusCodes.Status409Conflict, "Operación no permitida", ex.Message);
         }
     }
 
@@ -315,9 +512,13 @@ public sealed class AdminPayrollController : ControllerBase
         
         if (openPeriods.Items.FirstOrDefault() is var openPeriod && openPeriod != null)
         {
-            var lines = await _repository.GetPeriodLinesAsync(openPeriod.Id, cancellationToken);
-            currentTotal = lines.Sum(l => l.NetCompensation);
-            allNurseIds.AddRange(lines.Select(l => l.NurseUserId).Distinct());
+            // Use the period-level staff summary so deductions are netted once, not per line.
+            var detail = await _repository.GetPeriodByIdAsync(openPeriod.Id, cancellationToken);
+            if (detail != null)
+            {
+                currentTotal = detail.StaffSummary.Sum(s => s.NetCompensation);
+                allNurseIds.AddRange(detail.StaffSummary.Select(s => s.NurseUserId));
+            }
         }
 
         foreach (var period in closedPeriods.Items)
@@ -429,7 +630,7 @@ public sealed class AdminPayrollController : ControllerBase
                 return this.ProblemResponse(StatusCodes.Status404NotFound, Messages.Get("errors.override_no_encontrado"), $"No hay una solicitud de compensación pendiente para la línea '{lineId}'.");
 
             if (error is not null)
-                return this.ProblemResponse(StatusCodes.Status403Forbidden, "No autorizado", "Not authorized to approve this override.");
+                return this.ProblemResponse(StatusCodes.Status400BadRequest, Messages.Get("errors.datos_invalidos"), error);
 
             return NoContent();
         }
