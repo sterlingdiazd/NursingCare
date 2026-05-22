@@ -116,4 +116,16 @@ public sealed class AdminCompensationRulesRepository : IAdminCompensationRulesRe
         await _dbContext.SaveChangesAsync(cancellationToken);
         return true;
     }
+
+    public async Task<bool> ReactivateRuleAsync(Guid ruleId, CancellationToken cancellationToken)
+    {
+        var rule = await _dbContext.CompensationRules
+            .FirstOrDefaultAsync(r => r.Id == ruleId, cancellationToken);
+
+        if (rule is null) return false;
+
+        rule.Reactivate(DateTime.UtcNow);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
 }
