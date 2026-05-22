@@ -47,8 +47,9 @@ public sealed class NursePayrollController : ControllerBase
         decimal totalComp = 0m;
         if (currentPeriod != null)
         {
-            var lines = await _payrollRepository.GetPeriodLinesAsync(currentPeriod.Id, cancellationToken);
-            totalComp = lines.Where(l => l.NurseUserId == nurseId).Sum(l => l.NetCompensation);
+            // Net is computed once per period (deductions subtracted at the period level).
+            var detail = await _payrollRepository.GetNursePeriodDetailAsync(currentPeriod.Id, nurseId, cancellationToken);
+            totalComp = detail?.NetCompensation ?? 0m;
         }
 
         var pendingCount = await _payrollRepository.CountNurseLinesInOpenPeriodsAsync(nurseId, cancellationToken);
