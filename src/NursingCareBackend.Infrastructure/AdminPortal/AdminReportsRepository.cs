@@ -373,17 +373,32 @@ public sealed class AdminReportsRepository : IAdminReportsRepository
                 NetCompensation: execution.NetCompensation))
             .ToList();
 
+        // Deductions are period-level per nurse (subtracted once), not per service execution.
+        var deductionsByNurse = payrollPeriod is null
+            ? new Dictionary<Guid, decimal>()
+            : await _dbContext.DeductionRecords
+                .AsNoTracking()
+                .Where(d => d.PayrollPeriodId == payrollPeriod.Id && nurseIds.Contains(d.NurseUserId))
+                .GroupBy(d => d.NurseUserId)
+                .Select(g => new { NurseUserId = g.Key, Total = g.Sum(d => d.Amount) })
+                .ToDictionaryAsync(x => x.NurseUserId, x => x.Total, cancellationToken);
+
         var staff = services
             .GroupBy(row => new { row.NurseId, row.NurseName })
-            .Select(group => new PayrollSummaryStaffRow(
-                NurseId: group.Key.NurseId,
-                NurseName: group.Key.NurseName,
-                ServiceCount: group.Count(),
-                GrossCompensation: group.Sum(row => row.BaseCompensation + row.TransportIncentive + row.ComplexityBonus + row.MedicalSuppliesCompensation + row.AdjustmentsTotal),
-                TransportIncentives: group.Sum(row => row.TransportIncentive),
-                AdjustmentsTotal: group.Sum(row => row.AdjustmentsTotal),
-                DeductionsTotal: group.Sum(row => row.DeductionsTotal),
-                NetCompensation: group.Sum(row => row.NetCompensation)))
+            .Select(group =>
+            {
+                var deductions = deductionsByNurse.GetValueOrDefault(Guid.Parse(group.Key.NurseId), 0m);
+                var gross = group.Sum(row => row.BaseCompensation + row.TransportIncentive + row.ComplexityBonus + row.MedicalSuppliesCompensation + row.AdjustmentsTotal);
+                return new PayrollSummaryStaffRow(
+                    NurseId: group.Key.NurseId,
+                    NurseName: group.Key.NurseName,
+                    ServiceCount: group.Count(),
+                    GrossCompensation: gross,
+                    TransportIncentives: group.Sum(row => row.TransportIncentive),
+                    AdjustmentsTotal: group.Sum(row => row.AdjustmentsTotal),
+                    DeductionsTotal: deductions,
+                    NetCompensation: gross - deductions);
+            })
             .OrderByDescending(row => row.NetCompensation)
             .ToList();
 
