@@ -237,11 +237,19 @@ public sealed class CareRequestsController : ControllerBase
 
         using var ms = new MemoryStream();
         await proof.CopyToAsync(ms, cancellationToken);
+        var bytes = ms.ToArray();
+
+        // Validate the actual file signature (magic bytes), not just the client-declared MIME.
+        if (!IsSupportedImage(bytes))
+        {
+            return this.ProblemResponse(StatusCodes.Status400BadRequest, "Formato no soportado",
+                "El comprobante debe ser una imagen JPG o PNG válida.");
+        }
 
         try
         {
             var updated = await _reportPaymentHandler.Handle(
-                new ReportPaymentCommand(id, userId.Value, ms.ToArray(), contentType, note),
+                new ReportPaymentCommand(id, userId.Value, bytes, contentType, note),
                 cancellationToken);
             return Ok(CareRequestResponse.FromDomain(updated));
         }
@@ -314,6 +322,16 @@ public sealed class CareRequestsController : ControllerBase
     {
         var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
         return Guid.TryParse(userIdClaim, out var userId) ? userId : null;
+    }
+
+    // Verifies the file signature: JPEG (FF D8 FF) or PNG (89 50 4E 47 0D 0A 1A 0A).
+    private static bool IsSupportedImage(byte[] bytes)
+    {
+        if (bytes.Length < 8) return false;
+        var isJpeg = bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF;
+        var isPng = bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47
+                    && bytes[4] == 0x0D && bytes[5] == 0x0A && bytes[6] == 0x1A && bytes[7] == 0x0A;
+        return isJpeg || isPng;
     }
 
     private bool TryResolveAccessScope(out CareRequestAccessScope accessScope)
