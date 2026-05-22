@@ -54,13 +54,27 @@ public sealed record HealthIndicator(
 /// <summary>A proactive insight ("things she might want to know") with a plain-language explanation.</summary>
 public sealed record Insight(string Key, string Severity, string Title, string Detail, string? DeepLinkPath);
 
-/// <summary>Source-record detail behind a dashboard metric: a report-style table with pre-formatted cells.</summary>
+/// <summary>
+/// Source-record detail behind a dashboard metric, shaped for an elegant card presentation
+/// (no tables, no truncation): a headline figure + ranked record cards, each with a primary label,
+/// a metadata line, a full amount, and a relative bar. Fields/Total feed the headline summary.
+/// </summary>
 public sealed record FinanceDetail(
     string Title,
     string? Explanation,
-    IReadOnlyList<string> Columns,
+    string Headline,
+    string HeadlineCaption,
+    IReadOnlyList<FinanceField> Summary,
     IReadOnlyList<FinanceDetailRow> Rows,
-    IReadOnlyList<string>? TotalsRow,
     string? Footnote);
 
-public sealed record FinanceDetailRow(IReadOnlyList<string> Cells, bool Emphasize = false);
+/// <summary>A labelled figure shown in the headline summary (e.g., "Ingresos" → "RD$ 70,710.00").</summary>
+public sealed record FinanceField(string Label, string Value, bool Emphasize = false);
+
+/// <summary>One record card: Primary (title), Meta (subtitle, may hold several labelled facts), Amount, BarFraction (0..1 of the max).</summary>
+public sealed record FinanceDetailRow(
+    string Primary,
+    string Meta,
+    string Amount,
+    double BarFraction,
+    IReadOnlyList<FinanceField> Facts);

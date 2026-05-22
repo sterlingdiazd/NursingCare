@@ -63,6 +63,21 @@ public sealed class AdminFinanceRepository : IAdminFinanceRepository
         var toEndEx = to.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
         string Dt(DateTime? dt) => dt?.ToString("dd/MM/yyyy") ?? "—";
 
+        // Bars are each record's share of the largest weight, so the card list reads as a ranking.
+        FinanceDetail Build(
+            string title, string? expl, string headline, string caption,
+            List<FinanceField> summary,
+            List<(string Primary, string Meta, string Amount, decimal Weight, List<FinanceField> Facts)> recs,
+            string? foot = null)
+        {
+            var max = recs.Count == 0 ? 0m : recs.Max(r => Math.Abs(r.Weight));
+            var rows = recs.Select(r => new FinanceDetailRow(
+                r.Primary, r.Meta, r.Amount,
+                max <= 0m ? 0d : (double)(Math.Abs(r.Weight) / max),
+                r.Facts)).ToList();
+            return new FinanceDetail(title, expl, headline, caption, summary, rows, foot);
+        }
+
         switch ((metric ?? string.Empty).ToLowerInvariant())
         {
             case "collected":
@@ -72,12 +87,14 @@ public sealed class AdminFinanceRepository : IAdminFinanceRepository
                     .Select(c => new { c.UserID, c.InvoiceNumber, c.PaidAtUtc, c.Total })
                     .ToListAsync(cancellationToken);
                 var name = await NameResolverAsync(rows.Select(r => r.UserID), cancellationToken);
-                var detail = rows.OrderByDescending(r => r.PaidAtUtc)
-                    .Select(r => new FinanceDetailRow(new[] { name(r.UserID), r.InvoiceNumber ?? "—", Dt(r.PaidAtUtc), M(r.Total) }))
-                    .ToList();
-                return new FinanceDetail("Cobrado", "Pagos confirmados por ti en el período.",
-                    new[] { "Cliente", "Factura", "Fecha de pago", "Monto" }, detail,
-                    new[] { "Total", "", "", M(rows.Sum(r => r.Total)) }, null);
+                var recs = rows.OrderByDescending(r => r.PaidAtUtc).Select(r => (
+                    Primary: name(r.UserID),
+                    Meta: $"Pagado el {Dt(r.PaidAtUtc)}",
+                    Amount: M(r.Total),
+                    Weight: r.Total,
+                    Facts: new List<FinanceField> { new("Factura", r.InvoiceNumber ?? "—"), new("Fecha de pago", Dt(r.PaidAtUtc)) })).ToList();
+                return Build("Cobrado", "Pagos confirmados por ti en el período.",
+                    M(rows.Sum(r => r.Total)), $"{rows.Count} pago(s) confirmados", new List<FinanceField>(), recs);
             }
             case "pending":
             {
@@ -86,12 +103,14 @@ public sealed class AdminFinanceRepository : IAdminFinanceRepository
                     .Select(c => new { c.UserID, c.InvoiceNumber, c.InvoicedAtUtc, c.Total })
                     .ToListAsync(cancellationToken);
                 var name = await NameResolverAsync(rows.Select(r => r.UserID), cancellationToken);
-                var detail = rows.OrderByDescending(r => r.InvoicedAtUtc)
-                    .Select(r => new FinanceDetailRow(new[] { name(r.UserID), r.InvoiceNumber ?? "—", Dt(r.InvoicedAtUtc), M(r.Total) }))
-                    .ToList();
-                return new FinanceDetail("Pendiente de cobro", "Servicios facturados que aún no se han confirmado como pagados.",
-                    new[] { "Cliente", "Factura", "Fecha factura", "Monto" }, detail,
-                    new[] { "Total", "", "", M(rows.Sum(r => r.Total)) }, null);
+                var recs = rows.OrderByDescending(r => r.InvoicedAtUtc).Select(r => (
+                    Primary: name(r.UserID),
+                    Meta: $"Facturado el {Dt(r.InvoicedAtUtc)}",
+                    Amount: M(r.Total),
+                    Weight: r.Total,
+                    Facts: new List<FinanceField> { new("Factura", r.InvoiceNumber ?? "—"), new("Fecha factura", Dt(r.InvoicedAtUtc)) })).ToList();
+                return Build("Pendiente de cobro", "Servicios facturados que aún no se han confirmado como pagados.",
+                    M(rows.Sum(r => r.Total)), $"{rows.Count} factura(s) por cobrar", new List<FinanceField>(), recs);
             }
             case "services":
             case "revenue":
@@ -103,68 +122,87 @@ public sealed class AdminFinanceRepository : IAdminFinanceRepository
                     .Select(e => new { e.NurseUserId, e.ServiceDate, e.PricingCategoryCode, e.SubtotalBeforeSupplies, e.NetCompensation })
                     .ToListAsync(cancellationToken);
                 var name = await NameResolverAsync(execs.Select(e => e.NurseUserId), cancellationToken);
-                var detail = execs.OrderByDescending(e => e.ServiceDate)
-                    .Select(e => new FinanceDetailRow(new[]
+                var recs = execs.OrderByDescending(e => e.ServiceDate).Select(e => (
+                    Primary: name(e.NurseUserId),
+                    Meta: $"{ServiceLineOf(e.PricingCategoryCode)} · {e.ServiceDate:dd/MM/yyyy}",
+                    Amount: M(e.SubtotalBeforeSupplies),
+                    Weight: e.SubtotalBeforeSupplies,
+                    Facts: new List<FinanceField>
                     {
-                        e.ServiceDate.ToString("dd/MM/yyyy"),
-                        name(e.NurseUserId),
-                        ServiceLineOf(e.PricingCategoryCode),
-                        M(e.SubtotalBeforeSupplies),
-                        M(e.NetCompensation),
-                        M(e.SubtotalBeforeSupplies - e.NetCompensation),
-                    }))
-                    .ToList();
+                        new("Pago a enfermera", M(e.NetCompensation)),
+                        new("Margen", M(e.SubtotalBeforeSupplies - e.NetCompensation), Emphasize: true),
+                    })).ToList();
                 var rev = execs.Sum(e => e.SubtotalBeforeSupplies);
                 var lab = execs.Sum(e => e.NetCompensation);
-                return new FinanceDetail("Servicios del período", "Cada servicio entregado: lo facturado al cliente, lo pagado a la enfermera y el margen.",
-                    new[] { "Fecha", "Enfermera", "Categoría", "Ingreso", "Pago", "Margen" }, detail,
-                    new[] { "Total", "", "", M(rev), M(lab), M(rev - lab) }, null);
+                return Build("Servicios del período", "Cada servicio entregado: lo facturado, lo pagado a la enfermera y el margen.",
+                    M(rev), $"{execs.Count} servicio(s)",
+                    new List<FinanceField> { new("Ingresos", M(rev)), new("Nómina", M(lab)), new("Margen", M(rev - lab), Emphasize: true) }, recs);
             }
             case "category":
             {
                 var ov = await GetOverviewAsync(from, to, cancellationToken);
-                var detail = ov.ByCategory
-                    .Select(c => new FinanceDetailRow(new[] { c.DisplayName, M(c.Revenue), M(c.Labor), M(c.Margin), PctStr(c.MarginPercent) }))
-                    .ToList();
-                return new FinanceDetail("Por categoría", "Ingresos y margen por categoría de servicio.",
-                    new[] { "Categoría", "Ingreso", "Nómina", "Margen", "Margen %" }, detail, null, null);
+                var recs = ov.ByCategory.Select(c => (
+                    Primary: c.DisplayName,
+                    Meta: $"Margen {PctStr(c.MarginPercent)}",
+                    Amount: M(c.Revenue),
+                    Weight: c.Revenue,
+                    Facts: new List<FinanceField> { new("Nómina", M(c.Labor)), new("Margen", M(c.Margin), Emphasize: true) })).ToList();
+                return Build("Por categoría", "Ingresos y margen por categoría de servicio.",
+                    M(ov.ByCategory.Sum(c => c.Revenue)), $"{ov.ByCategory.Count} categoría(s)", new List<FinanceField>(), recs);
             }
             case "line":
             {
                 var ov = await GetOverviewAsync(from, to, cancellationToken);
-                var detail = ov.ByServiceLine
-                    .Select(l => new FinanceDetailRow(new[] { l.ServiceLine, M(l.Revenue), M(l.Labor), M(l.Margin), PctStr(l.MarginPercent) }))
-                    .ToList();
-                return new FinanceDetail("Por línea de servicio", "Domicilio vs Casa hogar: cuál deja más margen.",
-                    new[] { "Línea", "Ingreso", "Nómina", "Margen", "Margen %" }, detail, null, null);
+                var recs = ov.ByServiceLine.Select(l => (
+                    Primary: l.ServiceLine,
+                    Meta: $"Margen {PctStr(l.MarginPercent)}",
+                    Amount: M(l.Revenue),
+                    Weight: l.Revenue,
+                    Facts: new List<FinanceField> { new("Nómina", M(l.Labor)), new("Margen", M(l.Margin), Emphasize: true) })).ToList();
+                return Build("Por línea de servicio", "Domicilio vs Casa hogar: cuál deja más margen.",
+                    M(ov.ByServiceLine.Sum(l => l.Revenue)), $"{ov.ByServiceLine.Count} línea(s)", new List<FinanceField>(), recs);
             }
             case "clients":
             {
                 var ov = await GetOverviewAsync(from, to, cancellationToken);
-                var detail = ov.TopClients
-                    .Select(c => new FinanceDetailRow(new[] { c.ClientName, $"{c.ServicesCount}", M(c.Billed), M(c.Collected), M(c.Pending), M(c.Margin) }))
-                    .ToList();
-                return new FinanceDetail("Por cliente", "Facturación y margen por cliente.",
-                    new[] { "Cliente", "Serv.", "Facturado", "Cobrado", "Pendiente", "Margen" }, detail, null, null);
+                var recs = ov.TopClients.Select(c => (
+                    Primary: c.ClientName,
+                    Meta: $"{c.ServicesCount} servicio(s)",
+                    Amount: M(c.Billed),
+                    Weight: c.Billed,
+                    Facts: new List<FinanceField> { new("Cobrado", M(c.Collected)), new("Pendiente", M(c.Pending)), new("Margen", M(c.Margin), Emphasize: true) })).ToList();
+                return Build("Por cliente", "Facturación y margen por cliente.",
+                    M(ov.TopClients.Sum(c => c.Billed)), $"{ov.TopClients.Count} cliente(s)", new List<FinanceField>(), recs);
             }
             case "nurses":
             {
                 var ov = await GetOverviewAsync(from, to, cancellationToken);
-                var detail = ov.NurseParticipation
-                    .Select(n => new FinanceDetailRow(new[] { n.NurseName, $"{n.ServicesCount}", $"{n.DaysWorked}", M(n.RevenueGenerated), M(n.NetPay), PctStr(n.ParticipationPercent), M(n.MarginContributed) }))
-                    .ToList();
-                return new FinanceDetail("Participación por enfermera", "Lo que genera y se le paga a cada enfermera.",
-                    new[] { "Enfermera", "Serv.", "Días", "Ingreso", "Pago", "Part. %", "Margen" }, detail, null, null);
+                var recs = ov.NurseParticipation.Select(n => (
+                    Primary: n.NurseName,
+                    Meta: $"{n.ServicesCount} servicio(s) · {n.DaysWorked} día(s)",
+                    Amount: M(n.RevenueGenerated),
+                    Weight: n.RevenueGenerated,
+                    Facts: new List<FinanceField>
+                    {
+                        new("Pago neto", M(n.NetPay)),
+                        new("Participación", PctStr(n.ParticipationPercent)),
+                        new("Margen aportado", M(n.MarginContributed), Emphasize: true),
+                        new("Préstamo pendiente", M(n.LoanOutstanding)),
+                    })).ToList();
+                return Build("Participación por enfermera", "Lo que genera y se le paga a cada enfermera.",
+                    M(ov.NurseParticipation.Sum(n => n.RevenueGenerated)), $"{ov.NurseParticipation.Count} enfermera(s)", new List<FinanceField>(), recs);
             }
             case "loans":
             {
                 var ov = await GetOverviewAsync(from, to, cancellationToken);
-                var detail = ov.Loans
-                    .Select(l => new FinanceDetailRow(new[] { l.NurseName, M(l.OutstandingBalance) }))
-                    .ToList();
-                return new FinanceDetail("Préstamos a enfermeras", "Saldo pendiente de préstamos/adelantos por enfermera.",
-                    new[] { "Enfermera", "Saldo" }, detail,
-                    new[] { "Total", M(ov.TotalLoansOutstanding) }, null);
+                var recs = ov.Loans.Select(l => (
+                    Primary: l.NurseName,
+                    Meta: "Saldo pendiente",
+                    Amount: M(l.OutstandingBalance),
+                    Weight: l.OutstandingBalance,
+                    Facts: new List<FinanceField>())).ToList();
+                return Build("Préstamos a enfermeras", "Saldo pendiente de préstamos/adelantos por enfermera.",
+                    M(ov.TotalLoansOutstanding), $"{ov.Loans.Count} enfermera(s) con saldo", new List<FinanceField>(), recs);
             }
             default:
                 return null;
