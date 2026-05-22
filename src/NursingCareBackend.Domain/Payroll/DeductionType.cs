@@ -5,4 +5,5 @@ public enum DeductionType
     Loan = 0,
     Advance = 1,
     Other = 2,
+    Insurance = 3,
 }
