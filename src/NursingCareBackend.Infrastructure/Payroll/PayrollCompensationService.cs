@@ -74,13 +74,6 @@ public sealed class PayrollCompensationService : IPayrollCompensationService
             2,
             MidpointRounding.AwayFromZero);
 
-        var effectiveDeductions = await _dbContext.DeductionRecords
-            .AsNoTracking()
-            .Where(record =>
-                record.NurseUserId == careRequest.AssignedNurse.Value
-                && record.PayrollPeriodId == payrollPeriod.Id)
-            .SumAsync(record => (decimal?)record.Amount, cancellationToken) ?? 0m;
-
         var existingExecution = await _dbContext.ServiceExecutions
             .FirstOrDefaultAsync(item => item.CareRequestId == careRequest.Id, cancellationToken);
 
@@ -120,7 +113,7 @@ public sealed class PayrollCompensationService : IPayrollCompensationService
                 complexityBonus: complexityBonus,
                 medicalSuppliesCompensation: medicalSuppliesCompensation,
                 adjustmentsTotal: 0m,
-                deductionsTotal: effectiveDeductions,
+                deductionsTotal: 0m,
                 manualOverrideAmount: null,
                 notes: "Auto-generado desde la solicitud completada usando el snapshot comercial.",
                 createdAtUtc: careRequest.CompletedAtUtc.Value);
@@ -145,7 +138,7 @@ public sealed class PayrollCompensationService : IPayrollCompensationService
                 complexityBonus: complexityBonus,
                 medicalSuppliesCompensation: medicalSuppliesCompensation,
                 adjustmentsTotal: 0m,
-                deductionsTotal: effectiveDeductions,
+                deductionsTotal: 0m,
                 manualOverrideAmount: null,
                 notes: "Recalculado desde el snapshot comercial persistido.",
                 updatedAtUtc: careRequest.CompletedAtUtc.Value);

@@ -106,13 +106,15 @@ public sealed class PayrollRecalculationService : IPayrollRecalculationService
                 * (rule.ComplexityBonusPercent / 100m), 2, MidpointRounding.AwayFromZero);
             var supplies = decimal.Round(exec.MedicalSuppliesCost * (rule.MedicalSuppliesPercent / 100m), 2, MidpointRounding.AwayFromZero);
 
-            var newNet = baseComp + transport + complexity + supplies + line.AdjustmentsTotal - line.DeductionsTotal;
+            // Deductions are applied once per nurse/period, not per line; line net excludes them
+            // and any value previously baked into the line is healed back to zero here.
+            var newNet = baseComp + transport + complexity + supplies + line.AdjustmentsTotal;
             newNet = decimal.Round(newNet, 2, MidpointRounding.AwayFromZero);
 
             totalOldNet += line.NetCompensation;
             totalNewNet += newNet;
 
-            line.RefreshAmounts(baseComp, transport, complexity, supplies, line.AdjustmentsTotal, line.DeductionsTotal, now);
+            line.RefreshAmounts(baseComp, transport, complexity, supplies, line.AdjustmentsTotal, 0m, now);
             affected++;
         }
 
