@@ -12,6 +12,12 @@ public sealed class DeductionRecord
     public DateTime EffectiveAtUtc { get; private set; }
     public DateTime CreatedAtUtc { get; private set; }
 
+    /// <summary>When set, this record is an auto-generated installment of a <see cref="ScheduledDeduction"/>.</summary>
+    public Guid? ScheduledDeductionId { get; private set; }
+
+    /// <summary>1-based installment number within the parent scheduled deduction, when applicable.</summary>
+    public int? InstallmentSequence { get; private set; }
+
     private DeductionRecord() { }
 
     public static DeductionRecord Create(
@@ -22,7 +28,9 @@ public sealed class DeductionRecord
         decimal amount,
         string? notes,
         DateTime effectiveAtUtc,
-        DateTime createdAtUtc)
+        DateTime createdAtUtc,
+        Guid? scheduledDeductionId = null,
+        int? installmentSequence = null)
     {
         if (nurseUserId == Guid.Empty)
         {
@@ -50,6 +58,37 @@ public sealed class DeductionRecord
             Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim(),
             EffectiveAtUtc = effectiveAtUtc,
             CreatedAtUtc = createdAtUtc,
+            ScheduledDeductionId = scheduledDeductionId,
+            InstallmentSequence = installmentSequence,
         };
+    }
+
+    /// <summary>Zero a pending installment that an admin chose to skip for its period.</summary>
+    public void MarkSkipped()
+    {
+        Amount = 0m;
+        if (!Label.EndsWith(" (omitida)", StringComparison.Ordinal))
+        {
+            Label = $"{Label} (omitida)";
+        }
+    }
+
+    /// <summary>Edit a manual one-off deduction's concept, label and amount.</summary>
+    public void Update(DeductionType deductionType, string label, decimal amount, string? notes)
+    {
+        if (string.IsNullOrWhiteSpace(label))
+        {
+            throw new ArgumentException("Deduction label is required.", nameof(label));
+        }
+
+        if (amount < 0)
+        {
+            throw new ArgumentException("Deduction amount must be >= 0.", nameof(amount));
+        }
+
+        DeductionType = deductionType;
+        Label = label.Trim();
+        Amount = decimal.Round(amount, 2, MidpointRounding.AwayFromZero);
+        Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
     }
 }

@@ -98,4 +98,9 @@ public sealed class CompensationRule
     {
         IsActive = false;
     }
+
+    public void Reactivate(DateTime reactivatedAtUtc)
+    {
+        IsActive = true;
+    }
 }
