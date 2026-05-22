@@ -13,5 +13,6 @@ public sealed record AdminPayrollLineItem(
     decimal AdjustmentsTotal,
     decimal DeductionsTotal,
     decimal NetCompensation,
+    decimal ServiceSubtotal, // subtotal cobrado al cliente (antes de insumos); para margen = ServiceSubtotal - NetCompensation
     DateTime CreatedAtUtc
 );

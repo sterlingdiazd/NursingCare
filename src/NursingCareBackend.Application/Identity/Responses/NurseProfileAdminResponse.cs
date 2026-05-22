@@ -24,5 +24,8 @@ public sealed record NurseProfileAdminResponse(
     string? BankName,
     string? AccountNumber,
     string? Category,
+    decimal VisitDailyRate,
+    decimal HomeCareMonthlyRate,
+    int HomeCareMonthlyExpectedDays,
     NurseWorkloadSummary Workload
 );

@@ -48,25 +48,6 @@ public sealed class PayrollRecalculationService : IPayrollRecalculationService
             return new RecalculatePayrollResult(emptyAudit.Id, 0, 0m, 0m, now);
         }
 
-        // Load all active compensation rules
-        var rules = await _dbContext.CompensationRules
-            .AsNoTracking()
-            .Where(r => r.IsActive)
-            .OrderBy(r => r.Priority)
-            .ToListAsync(cancellationToken);
-
-        // If ruleId filter specified, only use that rule
-        if (request.RuleId.HasValue)
-            rules = rules.Where(r => r.Id == request.RuleId.Value).ToList();
-
-        if (rules.Count == 0)
-        {
-            var emptyAudit = PayrollRecalculationAudit.Create(triggeredByUserId, now, request.PeriodId, request.RuleId, 0, 0m, 0m);
-            _dbContext.PayrollRecalculationAudits.Add(emptyAudit);
-            await _dbContext.SaveChangesAsync(cancellationToken);
-            return new RecalculatePayrollResult(emptyAudit.Id, 0, 0m, 0m, now);
-        }
-
         // Load payroll lines in open periods that have a ServiceExecutionId
         var lines = await _dbContext.PayrollLines
             .Where(l => openPeriodIds.Contains(l.PayrollPeriodId) && l.ServiceExecutionId != null)
@@ -80,6 +61,16 @@ public sealed class PayrollRecalculationService : IPayrollRecalculationService
 
         var executionById = executions.ToDictionary(e => e.Id);
 
+        // Nurse pay is decoupled from the client price: pay = nurse rate x days worked.
+        var nurseIds = executions.Select(e => e.NurseUserId).Distinct().ToList();
+        var nurseRates = await _dbContext.Nurses
+            .AsNoTracking()
+            .Where(n => nurseIds.Contains(n.UserId))
+            .ToDictionaryAsync(
+                n => n.UserId,
+                n => new NurseRates(n.VisitDailyRate, n.HomeCareMonthlyRate, n.HomeCareMonthlyExpectedDays),
+                cancellationToken);
+
         decimal totalOldNet = 0m;
         decimal totalNewNet = 0m;
         int affected = 0;
@@ -89,32 +80,16 @@ public sealed class PayrollRecalculationService : IPayrollRecalculationService
             if (!executionById.TryGetValue(line.ServiceExecutionId!.Value, out var exec))
                 continue;
 
-            var rule = ResolveRule(rules, exec.PricingCategoryCode, exec.UnitType, null);
-            if (rule is null) continue;
+            var rates = nurseRates.TryGetValue(exec.NurseUserId, out var r) ? r : new NurseRates(0m, 0m, 30);
+            var baseComp = ComputeNurseBasePay(exec.PricingCategoryCode, exec.Unit, rates);
 
-            // Recompute
-            var variantPercent = ResolveVariantPercent(rule, exec.Variant);
-            var subtotalBeforeSupplies = exec.SubtotalBeforeSupplies;
-            var baseComp = ResolveBaseCompensation(rule, subtotalBeforeSupplies, exec.Unit, variantPercent);
-            var transport = decimal.Round(
-                subtotalBeforeSupplies
-                * Math.Max(0m, exec.DistanceMultiplierSnapshot - 1.0m)
-                * (rule.TransportIncentivePercent / 100m), 2, MidpointRounding.AwayFromZero);
-            var complexity = decimal.Round(
-                subtotalBeforeSupplies
-                * Math.Max(0m, exec.ComplexityMultiplierSnapshot - 1.0m)
-                * (rule.ComplexityBonusPercent / 100m), 2, MidpointRounding.AwayFromZero);
-            var supplies = decimal.Round(exec.MedicalSuppliesCost * (rule.MedicalSuppliesPercent / 100m), 2, MidpointRounding.AwayFromZero);
-
-            // Deductions are applied once per nurse/period, not per line; line net excludes them
-            // and any value previously baked into the line is healed back to zero here.
-            var newNet = baseComp + transport + complexity + supplies + line.AdjustmentsTotal;
-            newNet = decimal.Round(newNet, 2, MidpointRounding.AwayFromZero);
+            // Incentives derived from the client price no longer apply to nurse pay.
+            var newNet = decimal.Round(baseComp + line.AdjustmentsTotal, 2, MidpointRounding.AwayFromZero);
 
             totalOldNet += line.NetCompensation;
             totalNewNet += newNet;
 
-            line.RefreshAmounts(baseComp, transport, complexity, supplies, line.AdjustmentsTotal, 0m, now);
+            line.RefreshAmounts(baseComp, 0m, 0m, 0m, line.AdjustmentsTotal, 0m, now);
             affected++;
         }
 
@@ -125,36 +100,18 @@ public sealed class PayrollRecalculationService : IPayrollRecalculationService
         return new RecalculatePayrollResult(audit.Id, affected, totalOldNet, totalNewNet, now);
     }
 
-    private static CompensationRule? ResolveRule(
-        IReadOnlyList<CompensationRule> rules,
-        string? pricingCategoryCode,
-        string unitTypeCode,
-        string? nurseCategoryCode)
+    private readonly record struct NurseRates(decimal VisitDailyRate, decimal HomeCareMonthlyRate, int HomeCareMonthlyExpectedDays);
+
+    // Pago de la enfermera = tarifa diaria x dias del servicio, independiente del precio al cliente.
+    // Los dias registrados en el servicio (Unit) se vuelven dias pagables al completarse.
+    // - Casa hogar: diaria = monto mensual / dias esperados del mes.
+    // - Domicilio/medicos: diaria = tarifa por dia (VisitDailyRate).
+    private static decimal ComputeNurseBasePay(string? pricingCategoryCode, int days, NurseRates rates)
     {
-        return rules.FirstOrDefault(r =>
-            Matches(r.CareRequestCategoryCode, pricingCategoryCode)
-            && Matches(r.UnitTypeCode, unitTypeCode)
-            && Matches(r.NurseCategoryCode, nurseCategoryCode));
+        var isHogar = string.Equals(pricingCategoryCode, "hogar", StringComparison.OrdinalIgnoreCase);
+        var daily = isHogar
+            ? (rates.HomeCareMonthlyExpectedDays > 0 ? rates.HomeCareMonthlyRate / rates.HomeCareMonthlyExpectedDays : 0m)
+            : rates.VisitDailyRate;
+        return decimal.Round(daily * Math.Max(1, days), 2, MidpointRounding.AwayFromZero);
     }
-
-    private static decimal ResolveVariantPercent(CompensationRule rule, ServiceExecutionVariant variant)
-        => variant switch
-        {
-            ServiceExecutionVariant.Partial => rule.PartialServicePercent,
-            ServiceExecutionVariant.Express => rule.ExpressServicePercent,
-            ServiceExecutionVariant.Suspended => rule.SuspendedServicePercent,
-            _ => 100m,
-        };
-
-    private static decimal ResolveBaseCompensation(CompensationRule rule, decimal subtotalBeforeSupplies, int unit, decimal variantPercent)
-    {
-        var percentageAmount = subtotalBeforeSupplies * (rule.BaseCompensationPercent / 100m);
-        var fixedAmount = rule.FixedAmountPerUnit * unit;
-        var baseAmount = fixedAmount > 0 ? fixedAmount : percentageAmount;
-        return decimal.Round(baseAmount * (variantPercent / 100m), 2, MidpointRounding.AwayFromZero);
-    }
-
-    private static bool Matches(string? ruleValue, string? currentValue)
-        => string.IsNullOrWhiteSpace(ruleValue)
-           || string.Equals(ruleValue.Trim(), currentValue?.Trim(), StringComparison.OrdinalIgnoreCase);
 }

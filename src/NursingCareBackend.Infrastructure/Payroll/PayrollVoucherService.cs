@@ -16,6 +16,17 @@ public sealed class PayrollVoucherService : IPayrollVoucherService
     private readonly CompanyInfoOptions _companyInfo;
     private static readonly CultureInfo DominicanCulture = new("es-DO");
 
+    // Shared palette/format with the payroll report export for a consistent look.
+    private const string Ink = "#1F2933";
+    private const string Muted = "#667085";
+    private const string Line = "#D0D5DD";
+    private const string Soft = "#F8FAFC";
+    private const string Soft2 = "#F2F4F7";
+    private const string Navy = "#1D3557";
+    private const string Green = "#247A5A";
+    private static readonly Regex RequestIdPattern =
+        new(@"solicitud\s+([0-9a-fA-F-]{36})", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
     public PayrollVoucherService(
         IAdminPayrollRepository repository,
         IOptions<CompanyInfoOptions> companyInfo)
@@ -68,150 +79,47 @@ public sealed class PayrollVoucherService : IPayrollVoucherService
 
     private byte[] GeneratePdf(PayrollVoucherData data)
     {
+        var hasAdjustments = data.TotalAdjustments != 0m;
+
         var document = Document.Create(container =>
         {
             container.Page(page =>
             {
                 page.Size(PageSizes.Letter);
                 page.Margin(40);
-                page.DefaultTextStyle(x => x.FontSize(9).FontFamily("Arial"));
+                page.DefaultTextStyle(x => x.FontFamily("Arial").FontSize(9).FontColor(Ink));
+                VoucherFooter(page);
 
                 page.Content().Column(col =>
                 {
-                    // Company header
-                    col.Item().BorderBottom(1).PaddingBottom(6).Column(header =>
+                    // Header: company (left), then a centered document title + period.
+                    // Centered/left content avoids the right-edge clipping that Row +
+                    // ConstantItem().AlignRight() produces in this layout.
+                    col.Item().Text(_companyInfo.Name).Bold().FontSize(16).FontColor(Navy);
+                    if (!string.IsNullOrWhiteSpace(_companyInfo.Rnc))
                     {
-                        header.Item().Text(_companyInfo.Name)
-                            .Bold().FontSize(14);
-                        if (!string.IsNullOrWhiteSpace(_companyInfo.Rnc))
-                        {
-                            header.Item().Text($"RNC: {_companyInfo.Rnc}")
-                                .FontSize(9).FontColor(Colors.Grey.Darken2);
-                        }
+                        col.Item().Text($"RNC: {_companyInfo.Rnc}").FontSize(8).FontColor(Muted);
+                    }
+                    col.Item().PaddingTop(6).BorderBottom(1).BorderColor(Line).PaddingBottom(8).Column(h =>
+                    {
+                        h.Item().Text("COMPROBANTE DE PAGO").Bold().FontSize(14).FontColor(Ink).AlignCenter();
+                        h.Item().Text($"Período {FormatDate(data.PeriodStartDate)} al {FormatDate(data.PeriodEndDate)}")
+                            .FontSize(9).FontColor(Muted).AlignCenter();
                     });
 
-                    col.Item().PaddingTop(8).PaddingBottom(8)
-                        .Text("COMPROBANTE DE PAGO")
-                        .Bold().FontSize(13).AlignCenter();
+                    col.Item().PaddingTop(12).Element(c => BuildInfoTable(c, data));
 
-                    // Period info
-                    col.Item().BorderBottom(1).BorderTop(1).PaddingVertical(6).Column(period =>
-                    {
-                        period.Item().Text($"Periodo: {FormatDate(data.PeriodStartDate)} al {FormatDate(data.PeriodEndDate)}");
-                        period.Item().Text($"Fecha de Pago: {FormatDate(data.PaymentDate)}");
-                        period.Item().Text($"Estado: {data.PeriodStatus}");
-                    });
+                    col.Item().PaddingTop(14).Text("Detalle de servicios").Bold().FontSize(11).FontColor(Navy);
+                    col.Item().PaddingTop(5).Element(c => BuildServicesTable(c, data));
 
-                    // Nurse info
-                    col.Item().PaddingTop(6).PaddingBottom(6).BorderBottom(1).Column(nurse =>
-                    {
-                        nurse.Item().Text($"Enfermera: {data.NurseDisplayName}").Bold();
-                        nurse.Item().Text($"Cedula: {data.NurseCedula ?? "No registrada"}");
-                    });
+                    col.Item().PaddingTop(14).Text("Resumen de pago").Bold().FontSize(11).FontColor(Navy);
+                    col.Item().PaddingTop(5).Element(c => BuildTotalsTable(c, data, hasAdjustments));
 
-                    // Line items table
-                    col.Item().PaddingTop(8).Text("DETALLE DE SERVICIOS").Bold().FontSize(10);
-                    col.Item().PaddingTop(4).Table(table =>
-                    {
-                        table.ColumnsDefinition(cols =>
-                        {
-                            cols.RelativeColumn(4);
-                            cols.RelativeColumn(2);
-                            cols.RelativeColumn(2);
-                            cols.RelativeColumn(2);
-                            cols.RelativeColumn(2);
-                            cols.RelativeColumn(2);
-                        });
-
-                        // Header row
-                        table.Header(header =>
-                        {
-                            header.Cell().Background(Colors.Grey.Lighten2).Padding(3).Text("Descripcion").Bold();
-                            header.Cell().Background(Colors.Grey.Lighten2).Padding(3).AlignRight().Text("Base").Bold();
-                            header.Cell().Background(Colors.Grey.Lighten2).Padding(3).AlignRight().Text("Transp.").Bold();
-                            header.Cell().Background(Colors.Grey.Lighten2).Padding(3).AlignRight().Text("Compl.").Bold();
-                            header.Cell().Background(Colors.Grey.Lighten2).Padding(3).AlignRight().Text("Insumos").Bold();
-                            header.Cell().Background(Colors.Grey.Lighten2).Padding(3).AlignRight().Text("Neto").Bold();
-                        });
-
-                        // Data rows
-                        foreach (var line in data.Lines)
-                        {
-                            table.Cell().Padding(3).Text(line.Description);
-                            table.Cell().Padding(3).AlignRight().Text(FormatCurrency(line.BaseCompensation));
-                            table.Cell().Padding(3).AlignRight().Text(FormatCurrency(line.TransportIncentive));
-                            table.Cell().Padding(3).AlignRight().Text(FormatCurrency(line.ComplexityBonus));
-                            table.Cell().Padding(3).AlignRight().Text(FormatCurrency(line.MedicalSuppliesCompensation));
-                            table.Cell().Padding(3).AlignRight().Text(FormatCurrency(line.NetCompensation));
-                        }
-                    });
-
-                    // Totals
-                    col.Item().PaddingTop(8).BorderTop(1).PaddingTop(6).Column(totals =>
-                    {
-                        totals.Item().Text("TOTALES").Bold().FontSize(10);
-                        totals.Item().PaddingTop(4).Row(row =>
-                        {
-                            row.RelativeItem().Text("Compensacion Bruta:");
-                            row.ConstantItem(120).AlignRight().Text(FormatCurrency(data.TotalGross));
-                        });
-                        totals.Item().Row(row =>
-                        {
-                            row.RelativeItem().Text("Transporte:");
-                            row.ConstantItem(120).AlignRight().Text(FormatCurrency(data.TotalTransport));
-                        });
-                        totals.Item().Row(row =>
-                        {
-                            row.RelativeItem().Text("Ajustes:");
-                            row.ConstantItem(120).AlignRight().Text(FormatCurrency(data.TotalAdjustments));
-                        });
-                        totals.Item().Row(row =>
-                        {
-                            row.RelativeItem().Text("Deducciones:");
-                            row.ConstantItem(120).AlignRight()
-                                .Text($"-{FormatCurrency(data.TotalDeductions)}");
-                        });
-                        totals.Item().PaddingTop(4).BorderTop(1).PaddingTop(4).Row(row =>
-                        {
-                            row.RelativeItem().Text("COMPENSACION NETA:").Bold();
-                            row.ConstantItem(120).AlignRight()
-                                .Text(FormatCurrency(data.NetCompensation)).Bold();
-                        });
-                    });
-
-                    // Deductions detail (only if any)
                     if (data.Deductions.Count > 0)
                     {
-                        col.Item().PaddingTop(12).Text("DETALLE DE DEDUCCIONES").Bold().FontSize(10);
-                        col.Item().PaddingTop(4).Table(table =>
-                        {
-                            table.ColumnsDefinition(cols =>
-                            {
-                                cols.RelativeColumn(2);
-                                cols.RelativeColumn(4);
-                                cols.RelativeColumn(2);
-                            });
-
-                            table.Header(header =>
-                            {
-                                header.Cell().Background(Colors.Grey.Lighten2).Padding(3).Text("Tipo").Bold();
-                                header.Cell().Background(Colors.Grey.Lighten2).Padding(3).Text("Concepto").Bold();
-                                header.Cell().Background(Colors.Grey.Lighten2).Padding(3).AlignRight().Text("Monto").Bold();
-                            });
-
-                            foreach (var deduction in data.Deductions)
-                            {
-                                table.Cell().Padding(3).Text(deduction.DeductionTypeLabel);
-                                table.Cell().Padding(3).Text(deduction.Label);
-                                table.Cell().Padding(3).AlignRight().Text(FormatCurrency(deduction.Amount));
-                            }
-                        });
+                        col.Item().PaddingTop(14).Text("Detalle de deducciones").Bold().FontSize(11).FontColor(Navy);
+                        col.Item().PaddingTop(5).Element(c => BuildDeductionsTable(c, data));
                     }
-
-                    // Generation timestamp
-                    col.Item().PaddingTop(12).AlignRight()
-                        .Text($"Generado el {DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC")
-                        .FontSize(8).FontColor(Colors.Grey.Darken1);
                 });
             });
         });
@@ -219,8 +127,170 @@ public sealed class PayrollVoucherService : IPayrollVoucherService
         return document.GeneratePdf();
     }
 
+    private static void BuildInfoTable(IContainer container, PayrollVoucherData data)
+    {
+        container.Table(table =>
+        {
+            table.ColumnsDefinition(cols =>
+            {
+                cols.ConstantColumn(95);
+                cols.RelativeColumn();
+                cols.ConstantColumn(95);
+                cols.RelativeColumn();
+            });
+
+            LabelCell(table, "Enfermera");
+            BodyCell(table, data.NurseDisplayName);
+            LabelCell(table, "Cédula");
+            BodyCell(table, string.IsNullOrWhiteSpace(data.NurseCedula) ? "No registrada" : data.NurseCedula);
+            LabelCell(table, "Estado");
+            BodyCell(table, FormatStatus(data.PeriodStatus));
+            LabelCell(table, "Fecha de pago");
+            BodyCell(table, FormatDate(data.PaymentDate));
+        });
+    }
+
+    private static void BuildServicesTable(IContainer container, PayrollVoucherData data)
+    {
+        container.Table(table =>
+        {
+            table.ColumnsDefinition(cols =>
+            {
+                cols.RelativeColumn();
+                cols.ConstantColumn(150);
+            });
+
+            HeaderCell(table, "Servicio");
+            HeaderCell(table, "Monto", alignRight: true);
+
+            foreach (var line in data.Lines)
+            {
+                var (service, requestId) = DescribeLine(line.Description);
+                Cell(table).Column(c =>
+                {
+                    c.Item().Text(service).SemiBold();
+                    c.Item().Text($"Solicitud {requestId}").FontSize(7).FontColor(Muted);
+                });
+                BodyCell(table, FormatCurrency(line.NetCompensation), alignRight: true);
+            }
+        });
+    }
+
+    private static void BuildTotalsTable(IContainer container, PayrollVoucherData data, bool hasAdjustments)
+    {
+        container.Table(table =>
+        {
+            table.ColumnsDefinition(cols =>
+            {
+                cols.RelativeColumn();
+                cols.ConstantColumn(150);
+            });
+
+            HeaderCell(table, "Concepto");
+            HeaderCell(table, "Monto", alignRight: true);
+
+            BodyCell(table, "Compensación bruta");
+            BodyCell(table, FormatCurrency(data.TotalGross), alignRight: true);
+
+            if (hasAdjustments)
+            {
+                BodyCell(table, "Ajustes");
+                BodyCell(table, FormatCurrency(data.TotalAdjustments), alignRight: true);
+            }
+
+            BodyCell(table, "Deducciones");
+            BodyCell(table, data.TotalDeductions != 0m
+                ? $"-{FormatCurrency(data.TotalDeductions)}"
+                : FormatCurrency(0m), alignRight: true);
+
+            BodyCell(table, "Total neto a pagar", highlight: true);
+            BodyCell(table, FormatCurrency(data.NetCompensation), highlight: true, alignRight: true);
+        });
+    }
+
+    private static void BuildDeductionsTable(IContainer container, PayrollVoucherData data)
+    {
+        container.Table(table =>
+        {
+            table.ColumnsDefinition(cols =>
+            {
+                cols.RelativeColumn(1.4f);
+                cols.RelativeColumn(3f);
+                cols.ConstantColumn(120);
+            });
+
+            HeaderCell(table, "Tipo");
+            HeaderCell(table, "Concepto");
+            HeaderCell(table, "Monto", alignRight: true);
+
+            foreach (var deduction in data.Deductions)
+            {
+                BodyCell(table, deduction.DeductionTypeLabel);
+                BodyCell(table, deduction.Label);
+                BodyCell(table, FormatCurrency(deduction.Amount), alignRight: true);
+            }
+        });
+    }
+
+    private static void VoucherFooter(PageDescriptor page)
+    {
+        page.Footer().BorderTop(0.5f).BorderColor(Line).PaddingTop(6).Text(text =>
+        {
+            text.AlignCenter();
+            text.Span($"Generado el {DateTime.UtcNow:dd-MM-yyyy HH:mm} UTC   ·   Página ").FontSize(7).FontColor(Muted);
+            text.CurrentPageNumber().FontSize(7).FontColor(Muted);
+        });
+    }
+
+    private static IContainer Cell(TableDescriptor table) =>
+        table.Cell().Border(0.5f).BorderColor(Line).Padding(5);
+
+    private static void HeaderCell(TableDescriptor table, string text, bool alignRight = false)
+    {
+        var descriptor = Cell(table).Background(Soft2);
+        var textDescriptor = descriptor.Text(text);
+        if (alignRight) textDescriptor.AlignRight();
+        textDescriptor.SemiBold().FontColor(Ink);
+    }
+
+    private static void LabelCell(TableDescriptor table, string text) =>
+        Cell(table).Background(Soft).Text(text).SemiBold().FontColor(Muted);
+
+    private static void BodyCell(TableDescriptor table, string text, bool highlight = false, bool alignRight = false)
+    {
+        var descriptor = Cell(table);
+        if (highlight) descriptor = descriptor.Background("#ECFDF3");
+        var textDescriptor = descriptor.Text(text);
+        if (alignRight) textDescriptor.AlignRight();
+        if (highlight) textDescriptor.SemiBold().FontColor(Green);
+    }
+
+    private static (string Service, string RequestId) DescribeLine(string description)
+    {
+        var match = RequestIdPattern.Match(description);
+        var requestId = match.Success ? match.Groups[1].Value : "sin identificador";
+        var service = match.Success ? description[..match.Index].Trim(' ', '.', '-', '·') : description.Trim();
+        service = service.Replace("Servicio ", string.Empty, StringComparison.OrdinalIgnoreCase);
+        service = Humanize(service);
+        return (string.IsNullOrWhiteSpace(service) ? "Servicio" : service, requestId);
+    }
+
+    private static string Humanize(string code)
+    {
+        if (string.IsNullOrWhiteSpace(code)) return code;
+        var spaced = code.Replace('_', ' ').Trim();
+        return char.ToUpper(spaced[0], DominicanCulture) + spaced[1..];
+    }
+
+    private static string FormatStatus(string status) => status.ToUpperInvariant() switch
+    {
+        "CLOSED" => "Cerrado",
+        "OPEN" => "Abierto",
+        _ => status
+    };
+
     private static string FormatDate(DateOnly date) =>
-        date.ToString("dd/MM/yyyy");
+        date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
 
     private static string FormatCurrency(decimal value) =>
         $"RD$ {value.ToString("N2", DominicanCulture)}";

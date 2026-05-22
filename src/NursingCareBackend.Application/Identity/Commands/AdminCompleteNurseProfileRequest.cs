@@ -34,5 +34,8 @@ public sealed record AdminCompleteNurseProfileRequest(
     [RegularExpression(IdentityInputRules.NumericOnlyPattern, ErrorMessage = "El numero de cuenta solo puede contener digitos.")]
     string? AccountNumber,
     [Required]
-    string Category
+    string Category,
+    [Range(0, 99999999)] decimal VisitDailyRate = 0m,
+    [Range(0, 99999999)] decimal HomeCareMonthlyRate = 0m,
+    [Range(1, 31)] int HomeCareMonthlyExpectedDays = 30
 );

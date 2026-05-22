@@ -39,4 +39,7 @@ public sealed record AdminCreateNurseProfileRequest(
     string? AccountNumber,
     [Required]
     string Category,
-    bool IsOperationallyActive);
+    bool IsOperationallyActive,
+    [Range(0, 99999999)] decimal VisitDailyRate = 0m,
+    [Range(0, 99999999)] decimal HomeCareMonthlyRate = 0m,
+    [Range(1, 31)] int HomeCareMonthlyExpectedDays = 30);

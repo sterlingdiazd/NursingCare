@@ -26,6 +26,12 @@ public static class CatalogSeeding
     public static readonly Guid CategoryDomicilioId = Guid.Parse("10000000-0000-0000-0000-000000000002");
     public static readonly Guid CategoryMedicosId = Guid.Parse("10000000-0000-0000-0000-000000000003");
 
+    // Stable IDs for the default compensation rules. Seeded insert-if-absent so admin
+    // edits made through the UI are never overwritten on a later application restart.
+    public static readonly Guid CompensationRuleHogarId = Guid.Parse("90000000-0000-0000-0000-000000000001");
+    public static readonly Guid CompensationRuleDomicilioId = Guid.Parse("90000000-0000-0000-0000-000000000002");
+    public static readonly Guid CompensationRuleMedicosId = Guid.Parse("90000000-0000-0000-0000-000000000003");
+
     // Fixed GUIDs for test nurses
     public static readonly Dictionary<string, Guid> NurseIds = new()
     {
@@ -67,6 +73,11 @@ public static class CatalogSeeding
         {
             await SeedCatalogsAsync(db, cancellationToken);
         }
+
+        // Seeded independently of the catalog guard: the default compensation rules were
+        // added after many databases already had catalogs, so they must self-heal on any
+        // existing database. Insert-if-absent keyed on stable IDs preserves admin UI edits.
+        await EnsureCompensationRulesAsync(db, cancellationToken);
 
         // Always ensure seeded test users exist with correct roles
         var nurseRole = await db.Roles.SingleAsync(r => r.Name == SystemRoles.Nurse, cancellationToken);
@@ -237,16 +248,16 @@ public static class CatalogSeeding
 
         db.CareRequestTypeCatalogs.AddRange(
             Type("30000000-0000-0000-0000-000000000001", "hogar_diario", "Hogar diario", "hogar", "dia_completo", 2500m, 1),
-            Type("30000000-0000-0000-0000-000000000002", "hogar_basico", "Hogar basico", "hogar", "mes", 55000m, 2),
-            Type("30000000-0000-0000-0000-000000000003", "hogar_estandar", "Hogar estandar", "hogar", "mes", 60000m, 3),
+            Type("30000000-0000-0000-0000-000000000002", "hogar_basico", "Hogar básico", "hogar", "mes", 55000m, 2),
+            Type("30000000-0000-0000-0000-000000000003", "hogar_estandar", "Hogar estándar", "hogar", "mes", 60000m, 3),
             Type("30000000-0000-0000-0000-000000000004", "hogar_premium", "Hogar premium", "hogar", "mes", 65000m, 4),
-            Type("30000000-0000-0000-0000-000000000005", "domicilio_dia_12h", "Domicilio dia 12h", "domicilio", "medio_dia", 2500m, 5),
-            Type("30000000-0000-0000-0000-000000000006", "domicilio_noche_12h", "Domicilio noche 12h", "domicilio", "medio_dia", 2500m, 6),
+            Type("30000000-0000-0000-0000-000000000005", "domicilio_dia_12h", "Domicilio día (12h)", "domicilio", "medio_dia", 2500m, 5),
+            Type("30000000-0000-0000-0000-000000000006", "domicilio_noche_12h", "Domicilio noche (12h)", "domicilio", "medio_dia", 2500m, 6),
             Type("30000000-0000-0000-0000-000000000007", "domicilio_24h", "Domicilio 24h", "domicilio", "dia_completo", 3500m, 7),
             Type("30000000-0000-0000-0000-000000000008", "suero", "Suero", "medicos", "sesion", 2000m, 8),
             Type("30000000-0000-0000-0000-000000000009", "medicamentos", "Medicamentos", "medicos", "sesion", 2000m, 9),
             Type("30000000-0000-0000-0000-000000000010", "sonda_vesical", "Sonda vesical", "medicos", "sesion", 2000m, 10),
-            Type("30000000-0000-0000-0000-000000000011", "sonda_nasogastrica", "Sonda nasogastrica", "medicos", "sesion", 3000m, 11),
+            Type("30000000-0000-0000-0000-000000000011", "sonda_nasogastrica", "Sonda nasogástrica", "medicos", "sesion", 3000m, 11),
             Type("30000000-0000-0000-0000-000000000012", "sonda_peg", "Sonda PEG", "medicos", "sesion", 4000m, 12),
             Type("30000000-0000-0000-0000-000000000013", "curas", "Curas", "medicos", "sesion", 2000m, 13));
 
@@ -317,59 +328,64 @@ public static class CatalogSeeding
             NurseCat("80000000-0000-0000-0000-000000000003", "Senior", "Senior", null, 3),
             NurseCat("80000000-0000-0000-0000-000000000004", "Lider", "Lider", "Lead", 4));
 
-        db.CompensationRules.AddRange(
-            CompensationRule.Create(
-                name: "Pago por servicio hogar",
-                employmentType: CompensationEmploymentType.PerService,
-                careRequestCategoryCode: "hogar",
-                unitTypeCode: null,
-                nurseCategoryCode: null,
-                baseCompensationPercent: 52m,
-                fixedAmountPerUnit: 0m,
-                transportIncentivePercent: 0m,
-                complexityBonusPercent: 20m,
-                medicalSuppliesPercent: 0m,
-                partialServicePercent: 65m,
-                expressServicePercent: 120m,
-                suspendedServicePercent: 40m,
-                isActive: true,
-                priority: 10,
-                createdAtUtc: DateTime.UtcNow),
-            CompensationRule.Create(
-                name: "Pago por servicio domicilio",
-                employmentType: CompensationEmploymentType.PerService,
-                careRequestCategoryCode: "domicilio",
-                unitTypeCode: null,
-                nurseCategoryCode: null,
-                baseCompensationPercent: 55m,
-                fixedAmountPerUnit: 0m,
-                transportIncentivePercent: 15m,
-                complexityBonusPercent: 18m,
-                medicalSuppliesPercent: 0m,
-                partialServicePercent: 65m,
-                expressServicePercent: 125m,
-                suspendedServicePercent: 40m,
-                isActive: true,
-                priority: 20,
-                createdAtUtc: DateTime.UtcNow),
-            CompensationRule.Create(
-                name: "Pago por servicio medicos",
-                employmentType: CompensationEmploymentType.PerService,
-                careRequestCategoryCode: "medicos",
-                unitTypeCode: null,
-                nurseCategoryCode: null,
-                baseCompensationPercent: 50m,
-                fixedAmountPerUnit: 0m,
-                transportIncentivePercent: 0m,
-                complexityBonusPercent: 10m,
-                medicalSuppliesPercent: 25m,
-                partialServicePercent: 70m,
-                expressServicePercent: 120m,
-                suspendedServicePercent: 40m,
-                isActive: true,
-                priority: 30,
-                createdAtUtc: DateTime.UtcNow));
+        await db.SaveChangesAsync(cancellationToken);
+    }
 
+    /// <summary>
+    /// Seeds the default per-service compensation rules using stable IDs, inserting only the
+    /// rules that are not already present. Existing rows (including admin edits made through the
+    /// UI) are left untouched, so this is safe to run on every application startup.
+    /// </summary>
+    private static async Task EnsureCompensationRulesAsync(NursingCareDbContext db, CancellationToken cancellationToken = default)
+    {
+        var defaults = new[]
+        {
+            (Id: CompensationRuleHogarId, Name: "Pago por servicio hogar", Category: "hogar",
+                Base: 52m, Transport: 0m, Complexity: 20m, Supplies: 0m,
+                Partial: 65m, Express: 120m, Suspended: 40m, Priority: 10),
+            (Id: CompensationRuleDomicilioId, Name: "Pago por servicio domicilio", Category: "domicilio",
+                Base: 55m, Transport: 15m, Complexity: 18m, Supplies: 0m,
+                Partial: 65m, Express: 125m, Suspended: 40m, Priority: 20),
+            (Id: CompensationRuleMedicosId, Name: "Pago por servicio medicos", Category: "medicos",
+                Base: 50m, Transport: 0m, Complexity: 10m, Supplies: 25m,
+                Partial: 70m, Express: 120m, Suspended: 40m, Priority: 30),
+        };
+
+        var seedIds = defaults.Select(d => d.Id).ToArray();
+        var existingIds = (await db.CompensationRules
+                .Where(rule => seedIds.Contains(rule.Id))
+                .Select(rule => rule.Id)
+                .ToListAsync(cancellationToken))
+            .ToHashSet();
+
+        var missing = defaults
+            .Where(d => !existingIds.Contains(d.Id))
+            .Select(d => CompensationRule.Create(
+                name: d.Name,
+                employmentType: CompensationEmploymentType.PerService,
+                careRequestCategoryCode: d.Category,
+                unitTypeCode: null,
+                nurseCategoryCode: null,
+                baseCompensationPercent: d.Base,
+                fixedAmountPerUnit: 0m,
+                transportIncentivePercent: d.Transport,
+                complexityBonusPercent: d.Complexity,
+                medicalSuppliesPercent: d.Supplies,
+                partialServicePercent: d.Partial,
+                expressServicePercent: d.Express,
+                suspendedServicePercent: d.Suspended,
+                isActive: true,
+                priority: d.Priority,
+                createdAtUtc: DateTime.UtcNow,
+                id: d.Id))
+            .ToList();
+
+        if (missing.Count == 0)
+        {
+            return;
+        }
+
+        db.CompensationRules.AddRange(missing);
         await db.SaveChangesAsync(cancellationToken);
     }
 
@@ -550,7 +566,10 @@ public static class CatalogSeeding
                 LicenseId = $"{nurseIndex + 100000}",
                 BankName = "Bank Test",
                 AccountNumber = $"{nurseIndex + 100000000}",
-                Category = category
+                Category = category,
+                VisitDailyRate = 1700m,
+                HomeCareMonthlyRate = 30000m,
+                HomeCareMonthlyExpectedDays = 30
             };
 
             db.Nurses.Add(nurseProfile);

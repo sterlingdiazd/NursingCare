@@ -32,6 +32,9 @@ public sealed class PayrollCompensationService : IPayrollCompensationService
                 user.Name,
                 user.LastName,
                 NurseCategory = user.NurseProfile != null ? user.NurseProfile.Category : null,
+                VisitDailyRate = user.NurseProfile != null ? user.NurseProfile.VisitDailyRate : 0m,
+                HomeCareMonthlyRate = user.NurseProfile != null ? user.NurseProfile.HomeCareMonthlyRate : 0m,
+                HomeCareMonthlyExpectedDays = user.NurseProfile != null ? user.NurseProfile.HomeCareMonthlyExpectedDays : 30,
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -56,23 +59,18 @@ public sealed class PayrollCompensationService : IPayrollCompensationService
 
         var variant = ServiceExecutionVariant.Standard;
         var variantPercent = ResolveVariantPercent(rule, variant);
-        var baseCompensation = ResolveBaseCompensation(rule, subtotalBeforeSupplies, careRequest.Unit, variantPercent);
-        var transportIncentive = decimal.Round(
-            subtotalBeforeSupplies
-            * Math.Max(0m, (careRequest.DistanceFactorMultiplierSnapshot ?? 1.0m) - 1.0m)
-            * (rule.TransportIncentivePercent / 100m),
-            2,
-            MidpointRounding.AwayFromZero);
-        var complexityBonus = decimal.Round(
-            subtotalBeforeSupplies
-            * Math.Max(0m, (careRequest.ComplexityMultiplierSnapshot ?? 1.0m) - 1.0m)
-            * (rule.ComplexityBonusPercent / 100m),
-            2,
-            MidpointRounding.AwayFromZero);
-        var medicalSuppliesCompensation = decimal.Round(
-            (careRequest.MedicalSuppliesCost ?? 0m) * (rule.MedicalSuppliesPercent / 100m),
-            2,
-            MidpointRounding.AwayFromZero);
+
+        // Nurse pay is decoupled from the client price: pay = nurse rate x days worked.
+        // The compensation rule is still resolved for the audit snapshot, but does NOT drive pay.
+        var baseCompensation = ComputeNurseBasePay(
+            careRequest.PricingCategoryCode,
+            careRequest.Unit,
+            nurse.VisitDailyRate,
+            nurse.HomeCareMonthlyRate,
+            nurse.HomeCareMonthlyExpectedDays);
+        var transportIncentive = 0m;
+        var complexityBonus = 0m;
+        var medicalSuppliesCompensation = 0m;
 
         var existingExecution = await _dbContext.ServiceExecutions
             .FirstOrDefaultAsync(item => item.CareRequestId == careRequest.Id, cancellationToken);
@@ -147,7 +145,17 @@ public sealed class PayrollCompensationService : IPayrollCompensationService
         var existingPayrollLine = await _dbContext.PayrollLines
             .FirstOrDefaultAsync(line => line.ServiceExecutionId == existingExecution.Id, cancellationToken);
 
-        var description = $"Servicio {careRequest.CareRequestType} · solicitud {careRequest.Id}";
+        // Use the catalog display name (human-readable) for the line, not the raw type code.
+        var serviceLabel = await _dbContext.CareRequestTypeCatalogs
+            .AsNoTracking()
+            .Where(t => t.Code == careRequest.CareRequestType)
+            .Select(t => t.DisplayName)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (string.IsNullOrWhiteSpace(serviceLabel))
+        {
+            serviceLabel = careRequest.CareRequestType;
+        }
+        var description = $"{serviceLabel} · solicitud {careRequest.Id}";
         if (existingPayrollLine is null)
         {
             existingPayrollLine = PayrollLine.Create(
@@ -255,12 +263,22 @@ public sealed class PayrollCompensationService : IPayrollCompensationService
             _ => 100m,
         };
 
-    private static decimal ResolveBaseCompensation(CompensationRule rule, decimal subtotalBeforeSupplies, int unit, decimal variantPercent)
+    // Pago de la enfermera = tarifa diaria x dias del servicio, independiente del precio al cliente.
+    // Los dias registrados en el servicio (Unit) se vuelven dias pagables al completarse.
+    // - Casa hogar: diaria = monto mensual / dias esperados del mes.
+    // - Domicilio/medicos: diaria = tarifa por dia (VisitDailyRate).
+    private static decimal ComputeNurseBasePay(
+        string? pricingCategoryCode,
+        int days,
+        decimal visitDailyRate,
+        decimal homeCareMonthlyRate,
+        int homeCareMonthlyExpectedDays)
     {
-        var percentageAmount = subtotalBeforeSupplies * (rule.BaseCompensationPercent / 100m);
-        var fixedAmount = rule.FixedAmountPerUnit * unit;
-        var baseAmount = fixedAmount > 0 ? fixedAmount : percentageAmount;
-        return decimal.Round(baseAmount * (variantPercent / 100m), 2, MidpointRounding.AwayFromZero);
+        var isHogar = string.Equals(pricingCategoryCode, "hogar", StringComparison.OrdinalIgnoreCase);
+        var daily = isHogar
+            ? (homeCareMonthlyExpectedDays > 0 ? homeCareMonthlyRate / homeCareMonthlyExpectedDays : 0m)
+            : visitDailyRate;
+        return decimal.Round(daily * Math.Max(1, days), 2, MidpointRounding.AwayFromZero);
     }
 
     private static bool Matches(string? ruleValue, string? currentValue)

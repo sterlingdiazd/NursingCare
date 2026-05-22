@@ -5,6 +5,7 @@ public sealed record AdminCompensationRuleDetail(
     string Name,
     string EmploymentType,
     decimal BaseCompensationPercent,
+    decimal FixedAmountPerUnit,
     decimal TransportIncentivePercent,
     decimal ComplexityBonusPercent,
     decimal MedicalSuppliesPercent,

@@ -27,6 +27,7 @@ public sealed class AdminCompensationRulesRepository : IAdminCompensationRulesRe
                 r.Name,
                 r.EmploymentType.ToString(),
                 r.BaseCompensationPercent,
+                r.FixedAmountPerUnit,
                 r.TransportIncentivePercent,
                 r.ComplexityBonusPercent,
                 r.MedicalSuppliesPercent,
@@ -51,6 +52,7 @@ public sealed class AdminCompensationRulesRepository : IAdminCompensationRulesRe
             rule.Name,
             rule.EmploymentType.ToString(),
             rule.BaseCompensationPercent,
+            rule.FixedAmountPerUnit,
             rule.TransportIncentivePercent,
             rule.ComplexityBonusPercent,
             rule.MedicalSuppliesPercent,
@@ -70,7 +72,7 @@ public sealed class AdminCompensationRulesRepository : IAdminCompensationRulesRe
             null, // unitTypeCode
             null, // nurseCategoryCode
             request.BaseCompensationPercent,
-            0m, // fixedAmountPerUnit
+            request.FixedAmountPerUnit,
             request.TransportIncentivePercent,
             request.ComplexityBonusPercent,
             request.MedicalSuppliesPercent,
@@ -93,9 +95,14 @@ public sealed class AdminCompensationRulesRepository : IAdminCompensationRulesRe
 
         if (rule is null) return false;
 
+        if (!Enum.TryParse<CompensationEmploymentType>(request.EmploymentType, ignoreCase: true, out var employmentType))
+            throw new ArgumentException($"Tipo de empleo invalido: {request.EmploymentType}");
+
         rule.Update(
             request.Name,
+            employmentType,
             request.BaseCompensationPercent,
+            request.FixedAmountPerUnit,
             request.TransportIncentivePercent,
             request.ComplexityBonusPercent,
             request.MedicalSuppliesPercent,

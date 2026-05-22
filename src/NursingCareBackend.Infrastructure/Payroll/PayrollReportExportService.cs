@@ -3,6 +3,7 @@ using System.IO.Compression;
 using System.Security;
 using System.Text;
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.Options;
 using NursingCareBackend.Application.AdminPortal.Payroll;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
@@ -14,7 +15,7 @@ public sealed class PayrollReportExportService : IPayrollReportExportService
 {
     private static readonly CultureInfo DominicanCulture = new("es-DO");
     private static readonly Regex RequestIdPattern = new(@"solicitud\s+([0-9a-fA-F-]{36})", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    private const string CompanyName = "Sol y Luna Nursing Care";
+    private readonly string _companyName;
     private const string Ink = "#1F2933";
     private const string Muted = "#667085";
     private const string Line = "#D0D5DD";
@@ -22,6 +23,11 @@ public sealed class PayrollReportExportService : IPayrollReportExportService
     private const string Soft2 = "#F2F4F7";
     private const string Navy = "#1D3557";
     private const string Green = "#247A5A";
+
+    public PayrollReportExportService(IOptions<CompanyInfoOptions> companyInfo)
+    {
+        _companyName = string.IsNullOrWhiteSpace(companyInfo.Value.Name) ? "Sol y Luna" : companyInfo.Value.Name;
+    }
 
     public byte[] GeneratePdf(AdminPayrollPeriodDetail period)
     {
@@ -39,7 +45,7 @@ public sealed class PayrollReportExportService : IPayrollReportExportService
                 {
                     col.Spacing(11);
                     col.Item().Text("Reporte de Nómina - Revisión Operativa").Bold().FontSize(18).FontColor(Ink);
-                    col.Item().Text($"{CompanyName} | Reporte profesional de nómina y soporte de pago").FontSize(9).FontColor(Muted);
+                    col.Item().Text($"{_companyName} | Reporte profesional de nómina y soporte de pago").FontSize(9).FontColor(Muted);
                     col.Item().Element(c => BuildMetadataTable(c, period, totals));
                     col.Item().Element(c => BuildKpiTable(c, period, totals));
 
@@ -109,7 +115,7 @@ public sealed class PayrollReportExportService : IPayrollReportExportService
         sb.AppendLine("<!doctype html><html lang=\"es\"><head><meta charset=\"utf-8\"><title>Reporte de Nómina</title>");
         sb.AppendLine("<style>:root{--ink:#1F2933;--muted:#667085;--line:#D0D5DD;--soft:#F8FAFC;--soft2:#F2F4F7;--navy:#1D3557;--green:#247A5A}*{box-sizing:border-box}body{margin:0;background:#eef2f6;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",Arial,sans-serif}main{max-width:1120px;margin:28px auto;background:white;padding:40px 44px;border:1px solid var(--line)}h1{font-size:28px;margin:0 0 4px}h2{font-size:17px;margin:30px 0 10px;color:var(--navy)}.sub{color:var(--muted);font-size:13px}.meta,.kpis{display:grid;gap:10px}.meta{grid-template-columns:repeat(4,1fr);margin-top:22px}.kpis{grid-template-columns:repeat(5,1fr);margin-top:18px}.box{border:1px solid var(--line);background:var(--soft);padding:12px}.label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}.value{font-weight:700;font-size:16px;margin-top:4px}.due{color:var(--green)}table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px;table-layout:fixed}th{background:var(--soft2);text-align:left;color:var(--ink)}td,th{border:1px solid var(--line);padding:7px 8px;vertical-align:top;overflow-wrap:anywhere}tbody tr:nth-child(even){background:var(--soft)}.num{text-align:right;white-space:nowrap}.twocol{display:grid;grid-template-columns:1fr 1fr;gap:18px}.approval{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:20px}.sig{height:72px;border:1px solid var(--line);padding:10px;background:var(--soft)}@media print{body{background:white}main{margin:0;max-width:none;border:0}}</style></head><body><main>");
         sb.AppendLine("<h1>Reporte de Nómina - Revisión Operativa</h1>");
-        sb.AppendLine($"<div class=\"sub\">{CompanyName} | Período {Html(PeriodLabel(period))}</div>");
+        sb.AppendLine($"<div class=\"sub\">{_companyName} | Período {Html(PeriodLabel(period))}</div>");
         sb.AppendLine("<section class=\"meta\">");
         AppendBox(sb, "Período", PeriodLabel(period));
         AppendBox(sb, "Estado", FormatStatus(period.Status));
@@ -153,7 +159,7 @@ public sealed class PayrollReportExportService : IPayrollReportExportService
             AddEntry(archive, "xl/_rels/workbook.xml.rels", "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet1.xml\"/><Relationship Id=\"rId2\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet2.xml\"/><Relationship Id=\"rId3\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet3.xml\"/><Relationship Id=\"rId4\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles\" Target=\"styles.xml\"/></Relationships>");
             AddEntry(archive, "xl/workbook.xml", "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><workbook xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"><sheets><sheet name=\"Resumen Ejecutivo\" sheetId=\"1\" r:id=\"rId1\"/><sheet name=\"Resumen Enfermeras\" sheetId=\"2\" r:id=\"rId2\"/><sheet name=\"Líneas Nómina\" sheetId=\"3\" r:id=\"rId3\"/></sheets></workbook>");
             AddEntry(archive, "xl/styles.xml", XlsxStyles());
-            AddEntry(archive, "xl/worksheets/sheet1.xml", SummarySheet(period, totals));
+            AddEntry(archive, "xl/worksheets/sheet1.xml", SummarySheet(period, totals, _companyName));
             AddEntry(archive, "xl/worksheets/sheet2.xml", StaffSheet(period));
             AddEntry(archive, "xl/worksheets/sheet3.xml", LinesSheet(period));
         }
@@ -486,12 +492,12 @@ public sealed class PayrollReportExportService : IPayrollReportExportService
     private static string XlsxStyles() =>
         "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><styleSheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><fonts count=\"2\"><font><sz val=\"11\"/><color rgb=\"FF1F2933\"/><name val=\"Calibri\"/></font><font><b/><sz val=\"11\"/><color rgb=\"FFFFFFFF\"/><name val=\"Calibri\"/></font></fonts><fills count=\"3\"><fill><patternFill patternType=\"none\"/></fill><fill><patternFill patternType=\"gray125\"/></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"FF1D3557\"/><bgColor indexed=\"64\"/></patternFill></fill></fills><borders count=\"1\"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count=\"1\"><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/></cellStyleXfs><cellXfs count=\"3\"><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\"/><xf numFmtId=\"0\" fontId=\"1\" fillId=\"2\" borderId=\"0\" xfId=\"0\" applyFill=\"1\" applyFont=\"1\"/><xf numFmtId=\"4\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyNumberFormat=\"1\"/></cellXfs></styleSheet>";
 
-    private static string SummarySheet(AdminPayrollPeriodDetail period, PayrollReportTotals totals)
+    private static string SummarySheet(AdminPayrollPeriodDetail period, PayrollReportTotals totals, string companyName)
     {
         var rows = new List<IReadOnlyList<object?>>
         {
             new object?[] { "Reporte de Nómina - Revisión Operativa" },
-            new object?[] { "Empresa", CompanyName },
+            new object?[] { "Empresa", companyName },
             new object?[] { "Período de nómina", PeriodLabel(period) },
             new object?[] { "Estado", FormatStatus(period.Status) },
             new object?[] { "Corte", FormatDate(period.CutoffDate) },

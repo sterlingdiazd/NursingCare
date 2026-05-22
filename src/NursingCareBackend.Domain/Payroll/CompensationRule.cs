@@ -38,7 +38,8 @@ public sealed class CompensationRule
         decimal suspendedServicePercent,
         bool isActive,
         int priority,
-        DateTime createdAtUtc)
+        DateTime createdAtUtc,
+        Guid? id = null)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -47,7 +48,7 @@ public sealed class CompensationRule
 
         return new CompensationRule
         {
-            Id = Guid.NewGuid(),
+            Id = id ?? Guid.NewGuid(),
             Name = name.Trim(),
             EmploymentType = employmentType,
             CareRequestCategoryCode = Normalize(careRequestCategoryCode),
@@ -75,7 +76,9 @@ public sealed class CompensationRule
 
     public void Update(
         string name,
+        CompensationEmploymentType employmentType,
         decimal baseCompensationPercent,
+        decimal fixedAmountPerUnit,
         decimal transportIncentivePercent,
         decimal complexityBonusPercent,
         decimal medicalSuppliesPercent,
@@ -87,7 +90,9 @@ public sealed class CompensationRule
         }
 
         Name = name.Trim();
+        EmploymentType = employmentType;
         BaseCompensationPercent = Clamp(baseCompensationPercent);
+        FixedAmountPerUnit = Clamp(fixedAmountPerUnit);
         TransportIncentivePercent = Clamp(transportIncentivePercent);
         ComplexityBonusPercent = Clamp(complexityBonusPercent);
         MedicalSuppliesPercent = Clamp(medicalSuppliesPercent);

@@ -154,6 +154,9 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
                 BankName = request.BankName.Trim(),
                 AccountNumber = TrimOptional(request.AccountNumber),
                 Category = normalizedCategory,
+                VisitDailyRate = request.VisitDailyRate,
+                HomeCareMonthlyRate = request.HomeCareMonthlyRate,
+                HomeCareMonthlyExpectedDays = request.HomeCareMonthlyExpectedDays,
             }
         };
 
@@ -259,6 +262,9 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
             request.BankName,
             request.AccountNumber,
             request.Category,
+            request.VisitDailyRate,
+            request.HomeCareMonthlyRate,
+            request.HomeCareMonthlyExpectedDays,
             cancellationToken);
 
         await _userRepository.UpdateAsync(user, cancellationToken);
@@ -319,6 +325,9 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
             request.BankName,
             request.AccountNumber,
             request.Category,
+            request.VisitDailyRate,
+            request.HomeCareMonthlyRate,
+            request.HomeCareMonthlyExpectedDays,
             cancellationToken);
 
         user.IsActive = true;
@@ -492,6 +501,9 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
             nurse.BankName,
             nurse.AccountNumber,
             category,
+            nurse.VisitDailyRate,
+            nurse.HomeCareMonthlyRate,
+            nurse.HomeCareMonthlyExpectedDays,
             workloads.TryGetValue(user.Id, out var workload) ? workload : EmptyWorkload);
     }
 
@@ -590,6 +602,9 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
         string bankName,
         string? accountNumber,
         string category,
+        decimal visitDailyRate,
+        decimal homeCareMonthlyRate,
+        int homeCareMonthlyExpectedDays,
         CancellationToken cancellationToken)
     {
         var nurse = user.NurseProfile!;
@@ -607,6 +622,9 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
         nurse.BankName = bankName.Trim();
         nurse.AccountNumber = TrimOptional(accountNumber);
         nurse.Category = await _nurseCatalog.NormalizeRequiredCategoryAsync(category, nameof(category), cancellationToken);
+        nurse.VisitDailyRate = visitDailyRate;
+        nurse.HomeCareMonthlyRate = homeCareMonthlyRate;
+        nurse.HomeCareMonthlyExpectedDays = homeCareMonthlyExpectedDays;
     }
 
     private static bool IsProfileComplete(User user)
@@ -655,7 +673,10 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
             licenseId = nurse?.LicenseId,
             bankName = nurse?.BankName,
             accountNumber = nurse?.AccountNumber,
-            category = nurse?.Category
+            category = nurse?.Category,
+            visitDailyRate = nurse?.VisitDailyRate,
+            homeCareMonthlyRate = nurse?.HomeCareMonthlyRate,
+            homeCareMonthlyExpectedDays = nurse?.HomeCareMonthlyExpectedDays
         };
     }
 
