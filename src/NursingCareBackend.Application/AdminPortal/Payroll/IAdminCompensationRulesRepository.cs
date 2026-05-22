@@ -7,4 +7,5 @@ public interface IAdminCompensationRulesRepository
     Task<Guid> CreateRuleAsync(CreateCompensationRuleRequest request, CancellationToken cancellationToken);
     Task<bool> UpdateRuleAsync(Guid ruleId, UpdateCompensationRuleRequest request, CancellationToken cancellationToken);
     Task<bool> DeactivateRuleAsync(Guid ruleId, CancellationToken cancellationToken);
+    Task<bool> ReactivateRuleAsync(Guid ruleId, CancellationToken cancellationToken);
 }
