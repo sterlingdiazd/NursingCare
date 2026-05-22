@@ -5,7 +5,26 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>
+    <!--
+      Build-output self-nesting fix (see .claude/skills/dotnet-build.md). The Web SDK default content
+      items use RECURSIVE globs (**\*.json, **\*.config, ...). On every rebuild they matched the prior
+      build output and the .azure-deploy publish folder and copied them one level deeper
+      (bin/Debug/net10.0/bin/Debug/net10.0/...), eventually breaking the build by exceeding the OS max
+      path length. We disable the default (recursive) content items and explicitly include only the
+      non-recursive content this API needs. StaticWebAssetsEnabled is off because the API serves no
+      project static web assets (Swagger UI is embedded; wwwroot is served via UseStaticFiles).
+    -->
+    <StaticWebAssetsEnabled>false</StaticWebAssetsEnabled>
+    <EnableDefaultContentItems>false</EnableDefaultContentItems>
+    <DefaultItemExcludes>$(DefaultItemExcludes);bin/**;obj/**;.azure-deploy/**</DefaultItemExcludes>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Explicit, non-recursive content (no ** globs that could re-capture build/publish output). -->
+    <Content Include="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="appsettings.*.json" CopyToOutputDirectory="PreserveNewest" DependentUpon="appsettings.json" />
+    <Content Include="wwwroot\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0" />

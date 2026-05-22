@@ -203,11 +203,11 @@ public sealed class CareRequestsController : ControllerBase
     // Ownership is enforced by the client access scope inside the handler.
     [HttpPost("{id:guid}/report-payment")]
     [Authorize(Policy = "CareRequestReader")]
+    [Consumes("multipart/form-data")]
     [RequestSizeLimit(6_000_000)]
     public async Task<IActionResult> ReportPayment(
         Guid id,
-        [FromForm] IFormFile proof,
-        [FromForm] string? note,
+        [FromForm] ReportPaymentForm form,
         CancellationToken cancellationToken)
     {
         var userId = ResolveCurrentUserId();
@@ -216,6 +216,8 @@ public sealed class CareRequestsController : ControllerBase
             return Unauthorized();
         }
 
+        var proof = form.Proof;
+        var note = form.Note;
         if (proof is null || proof.Length == 0)
         {
             return this.ProblemResponse(StatusCodes.Status400BadRequest, "Comprobante requerido",
@@ -358,4 +360,12 @@ public sealed class CareRequestsController : ControllerBase
         accessScope = CareRequestAccessScope.ForClient(userId.Value);
         return true;
     }
+}
+
+/// <summary>Multipart form for reporting a payment. Bound as a single model so Swashbuckle can
+/// describe the file upload in the OpenAPI document.</summary>
+public sealed class ReportPaymentForm
+{
+    public IFormFile Proof { get; set; } = default!;
+    public string? Note { get; set; }
 }
