@@ -16,6 +16,8 @@ using NursingCareBackend.Application.Identity.Services;
 using NursingCareBackend.Application.AdminPortal.Reports;
 using NursingCareBackend.Application.AdminPortal.Catalog;
 using NursingCareBackend.Application.AdminPortal.Notifications;
+using NursingCareBackend.Application.Notifications;
+using NursingCareBackend.Infrastructure.Notifications;
 using NursingCareBackend.Application.AdminPortal.Settings;
 using NursingCareBackend.Application.AdminPortal.Payroll;
 using NursingCareBackend.Application.Email;
@@ -109,11 +111,25 @@ public static class DependencyInjection
         services.AddScoped<IAuditLogQueryService, AuditLogQueryService>();
         services.AddScoped<IAdminNotificationService, AdminNotificationService>();
         services.AddScoped<IAdminNotificationPublisher, AdminNotificationPublisher>();
+
+        // Push delivery: HttpClient + worker. The worker is a long-running
+        // BackgroundService that drains NotificationOutbox; the HttpClient
+        // talks to the Expo Push Service. See PushDispatcherWorker.cs.
+        services.AddHttpClient<IExpoPushClient, ExpoPushClient>(client =>
+        {
+          client.BaseAddress = new Uri("https://exp.host/--/api/v2/push/");
+          client.DefaultRequestHeaders.Add("accept", "application/json");
+          client.DefaultRequestHeaders.Add("accept-encoding", "gzip, deflate");
+          client.Timeout = TimeSpan.FromSeconds(30);
+        });
+        services.AddScoped<IPushTokenService, PushTokenService>();
+        services.AddHostedService<PushDispatcherWorker>();
         services.AddScoped<IAdminReportsRepository, AdminReportsRepository>();
         services.AddScoped<AdminPayrollRepository>();
         services.AddScoped<IAdminPayrollRepository>(sp => sp.GetRequiredService<AdminPayrollRepository>());
         services.AddScoped<INursePayrollRepository>(sp => sp.GetRequiredService<AdminPayrollRepository>());
         services.AddScoped<IAdminCompensationRulesRepository, AdminCompensationRulesRepository>();
+        services.AddScoped<IAdminScheduledDeductionRepository, AdminScheduledDeductionRepository>();
         services.AddScoped<IAdminShiftRepository, AdminShiftRepository>();
         services.AddScoped<GetAdminReportHandler>();
 
@@ -145,6 +161,8 @@ public static class DependencyInjection
         services.AddScoped<IPayrollRecalculationService, PayrollRecalculationService>();
         services.AddScoped<IAdminPayrollOverrideRepository, AdminPayrollOverrideRepository>();
         services.AddScoped<IPayrollVoucherService, PayrollVoucherService>();
+        services.AddScoped<IPayrollReportExportService, PayrollReportExportService>();
+        services.AddScoped<IScheduledDeductionService, ScheduledDeductionService>();
 
         services.Configure<CompanyInfoOptions>(options =>
         {
