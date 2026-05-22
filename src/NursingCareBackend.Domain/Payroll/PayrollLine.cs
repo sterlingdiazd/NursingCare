@@ -49,7 +49,9 @@ public sealed class PayrollLine
             throw new ArgumentException("Payroll line description is required.", nameof(description));
         }
 
-        var net = baseCompensation + transportIncentive + complexityBonus + medicalSuppliesCompensation + adjustmentsTotal - deductionsTotal;
+        // Deductions are a period-level concept applied once per nurse (see ScheduledDeduction /
+        // DeductionRecord), never folded into a per-service line. Line net excludes them.
+        var net = baseCompensation + transportIncentive + complexityBonus + medicalSuppliesCompensation + adjustmentsTotal;
 
         return new PayrollLine
         {
@@ -85,7 +87,7 @@ public sealed class PayrollLine
         MedicalSuppliesCompensation = Round(medicalSuppliesCompensation);
         AdjustmentsTotal = Round(adjustmentsTotal);
         DeductionsTotal = Round(deductionsTotal);
-        NetCompensation = Round(BaseCompensation + TransportIncentive + ComplexityBonus + MedicalSuppliesCompensation + AdjustmentsTotal - DeductionsTotal);
+        NetCompensation = Round(BaseCompensation + TransportIncentive + ComplexityBonus + MedicalSuppliesCompensation + AdjustmentsTotal);
         UpdatedAtUtc = updatedAtUtc;
     }
 
