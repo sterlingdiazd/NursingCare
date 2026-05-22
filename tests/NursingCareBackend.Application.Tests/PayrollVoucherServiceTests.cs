@@ -200,6 +200,7 @@ file sealed class FakeVoucherRepository : IAdminPayrollRepository
     public Task<IReadOnlyList<AdminPayrollLineItem>> GetPeriodLinesAsync(Guid periodId, CancellationToken cancellationToken) => throw new NotImplementedException();
     public Task<AdminDeductionListResult> GetDeductionsAsync(Guid? nurseId, Guid? periodId, CancellationToken cancellationToken) => throw new NotImplementedException();
     public Task<Guid> CreateDeductionAsync(CreateDeductionRequest request, CancellationToken cancellationToken) => throw new NotImplementedException();
+    public Task<bool> UpdateDeductionAsync(Guid deductionId, UpdateDeductionRequest request, CancellationToken cancellationToken) => throw new NotImplementedException();
     public Task<bool> DeleteDeductionAsync(Guid deductionId, CancellationToken cancellationToken) => throw new NotImplementedException();
     public Task<AdminCompensationAdjustmentListResult> GetAdjustmentsAsync(Guid? executionId, CancellationToken cancellationToken) => throw new NotImplementedException();
     public Task<Guid> CreateAdjustmentAsync(CreateCompensationAdjustmentRequest request, CancellationToken cancellationToken) => throw new NotImplementedException();
