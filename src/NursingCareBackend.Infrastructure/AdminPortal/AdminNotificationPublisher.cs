@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using NursingCareBackend.Application.AdminPortal.Notifications;
 using NursingCareBackend.Domain.Admin;
 using NursingCareBackend.Domain.Identity;
+using NursingCareBackend.Domain.Notifications;
 using NursingCareBackend.Infrastructure.Persistence;
 
 namespace NursingCareBackend.Infrastructure.AdminPortal;
@@ -70,9 +71,24 @@ public sealed class AdminNotificationPublisher : IAdminNotificationPublisher
       ReadAtUtc = null,
       ArchivedAtUtc = null,
       CreatedBySystem = request.CreatedBySystem,
-    });
+    }).ToList();
+
+    // Outbox row per (notification, recipient). Worker drains these and pushes
+    // via Expo. Same SaveChangesAsync transaction as the inbox rows so a push
+    // failure never leaves an orphaned inbox entry — and an inbox row never
+    // exists without a corresponding push attempt scheduled.
+    var outboxRows = notifications.Select(n => new NotificationOutbox
+    {
+      Id = Guid.NewGuid(),
+      NotificationId = n.Id,
+      RecipientUserId = n.RecipientUserId,
+      Status = NotificationOutboxStatus.Pending,
+      Attempts = 0,
+      CreatedAtUtc = createdAtUtc,
+    }).ToList();
 
     await _dbContext.AdminNotifications.AddRangeAsync(notifications, cancellationToken);
+    await _dbContext.NotificationOutbox.AddRangeAsync(outboxRows, cancellationToken);
     await _dbContext.SaveChangesAsync(cancellationToken);
   }
 }
