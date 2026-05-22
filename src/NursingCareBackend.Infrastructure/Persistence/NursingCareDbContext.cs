@@ -3,6 +3,7 @@ using NursingCareBackend.Domain.Admin;
 using NursingCareBackend.Domain.CareRequests;
 using NursingCareBackend.Domain.Catalogs;
 using NursingCareBackend.Domain.Identity;
+using NursingCareBackend.Domain.Notifications;
 using NursingCareBackend.Domain.Payroll;
 using NursingCareBackend.Domain.SystemSettings;
 
@@ -26,6 +27,8 @@ public sealed class NursingCareDbContext : DbContext
        public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
        public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
        public DbSet<AdminNotification> AdminNotifications => Set<AdminNotification>();
+       public DbSet<UserPushToken> UserPushTokens => Set<UserPushToken>();
+       public DbSet<NotificationOutbox> NotificationOutbox => Set<NotificationOutbox>();
 
        public DbSet<CareRequestCategoryCatalog> CareRequestCategoryCatalogs => Set<CareRequestCategoryCatalog>();
        public DbSet<UnitTypeCatalog> UnitTypeCatalogs => Set<UnitTypeCatalog>();
@@ -44,6 +47,7 @@ public sealed class NursingCareDbContext : DbContext
        public DbSet<CompensationRule> CompensationRules => Set<CompensationRule>();
        public DbSet<CompensationAdjustment> CompensationAdjustments => Set<CompensationAdjustment>();
        public DbSet<DeductionRecord> DeductionRecords => Set<DeductionRecord>();
+       public DbSet<ScheduledDeduction> ScheduledDeductions => Set<ScheduledDeduction>();
        public DbSet<PayrollRecalculationAudit> PayrollRecalculationAudits => Set<PayrollRecalculationAudit>();
        public DbSet<PayrollLineOverride> PayrollLineOverrides => Set<PayrollLineOverride>();
 
@@ -463,6 +467,37 @@ public sealed class NursingCareDbContext : DbContext
 
                      builder.Property(x => x.Amount).HasColumnType("decimal(10,2)");
                      builder.Property(x => x.Notes).HasMaxLength(1000);
+
+                     // One generated installment per scheduled deduction per period (manual one-off
+                     // deductions keep ScheduledDeductionId NULL and are exempt via the filter).
+                     builder.HasIndex(x => new { x.ScheduledDeductionId, x.PayrollPeriodId })
+                            .IsUnique()
+                            .HasFilter("[ScheduledDeductionId] IS NOT NULL");
+              });
+
+              modelBuilder.Entity<ScheduledDeduction>(builder =>
+              {
+                     builder.ToTable("ScheduledDeductions");
+                     builder.HasKey(x => x.Id);
+
+                     builder.Property(x => x.DeductionType).HasConversion<string>().HasMaxLength(32);
+                     builder.Property(x => x.Modality).HasConversion<string>().HasMaxLength(32);
+                     builder.Property(x => x.Cadence).HasConversion<string>().HasMaxLength(32);
+                     builder.Property(x => x.Status).HasConversion<string>().HasMaxLength(32);
+
+                     builder.Property(x => x.Label).IsRequired().HasMaxLength(150);
+                     builder.Property(x => x.Notes).HasMaxLength(1000);
+                     builder.Property(x => x.CancelReason).HasMaxLength(500);
+
+                     builder.Property(x => x.PrincipalAmount).HasColumnType("decimal(10,2)");
+                     builder.Property(x => x.InterestRatePercent).HasColumnType("decimal(9,4)");
+                     builder.Property(x => x.TotalRepayable).HasColumnType("decimal(10,2)");
+                     builder.Property(x => x.InstallmentAmount).HasColumnType("decimal(10,2)");
+                     builder.Property(x => x.RecurringAmount).HasColumnType("decimal(10,2)");
+                     builder.Property(x => x.AmountSettled).HasColumnType("decimal(10,2)");
+
+                     builder.Ignore(x => x.RemainingBalance);
+                     builder.HasIndex(x => new { x.NurseUserId, x.Status });
               });
 
               modelBuilder.Entity<PayrollRecalculationAudit>(builder =>
@@ -614,6 +649,48 @@ public sealed class NursingCareDbContext : DbContext
                   .IsRequired();
 
                      builder.HasIndex(x => new { x.RecipientUserId, x.ArchivedAtUtc, x.ReadAtUtc });
+              });
+
+              modelBuilder.Entity<UserPushToken>(builder =>
+              {
+                     builder.ToTable("UserPushTokens");
+                     builder.HasKey(x => x.Id);
+
+                     builder.Property(x => x.UserId).IsRequired();
+                     builder.Property(x => x.ExpoPushToken).IsRequired().HasMaxLength(200);
+                     builder.Property(x => x.DeviceId).HasMaxLength(128);
+                     builder.Property(x => x.Platform).IsRequired().HasMaxLength(16);
+                     builder.Property(x => x.AppVersion).HasMaxLength(32);
+                     builder.Property(x => x.Locale).HasMaxLength(16);
+                     builder.Property(x => x.FailureReason).HasMaxLength(64);
+                     builder.Property(x => x.CreatedAtUtc).IsRequired();
+                     builder.Property(x => x.LastSeenAtUtc).IsRequired();
+
+                     // Token string is globally unique per Expo. If a device hands off
+                     // between users, we update UserId rather than creating a duplicate.
+                     builder.HasIndex(x => x.ExpoPushToken).IsUnique();
+                     builder.HasIndex(x => new { x.UserId, x.IsActive });
+                     builder.HasIndex(x => new { x.UserId, x.DeviceId });
+              });
+
+              modelBuilder.Entity<NotificationOutbox>(builder =>
+              {
+                     builder.ToTable("NotificationOutbox");
+                     builder.HasKey(x => x.Id);
+
+                     builder.Property(x => x.NotificationId).IsRequired();
+                     builder.Property(x => x.RecipientUserId).IsRequired();
+                     builder.Property(x => x.Status)
+                            .IsRequired()
+                            .HasConversion<int>();
+                     builder.Property(x => x.ExpoTicketId).HasMaxLength(64);
+                     builder.Property(x => x.LastError).HasMaxLength(120);
+                     builder.Property(x => x.CreatedAtUtc).IsRequired();
+
+                     // Worker drains by status + age. RecipientUserId index helps the
+                     // dispatcher resolve push tokens per row in a single join.
+                     builder.HasIndex(x => new { x.Status, x.CreatedAtUtc });
+                     builder.HasIndex(x => x.RecipientUserId);
               });
 
               modelBuilder.Entity<CareRequestCategoryCatalog>(builder =>
