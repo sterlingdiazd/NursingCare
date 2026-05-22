@@ -41,6 +41,7 @@ public interface IAdminPayrollRepository
     Task<Guid> CreateDeductionAsync(CreateDeductionRequest request, CancellationToken cancellationToken);
     Task<bool> UpdateDeductionAsync(Guid deductionId, UpdateDeductionRequest request, CancellationToken cancellationToken);
     Task<bool> DeleteDeductionAsync(Guid deductionId, CancellationToken cancellationToken);
+    Task<bool> SetDeductionPausedAsync(Guid deductionId, bool paused, CancellationToken cancellationToken);
 
     Task<AdminCompensationAdjustmentListResult> GetAdjustmentsAsync(Guid? executionId, CancellationToken cancellationToken);
     Task<Guid> CreateAdjustmentAsync(CreateCompensationAdjustmentRequest request, CancellationToken cancellationToken);

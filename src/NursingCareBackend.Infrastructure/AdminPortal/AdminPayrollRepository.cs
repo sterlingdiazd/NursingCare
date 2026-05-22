@@ -492,6 +492,39 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
         return true;
     }
 
+    public async Task<bool> SetDeductionPausedAsync(Guid deductionId, bool paused, CancellationToken cancellationToken)
+    {
+        var deduction = await _dbContext.DeductionRecords
+            .FirstOrDefaultAsync(d => d.Id == deductionId, cancellationToken);
+
+        if (deduction is null) return false;
+
+        if (deduction.ScheduledDeductionId is null)
+        {
+            throw new InvalidOperationException("Solo se pueden pausar las cuotas de un descuento programado.");
+        }
+
+        // A cuota can only be paused/resumed while its period is still open.
+        if (deduction.PayrollPeriodId is { } periodId && periodId != Guid.Empty)
+        {
+            var period = await _dbContext.PayrollPeriods
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Id == periodId, cancellationToken);
+
+            if (period is not null)
+            {
+                try { period.EnsureOpen(); }
+                catch (InvalidOperationException) { throw new PayrollPeriodClosedException(period.Id); }
+            }
+        }
+
+        if (paused) deduction.Pause();
+        else deduction.Resume();
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     public async Task<AdminCompensationAdjustmentListResult> GetAdjustmentsAsync(Guid? executionId, CancellationToken cancellationToken)
     {
         var query = _dbContext.CompensationAdjustments.AsNoTracking();

@@ -24,6 +24,7 @@ public sealed class AdminPayrollController : ControllerBase
     private readonly IPayrollReportExportService _reportExportService;
     private readonly IScheduledDeductionService _scheduledDeductionService;
     private readonly IAuthRateLimiter _rateLimiter;
+    private readonly NursingCareBackend.Application.AdminPortal.Auditing.IAdminAuditService _auditService;
 
     public AdminPayrollController(
         IAdminPayrollRepository repository,
@@ -32,7 +33,8 @@ public sealed class AdminPayrollController : ControllerBase
         IPayrollVoucherService voucherService,
         IPayrollReportExportService reportExportService,
         IScheduledDeductionService scheduledDeductionService,
-        IAuthRateLimiter rateLimiter)
+        IAuthRateLimiter rateLimiter,
+        NursingCareBackend.Application.AdminPortal.Auditing.IAdminAuditService auditService)
     {
         _repository = repository;
         _recalculationService = recalculationService;
@@ -41,6 +43,7 @@ public sealed class AdminPayrollController : ControllerBase
         _reportExportService = reportExportService;
         _scheduledDeductionService = scheduledDeductionService;
         _rateLimiter = rateLimiter;
+        _auditService = auditService;
     }
 
     private Guid GetAdminUserId()
@@ -412,6 +415,58 @@ public sealed class AdminPayrollController : ControllerBase
         catch (PayrollPeriodClosedException ex)
         {
             return this.ProblemResponse(StatusCodes.Status409Conflict, Messages.Get("errors.periodo_cerrado"), ex.Message);
+        }
+    }
+
+    // POST /api/admin/payroll/deductions/{id}/pause
+    [HttpPost("deductions/{id:guid}/pause")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public Task<IActionResult> PauseDeduction(Guid id, CancellationToken cancellationToken)
+        => SetDeductionPaused(id, true, cancellationToken);
+
+    // POST /api/admin/payroll/deductions/{id}/resume
+    [HttpPost("deductions/{id:guid}/resume")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public Task<IActionResult> ResumeDeduction(Guid id, CancellationToken cancellationToken)
+        => SetDeductionPaused(id, false, cancellationToken);
+
+    private async Task<IActionResult> SetDeductionPaused(Guid id, bool paused, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var found = await _repository.SetDeductionPausedAsync(id, paused, cancellationToken);
+            if (!found)
+            {
+                return this.ProblemResponse(
+                    StatusCodes.Status404NotFound,
+                    Messages.Get("errors.deduccion_no_encontrada"),
+                    $"No se encontró la deducción con id '{id}'.");
+            }
+
+            await _auditService.WriteAsync(
+                new NursingCareBackend.Application.AdminPortal.Auditing.AdminAuditRecord(
+                    ActorUserId: GetAdminUserId(),
+                    ActorRole: "Admin",
+                    Action: paused ? "PauseDeduction" : "ResumeDeduction",
+                    EntityType: "DeductionRecord",
+                    EntityId: id.ToString(),
+                    Notes: paused ? "Cuota pausada: no se cobra este período." : "Cuota reanudada.",
+                    MetadataJson: null),
+                cancellationToken);
+
+            return NoContent();
+        }
+        catch (PayrollPeriodClosedException ex)
+        {
+            return this.ProblemResponse(StatusCodes.Status409Conflict, Messages.Get("errors.periodo_cerrado"), ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return this.ProblemResponse(StatusCodes.Status400BadRequest, Messages.Get("errors.datos_invalidos"), ex.Message);
         }
     }
 

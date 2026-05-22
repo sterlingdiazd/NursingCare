@@ -18,6 +18,13 @@ public sealed class DeductionRecord
     /// <summary>1-based installment number within the parent scheduled deduction, when applicable.</summary>
     public int? InstallmentSequence { get; private set; }
 
+    /// <summary>Admin paused this installment for its (open) period: amount becomes 0 and is not
+    /// collected. Reversible (Resume restores the amount). The record still counts as generated, so a
+    /// paused amortizing installment is naturally recovered later, while a paused recurring-fixed one
+    /// is simply skipped.</summary>
+    public bool IsPaused { get; private set; }
+    public decimal? AmountBeforePause { get; private set; }
+
     private DeductionRecord() { }
 
     public static DeductionRecord Create(
@@ -70,6 +77,33 @@ public sealed class DeductionRecord
         if (!Label.EndsWith(" (omitida)", StringComparison.Ordinal))
         {
             Label = $"{Label} (omitida)";
+        }
+    }
+
+    /// <summary>Pause this installment for its open period: zero the amount but keep the record so it
+    /// still counts as generated. Reversible via <see cref="Resume"/>.</summary>
+    public void Pause()
+    {
+        if (IsPaused) return;
+        AmountBeforePause = Amount;
+        Amount = 0m;
+        IsPaused = true;
+        if (!Label.EndsWith(" (en pausa)", StringComparison.Ordinal))
+        {
+            Label = $"{Label} (en pausa)";
+        }
+    }
+
+    /// <summary>Reverse a pause, restoring the original amount.</summary>
+    public void Resume()
+    {
+        if (!IsPaused) return;
+        Amount = AmountBeforePause ?? Amount;
+        AmountBeforePause = null;
+        IsPaused = false;
+        if (Label.EndsWith(" (en pausa)", StringComparison.Ordinal))
+        {
+            Label = Label[..^" (en pausa)".Length];
         }
     }
 
