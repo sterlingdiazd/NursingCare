@@ -30,6 +30,12 @@ public static class Messages
         ["errors.rango_fechas_detalle"] = "La fecha de fin debe ser igual o posterior a la fecha de inicio.",
         ["errors.datos_invalidos"] = "Datos inválidos",
         ["errors.periodo_cerrado"] = "Período cerrado",
+        ["errors.periodo_cerrado_no_modificable"] = "Un período cerrado no se puede modificar ni eliminar.",
+        ["errors.periodo_en_uso"] = "Período en uso",
+        ["errors.periodo_en_uso_detalle"] = "No se puede modificar ni eliminar: el período ya tiene nómina calculada o deducciones asociadas.",
+        ["errors.periodo_vacio"] = "Período sin nómina",
+        ["errors.periodo_vacio_detalle"] = "No se puede cerrar un período sin valores. Recalcula la nómina o agrega deducciones antes de cerrarlo.",
+        ["errors.fechas_periodo_detalle"] = "El corte debe ser igual o posterior al inicio, y el pago igual o posterior al corte.",
 
         // Deductions
         ["errors.deduccion_no_encontrada"] = "Deducción no encontrada",
@@ -55,6 +61,12 @@ public static class Messages
         ["errors.cliente_no_encontrado_detalle"] = "No se encontró el cliente solicitado.",
         ["errors.cliente_invalido"] = "Cliente inválido",
         ["errors.cliente_invalido_detalle"] = "Debes seleccionar un cliente activo y válido para crear la solicitud.",
+        ["errors.cliente_requerido"] = "Cliente requerido",
+        ["errors.cliente_requerido_detalle"] = "Selecciona el cliente para el cual se crea la solicitud.",
+        ["errors.cliente_no_valido"] = "Cliente no válido",
+        ["errors.cliente_no_valido_detalle"] = "El usuario seleccionado no es un cliente válido.",
+        ["errors.acceso_denegado"] = "Acceso denegado",
+        ["errors.acceso_denegado_detalle"] = "No tienes permiso para realizar esta acción.",
 
         // Care requests
         ["errors.solicitud_no_encontrada"] = "Solicitud no encontrada",
