@@ -38,6 +38,7 @@ public static class DependencyInjection
     services.AddScoped<GetAdminUserDetailHandler>();
     services.AddScoped<InvoiceCareRequestHandler>();
     services.AddScoped<PayCareRequestHandler>();
+    services.AddScoped<CareRequests.Commands.ReportPayment.ReportPaymentHandler>();
     services.AddScoped<VoidCareRequestHandler>();
     services.AddScoped<GenerateReceiptHandler>();
     services.AddScoped<GetReceiptHandler>();

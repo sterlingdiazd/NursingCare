@@ -10,5 +10,7 @@ public sealed class AuditLog
   public string EntityId { get; set; } = default!;
   public string? Notes { get; set; }
   public string? MetadataJson { get; set; }
+  // Correlates this audit entry with the request's logs and response (X-Correlation-Id).
+  public string? CorrelationId { get; set; }
   public DateTime CreatedAtUtc { get; set; }
 }

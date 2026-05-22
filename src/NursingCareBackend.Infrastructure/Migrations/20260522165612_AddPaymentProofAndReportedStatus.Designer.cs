@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NursingCareBackend.Infrastructure.Persistence;
 
@@ -11,9 +12,11 @@ using NursingCareBackend.Infrastructure.Persistence;
 namespace NursingCareBackend.Infrastructure.Migrations
 {
     [DbContext(typeof(NursingCareDbContext))]
-    partial class NursingCareDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260522165612_AddPaymentProofAndReportedStatus")]
+    partial class AddPaymentProofAndReportedStatus
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -110,9 +113,6 @@ namespace NursingCareBackend.Infrastructure.Migrations
 
                     b.Property<Guid?>("ActorUserId")
                         .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("CorrelationId")
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("datetime2");

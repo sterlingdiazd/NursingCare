@@ -6,6 +6,7 @@ using NursingCareBackend.Application.CareRequests;
 using NursingCareBackend.Application.CareRequests.Commands.AssignCareRequestNurse;
 using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
 using NursingCareBackend.Application.CareRequests.Commands.TransitionCareRequest;
+using NursingCareBackend.Application.CareRequests.Commands.ReportPayment;
 using NursingCareBackend.Application.CareRequests.Queries;
 using NursingCareBackend.Application.Identity.Repositories;
 using NursingCareBackend.Api.Extensions;
@@ -23,6 +24,7 @@ public sealed class CareRequestsController : ControllerBase
     private readonly GetCareRequestsHandler _getAllHandler;
     private readonly GetCareRequestByIdHandler _getByIdHandler;
     private readonly VerifyPricingHandler _verifyPricingHandler;
+    private readonly ReportPaymentHandler _reportPaymentHandler;
     private readonly IUserRepository _userRepository;
 
     public CareRequestsController(
@@ -32,6 +34,7 @@ public sealed class CareRequestsController : ControllerBase
         GetCareRequestsHandler getAllHandler,
         GetCareRequestByIdHandler getByIdHandler,
         VerifyPricingHandler verifyPricingHandler,
+        ReportPaymentHandler reportPaymentHandler,
         IUserRepository userRepository)
     {
         _assignNurseHandler = assignNurseHandler;
@@ -40,6 +43,7 @@ public sealed class CareRequestsController : ControllerBase
         _getAllHandler = getAllHandler;
         _getByIdHandler = getByIdHandler;
         _verifyPricingHandler = verifyPricingHandler;
+        _reportPaymentHandler = reportPaymentHandler;
         _userRepository = userRepository;
     }
 
@@ -194,6 +198,63 @@ public sealed class CareRequestsController : ControllerBase
     [Authorize(Policy = "CareRequestCanceller")]
     public Task<ActionResult<CareRequestResponse>> Cancel(Guid id, CancellationToken cancellationToken)
       => Transition(id, CareRequestTransitionAction.Cancel, cancellationToken);
+
+    // Client uploads a payment proof (invoice photo / transfer screenshot) and reports the payment.
+    // Ownership is enforced by the client access scope inside the handler.
+    [HttpPost("{id:guid}/report-payment")]
+    [Authorize(Policy = "CareRequestReader")]
+    [RequestSizeLimit(6_000_000)]
+    public async Task<IActionResult> ReportPayment(
+        Guid id,
+        [FromForm] IFormFile proof,
+        [FromForm] string? note,
+        CancellationToken cancellationToken)
+    {
+        var userId = ResolveCurrentUserId();
+        if (!userId.HasValue)
+        {
+            return Unauthorized();
+        }
+
+        if (proof is null || proof.Length == 0)
+        {
+            return this.ProblemResponse(StatusCodes.Status400BadRequest, "Comprobante requerido",
+                "Debes adjuntar una imagen del comprobante de pago.");
+        }
+
+        if (proof.Length > 5_000_000)
+        {
+            return this.ProblemResponse(StatusCodes.Status400BadRequest, "Archivo muy grande",
+                "El comprobante no debe superar 5 MB.");
+        }
+
+        var contentType = (proof.ContentType ?? string.Empty).ToLowerInvariant();
+        if (contentType is not ("image/jpeg" or "image/jpg" or "image/png"))
+        {
+            return this.ProblemResponse(StatusCodes.Status400BadRequest, "Formato no soportado",
+                "El comprobante debe ser una imagen JPG o PNG.");
+        }
+
+        using var ms = new MemoryStream();
+        await proof.CopyToAsync(ms, cancellationToken);
+
+        try
+        {
+            var updated = await _reportPaymentHandler.Handle(
+                new ReportPaymentCommand(id, userId.Value, ms.ToArray(), contentType, note),
+                cancellationToken);
+            return Ok(CareRequestResponse.FromDomain(updated));
+        }
+        catch (KeyNotFoundException)
+        {
+            return this.ProblemResponse(StatusCodes.Status404NotFound, "Solicitud no encontrada",
+                $"No se encontró la solicitud '{id}'.");
+        }
+        catch (InvalidOperationException ex)
+        {
+            return this.ProblemResponse(StatusCodes.Status400BadRequest, "Operación inválida", ex.Message);
+        }
+    }
 
     [HttpGet("{id:guid}/verify-pricing")]
     [Authorize(Roles = SystemRoles.Admin)]

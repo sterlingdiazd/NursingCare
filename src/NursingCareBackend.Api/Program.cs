@@ -32,6 +32,12 @@ builder.Services.AddJwtAuthentication(builder.Configuration);
 // Application services
 builder.Services.AddApplicationServices();
 
+// Expose the per-request correlation id (set by CorrelationIdMiddleware) to inner layers so the
+// audit trail carries it alongside the logs/response.
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<NursingCareBackend.Application.Abstractions.ICorrelationContext,
+    NursingCareBackend.Api.Infrastructure.HttpCorrelationContext>();
+
 var app = builder.Build();
 
 app.LogDatabaseConfiguration();

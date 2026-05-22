@@ -1,3 +1,4 @@
+using NursingCareBackend.Application.Abstractions;
 using NursingCareBackend.Application.AdminPortal.Auditing;
 using NursingCareBackend.Domain.Admin;
 using NursingCareBackend.Infrastructure.Persistence;
@@ -7,10 +8,12 @@ namespace NursingCareBackend.Infrastructure.AdminPortal;
 public sealed class AdminAuditService : IAdminAuditService
 {
   private readonly NursingCareDbContext _dbContext;
+  private readonly ICorrelationContext _correlation;
 
-  public AdminAuditService(NursingCareDbContext dbContext)
+  public AdminAuditService(NursingCareDbContext dbContext, ICorrelationContext correlation)
   {
     _dbContext = dbContext;
+    _correlation = correlation;
   }
 
   public async Task WriteAsync(AdminAuditRecord record, CancellationToken cancellationToken = default)
@@ -25,6 +28,7 @@ public sealed class AdminAuditService : IAdminAuditService
       EntityId = record.EntityId.Trim(),
       Notes = string.IsNullOrWhiteSpace(record.Notes) ? null : record.Notes.Trim(),
       MetadataJson = string.IsNullOrWhiteSpace(record.MetadataJson) ? null : record.MetadataJson,
+      CorrelationId = _correlation.CorrelationId,
       CreatedAtUtc = DateTime.UtcNow
     };
 

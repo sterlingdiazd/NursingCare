@@ -1,3 +1,4 @@
+using NursingCareBackend.Application.AdminPortal.Auditing;
 using NursingCareBackend.Application.CareRequests;
 using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
 using NursingCareBackend.Application.Identity.Repositories;
@@ -18,19 +19,22 @@ public sealed class GenerateReceiptHandler
     private readonly IPaymentValidationRepository _paymentValidationRepository;
     private readonly IReceiptPdfService _receiptPdfService;
     private readonly IUserRepository _userRepository;
+    private readonly IAdminAuditService _auditService;
 
     public GenerateReceiptHandler(
         ICareRequestRepository repository,
         IReceiptRepository receiptRepository,
         IPaymentValidationRepository paymentValidationRepository,
         IReceiptPdfService receiptPdfService,
-        IUserRepository userRepository)
+        IUserRepository userRepository,
+        IAdminAuditService auditService)
     {
         _repository = repository;
         _receiptRepository = receiptRepository;
         _paymentValidationRepository = paymentValidationRepository;
         _receiptPdfService = receiptPdfService;
         _userRepository = userRepository;
+        _auditService = auditService;
     }
 
     public async Task<GenerateReceiptResponse> Handle(
@@ -103,6 +107,17 @@ public sealed class GenerateReceiptHandler
             generatedAtUtc: generatedAtUtc);
 
         await _receiptRepository.AddAsync(receipt, cancellationToken);
+
+        await _auditService.WriteAsync(
+            new AdminAuditRecord(
+                ActorUserId: command.ActingAdminUserId,
+                ActorRole: "Admin",
+                Action: "GenerateReceipt",
+                EntityType: "CareRequest",
+                EntityId: careRequest.Id.ToString(),
+                Notes: $"Recibo {receiptNumber} generado para la factura {careRequest.InvoiceNumber}.",
+                MetadataJson: null),
+            cancellationToken);
 
         return new GenerateReceiptResponse(
             receipt.Id,

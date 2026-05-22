@@ -7,6 +7,7 @@ using NursingCareBackend.Api.Extensions;
 using NursingCareBackend.Api.Localization;
 using NursingCareBackend.Application.AdminPortal.Queries;
 using NursingCareBackend.Application.AdminPortal.Shifts;
+using NursingCareBackend.Application.CareRequests;
 using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
 using NursingCareBackend.Application.CareRequests.Commands.GenerateReceipt;
 using NursingCareBackend.Application.CareRequests.Commands.InvoiceCareRequest;
@@ -35,6 +36,7 @@ public sealed class AdminCareRequestsController : ControllerBase
   private readonly VoidCareRequestHandler _voidHandler;
   private readonly GenerateReceiptHandler _generateReceiptHandler;
   private readonly GetReceiptHandler _getReceiptHandler;
+  private readonly IPaymentProofRepository _paymentProofRepository;
 
   public AdminCareRequestsController(
     GetAdminCareRequestsHandler getListHandler,
@@ -48,7 +50,8 @@ public sealed class AdminCareRequestsController : ControllerBase
     PayCareRequestHandler payHandler,
     VoidCareRequestHandler voidHandler,
     GenerateReceiptHandler generateReceiptHandler,
-    GetReceiptHandler getReceiptHandler)
+    GetReceiptHandler getReceiptHandler,
+    IPaymentProofRepository paymentProofRepository)
   {
     _getListHandler = getListHandler;
     _getDetailHandler = getDetailHandler;
@@ -62,6 +65,23 @@ public sealed class AdminCareRequestsController : ControllerBase
     _voidHandler = voidHandler;
     _generateReceiptHandler = generateReceiptHandler;
     _getReceiptHandler = getReceiptHandler;
+    _paymentProofRepository = paymentProofRepository;
+  }
+
+  // Returns the payment-proof image the client uploaded, for the admin to verify before paying.
+  [HttpGet("{id:guid}/payment-proof")]
+  [ProducesResponseType(StatusCodes.Status200OK)]
+  [ProducesResponseType(StatusCodes.Status404NotFound)]
+  public async Task<IActionResult> GetPaymentProof(Guid id, CancellationToken cancellationToken)
+  {
+    var proof = await _paymentProofRepository.GetLatestByCareRequestIdAsync(id, cancellationToken);
+    if (proof is null)
+    {
+      return this.ProblemResponse(StatusCodes.Status404NotFound, "Comprobante no encontrado",
+        $"No hay comprobante de pago para la solicitud '{id}'.");
+    }
+
+    return File(proof.Content, proof.ContentType);
   }
 
   private Guid GetAdminUserId()

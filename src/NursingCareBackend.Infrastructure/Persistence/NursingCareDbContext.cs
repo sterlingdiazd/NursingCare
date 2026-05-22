@@ -19,6 +19,7 @@ public sealed class NursingCareDbContext : DbContext
        public DbSet<CareRequest> CareRequests => Set<CareRequest>();
        public DbSet<PaymentValidation> PaymentValidations => Set<PaymentValidation>();
        public DbSet<Receipt> Receipts => Set<Receipt>();
+       public DbSet<PaymentProof> PaymentProofs => Set<PaymentProof>();
        public DbSet<User> Users => Set<User>();
        public DbSet<Nurse> Nurses => Set<Nurse>();
        public DbSet<Client> Clients => Set<Client>();
@@ -74,6 +75,17 @@ public sealed class NursingCareDbContext : DbContext
                      builder.Property(x => x.ReceiptNumber).IsRequired().HasMaxLength(30);
                      builder.Property(x => x.ReceiptContent).IsRequired();
                      builder.Property(x => x.GeneratedAtUtc).IsRequired();
+              });
+
+              modelBuilder.Entity<PaymentProof>(builder =>
+              {
+                     builder.ToTable("PaymentProofs");
+                     builder.HasKey(x => x.Id);
+                     builder.HasIndex(x => x.CareRequestId);
+                     builder.Property(x => x.Content).IsRequired();
+                     builder.Property(x => x.ContentType).IsRequired().HasMaxLength(100);
+                     builder.Property(x => x.Note).HasMaxLength(500);
+                     builder.Property(x => x.UploadedAtUtc).IsRequired();
               });
 
               modelBuilder.Entity<CareRequest>(builder =>

@@ -48,6 +48,8 @@ public sealed class CareRequest
     // Service lifecycle billing fields
     public string? InvoiceNumber { get; private set; }
     public DateTime? InvoicedAtUtc { get; private set; }
+    public DateTime? PaymentReportedAtUtc { get; private set; }
+    public Guid? PaymentProofId { get; private set; }
     public DateTime? PaidAtUtc { get; private set; }
     public DateTime? VoidedAtUtc { get; private set; }
     public string? VoidReason { get; private set; }
@@ -272,12 +274,32 @@ public sealed class CareRequest
         UpdatedAtUtc = invoiceDate;
     }
 
-    public void Pay(string bankReference, DateTime paymentDate)
+    // Client reports a payment (uploads proof). Moves Invoiced -> PaymentReported, awaiting
+    // admin verification against the bank. Does NOT recognize revenue yet.
+    public void ReportPayment(Guid paymentProofId, DateTime reportedAtUtc)
     {
         if (Status != CareRequestStatus.Invoiced)
         {
             throw new InvalidOperationException(
-                $"Care request can only be paid from Invoiced status. Current status is {Status}.");
+                $"A payment can only be reported from Invoiced status. Current status is {Status}.");
+        }
+
+        if (paymentProofId == Guid.Empty)
+            throw new ArgumentException("Payment proof identifier cannot be empty.", nameof(paymentProofId));
+
+        Status = CareRequestStatus.PaymentReported;
+        PaymentProofId = paymentProofId;
+        PaymentReportedAtUtc = reportedAtUtc;
+        UpdatedAtUtc = reportedAtUtc;
+    }
+
+    // Admin confirms the money was received in the bank. Recognizes revenue (Paid).
+    public void Pay(string bankReference, DateTime paymentDate)
+    {
+        if (Status != CareRequestStatus.PaymentReported && Status != CareRequestStatus.Invoiced)
+        {
+            throw new InvalidOperationException(
+                $"Care request can only be paid from PaymentReported or Invoiced status. Current status is {Status}.");
         }
 
         if (string.IsNullOrWhiteSpace(bankReference))

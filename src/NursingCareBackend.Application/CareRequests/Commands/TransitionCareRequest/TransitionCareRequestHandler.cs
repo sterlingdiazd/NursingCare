@@ -13,17 +13,20 @@ public sealed class TransitionCareRequestHandler
   private readonly IAdminNotificationPublisher _notifications;
   private readonly IPayrollCompensationService _payrollCompensationService;
   private readonly IAdminAuditService _auditService;
+  private readonly IInvoiceNumberGenerator _invoiceNumbers;
 
   public TransitionCareRequestHandler(
     ICareRequestRepository repository,
     IAdminNotificationPublisher notifications,
     IPayrollCompensationService payrollCompensationService,
-    IAdminAuditService auditService)
+    IAdminAuditService auditService,
+    IInvoiceNumberGenerator invoiceNumbers)
   {
     _repository = repository;
     _notifications = notifications;
     _payrollCompensationService = payrollCompensationService;
     _auditService = auditService;
+    _invoiceNumbers = invoiceNumbers;
   }
 
   public async Task<CareRequest> Handle(
@@ -81,6 +84,23 @@ public sealed class TransitionCareRequestHandler
     if (command.Action == CareRequestTransitionAction.Complete)
     {
       await _payrollCompensationService.RecordExecutionForCompletedCareRequestAsync(careRequest, cancellationToken);
+
+      // Auto-generate the invoice the moment the service is completed (Completed -> Invoiced),
+      // so the client can pay and report the payment. Number scheme is configurable (FiscalOptions).
+      var invoiceNumber = await _invoiceNumbers.NextAsync(transitionedAtUtc, cancellationToken);
+      careRequest.Invoice(invoiceNumber, transitionedAtUtc);
+      await _repository.UpdateAsync(careRequest, cancellationToken);
+
+      await _auditService.WriteAsync(
+        new AdminAuditRecord(
+          ActorUserId: command.ActingUserId,
+          ActorRole: "System",
+          Action: "Invoice",
+          EntityType: "CareRequest",
+          EntityId: careRequest.Id.ToString(),
+          Notes: $"Factura {invoiceNumber} generada automaticamente al completar el servicio.",
+          MetadataJson: null),
+        cancellationToken);
     }
 
     if (command.Action == CareRequestTransitionAction.Reject)

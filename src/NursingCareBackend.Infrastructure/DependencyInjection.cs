@@ -100,6 +100,7 @@ public static class DependencyInjection
         services.AddScoped<ICareRequestRepository, CareRequestRepository>();
         services.AddScoped<IPaymentValidationRepository, PaymentValidationRepository>();
         services.AddScoped<IReceiptRepository, ReceiptRepository>();
+        services.AddScoped<IPaymentProofRepository, PaymentProofRepository>();
         services.AddScoped<IReceiptPdfService, ReceiptPdfService>();
         services.AddScoped<IAdminDashboardRepository, AdminDashboardRepository>();
         services.AddScoped<IAdminActionQueueRepository, AdminActionQueueRepository>();
@@ -111,6 +112,7 @@ public static class DependencyInjection
         services.AddScoped<IAuditLogQueryService, AuditLogQueryService>();
         services.AddScoped<IAdminNotificationService, AdminNotificationService>();
         services.AddScoped<IAdminNotificationPublisher, AdminNotificationPublisher>();
+        services.AddScoped<IAdminEmailNotifier, AdminEmailNotifier>();
 
         // Push delivery: HttpClient + worker. The worker is a long-running
         // BackgroundService that drains NotificationOutbox; the HttpClient
@@ -170,6 +172,11 @@ public static class DependencyInjection
             options.Name = section["Name"] ?? "NursingCare";
             options.Rnc = section["Rnc"];
         });
+
+        services.Configure<NursingCareBackend.Infrastructure.Fiscal.FiscalOptions>(
+            configuration.GetSection(NursingCareBackend.Infrastructure.Fiscal.FiscalOptions.SectionName));
+        services.AddScoped<NursingCareBackend.Application.CareRequests.IInvoiceNumberGenerator,
+            NursingCareBackend.Infrastructure.CareRequests.InvoiceNumberGenerator>();
 
         return services;
     }
