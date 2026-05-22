@@ -10,5 +10,8 @@ public sealed record AdminPayrollPeriodDetail(
     DateTime CreatedAtUtc,
     DateTime? ClosedAtUtc,
     IReadOnlyList<AdminPayrollLineItem> Lines,
-    IReadOnlyList<AdminPayrollStaffSummary> StaffSummary
+    IReadOnlyList<AdminPayrollStaffSummary> StaffSummary,
+    // True only while the period is Open and has no calculated lines and no
+    // deductions/installments — i.e. it can still be edited or deleted.
+    bool CanModify
 );
