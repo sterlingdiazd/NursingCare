@@ -23,7 +23,7 @@ public sealed class AdminDashboardApiTests : IClassFixture<CustomWebApplicationF
     Assert.NotNull(baselinePayload);
 
     await RegisterPendingNurseAsync("dashboard-pending-nurse");
-    var (_, activeNurseUserId) = await CareRequestApiAuthHelper.CreateCompletedNurseTokenAsync(_factory, "dashboard-active-nurse");
+    var (activeNurseToken, activeNurseUserId) = await CareRequestApiAuthHelper.CreateCompletedNurseTokenAsync(_factory, "dashboard-active-nurse");
     var (firstClientToken, _) = await CareRequestApiAuthHelper.CreateClientTokenAsync(_factory, "dashboard-client-1");
     var (secondClientToken, _) = await CareRequestApiAuthHelper.CreateClientTokenAsync(_factory, "dashboard-client-2");
 
@@ -34,10 +34,14 @@ public sealed class AdminDashboardApiTests : IClassFixture<CustomWebApplicationF
     var waitingApprovalRequestId = await CreateCareRequestAsClientAsync(secondClientToken, "Solicitud lista para aprobacion");
     var approvedRequestId = await CreateCareRequestAsClientAsync(firstClientToken, "Solicitud aprobada sin cierre");
     var rejectedRequestId = await CreateCareRequestAsClientAsync(secondClientToken, "Solicitud rechazada hoy");
+    var completedTodayRequestId = await CreateCareRequestAsClientAsync(secondClientToken, "Solicitud completada hoy");
 
     await AssignCareRequestAsync(waitingApprovalRequestId, activeNurseUserId);
     await AssignCareRequestAsync(approvedRequestId, activeNurseUserId);
+    await AssignCareRequestAsync(completedTodayRequestId, activeNurseUserId);
     await ApproveCareRequestAsync(approvedRequestId);
+    await ApproveCareRequestAsync(completedTodayRequestId);
+    await CompleteCareRequestAsync(completedTodayRequestId, activeNurseToken);
     await RejectCareRequestAsync(rejectedRequestId);
 
     var adminClient = CreateAdminClient();
@@ -48,15 +52,25 @@ public sealed class AdminDashboardApiTests : IClassFixture<CustomWebApplicationF
     var payload = await response.Content.ReadFromJsonAsync<AdminDashboardDto>();
 
     Assert.NotNull(payload);
-    Assert.Equal(1, payload!.PendingNurseProfilesCount);
-    Assert.Equal(1, payload.CareRequestsWaitingForAssignmentCount);
-    Assert.Equal(1, payload.CareRequestsWaitingForApprovalCount);
-    Assert.Equal(1, payload.CareRequestsRejectedTodayCount);
-    Assert.Equal(1, payload.ApprovedCareRequestsStillIncompleteCount);
-    Assert.Equal(1, payload.OverdueOrStaleRequestsCount);
-    Assert.Equal(1, payload.ActiveNursesCount);
-    Assert.Equal(2, payload.ActiveClientsCount);
+    Assert.Equal(baselinePayload!.PendingNurseProfilesCount + 1, payload!.PendingNurseProfilesCount);
+    Assert.Equal(baselinePayload.CareRequestsWaitingForAssignmentCount + 1, payload.CareRequestsWaitingForAssignmentCount);
+    Assert.Equal(baselinePayload.CareRequestsWaitingForApprovalCount + 1, payload.CareRequestsWaitingForApprovalCount);
+    Assert.Equal(baselinePayload.CareRequestsRejectedTodayCount + 1, payload.CareRequestsRejectedTodayCount);
+    Assert.Equal(baselinePayload.ApprovedCareRequestsStillIncompleteCount + 1, payload.ApprovedCareRequestsStillIncompleteCount);
+    Assert.Equal(baselinePayload.OverdueOrStaleRequestsCount + 1, payload.OverdueOrStaleRequestsCount);
+    Assert.Equal(baselinePayload.ActiveNursesCount + 1, payload.ActiveNursesCount);
+    Assert.Equal(baselinePayload.ActiveClientsCount + 2, payload.ActiveClientsCount);
     Assert.True(payload.UnreadAdminNotificationsCount >= baselinePayload!.UnreadAdminNotificationsCount);
+    Assert.Equal(
+      payload.OverdueOrStaleRequestsCount
+      + payload.CareRequestsWaitingForAssignmentCount
+      + payload.CareRequestsWaitingForApprovalCount
+      + payload.UnreadAdminNotificationsCount,
+      payload.PendingDashboardTasksCount);
+    Assert.Equal(baselinePayload.CompletedDashboardTasksTodayCount + 1, payload.CompletedDashboardTasksTodayCount);
+    Assert.Equal(
+      payload.PendingDashboardTasksCount + payload.CompletedDashboardTasksTodayCount,
+      payload.TotalDashboardTasksTodayCount);
     Assert.Empty(payload.HighSeverityAlerts);
     Assert.True(payload.GeneratedAtUtc > DateTime.UtcNow.AddMinutes(-5));
 
@@ -130,6 +144,15 @@ public sealed class AdminDashboardApiTests : IClassFixture<CustomWebApplicationF
     response.EnsureSuccessStatusCode();
   }
 
+  private async Task CompleteCareRequestAsync(Guid careRequestId, string nurseToken)
+  {
+    var nurseClient = _factory.CreateClient();
+    nurseClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", nurseToken);
+    var response = await nurseClient.PostAsync($"/api/care-requests/{careRequestId}/complete", null);
+
+    response.EnsureSuccessStatusCode();
+  }
+
   private async Task RegisterPendingNurseAsync(string scenario)
   {
     var client = _factory.CreateClient();
@@ -164,6 +187,9 @@ public sealed class AdminDashboardApiTests : IClassFixture<CustomWebApplicationF
     public int ActiveNursesCount { get; set; }
     public int ActiveClientsCount { get; set; }
     public int UnreadAdminNotificationsCount { get; set; }
+    public int PendingDashboardTasksCount { get; set; }
+    public int CompletedDashboardTasksTodayCount { get; set; }
+    public int TotalDashboardTasksTodayCount { get; set; }
     public List<AdminDashboardAlertDto> HighSeverityAlerts { get; set; } = [];
     public DateTime GeneratedAtUtc { get; set; }
   }
