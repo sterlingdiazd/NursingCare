@@ -17,9 +17,21 @@ public interface IAdminPayrollRepository
         DateOnly paymentDate,
         CancellationToken cancellationToken);
 
-    Task<bool> ClosePeriodAsync(
+    Task<PeriodCloseResult> ClosePeriodAsync(
         Guid periodId,
-        CancellationToken cancellationToken);  // returns false if not found
+        CancellationToken cancellationToken);
+
+    Task<PeriodMutationResult> UpdatePeriodAsync(
+        Guid periodId,
+        DateOnly startDate,
+        DateOnly endDate,
+        DateOnly cutoffDate,
+        DateOnly paymentDate,
+        CancellationToken cancellationToken);
+
+    Task<PeriodMutationResult> DeletePeriodAsync(
+        Guid periodId,
+        CancellationToken cancellationToken);
 
     Task<IReadOnlyList<AdminPayrollLineItem>> GetPeriodLinesAsync(
         Guid periodId,
@@ -27,6 +39,7 @@ public interface IAdminPayrollRepository
 
     Task<AdminDeductionListResult> GetDeductionsAsync(Guid? nurseId, Guid? periodId, CancellationToken cancellationToken);
     Task<Guid> CreateDeductionAsync(CreateDeductionRequest request, CancellationToken cancellationToken);
+    Task<bool> UpdateDeductionAsync(Guid deductionId, UpdateDeductionRequest request, CancellationToken cancellationToken);
     Task<bool> DeleteDeductionAsync(Guid deductionId, CancellationToken cancellationToken);
 
     Task<AdminCompensationAdjustmentListResult> GetAdjustmentsAsync(Guid? executionId, CancellationToken cancellationToken);
