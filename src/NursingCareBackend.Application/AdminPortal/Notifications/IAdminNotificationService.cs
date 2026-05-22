@@ -2,10 +2,9 @@ namespace NursingCareBackend.Application.AdminPortal.Notifications;
 
 public interface IAdminNotificationService
 {
-  Task<IReadOnlyList<AdminNotificationListItem>> ListForAdminAsync(
+  Task<AdminNotificationListPage> ListForAdminAsync(
     Guid adminUserId,
-    bool includeArchived,
-    bool unreadOnly,
+    AdminNotificationListFilter filter,
     CancellationToken cancellationToken = default);
 
   Task<AdminNotificationSummary> GetSummaryAsync(
