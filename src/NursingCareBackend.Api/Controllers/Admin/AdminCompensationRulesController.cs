@@ -101,4 +101,23 @@ public sealed class AdminCompensationRulesController : ControllerBase
 
         return NoContent();
     }
+
+    // POST /api/admin/payroll/compensation-rules/{id}/reactivate
+    [HttpPost("{id:guid}/reactivate")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ReactivateRule(Guid id, CancellationToken cancellationToken)
+    {
+        var found = await _repository.ReactivateRuleAsync(id, cancellationToken);
+
+        if (!found)
+        {
+            return this.ProblemResponse(
+                StatusCodes.Status404NotFound,
+                Messages.Get("errors.regla_no_encontrada"),
+                $"No se encontró la regla de compensación con id '{id}'.");
+        }
+
+        return NoContent();
+    }
 }
