@@ -564,6 +564,8 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
 
         _dbContext.CompensationAdjustments.Add(adjustment);
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await RecomputeAdjustmentsForServiceExecutionAsync(request.ServiceExecutionId, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
         return adjustment.Id;
     }
 
@@ -575,6 +577,9 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
         if (adjustment is null) return false;
 
         adjustment.Update(request.Label, request.Amount, null);
+        var serviceExecutionId = adjustment.ServiceExecutionId;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await RecomputeAdjustmentsForServiceExecutionAsync(serviceExecutionId, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
         return true;
     }
@@ -586,9 +591,39 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
 
         if (adjustment is null) return false;
 
+        var serviceExecutionId = adjustment.ServiceExecutionId;
         _dbContext.CompensationAdjustments.Remove(adjustment);
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await RecomputeAdjustmentsForServiceExecutionAsync(serviceExecutionId, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
         return true;
+    }
+
+    // Fold the current CompensationAdjustment total for a service execution into both the
+    // ServiceExecution (drives payment reports) and the PayrollLine (drives the voucher/period
+    // detail). Skips lines in a CLOSED period (payroll immutability). Caller must SaveChanges.
+    private async Task RecomputeAdjustmentsForServiceExecutionAsync(Guid serviceExecutionId, CancellationToken cancellationToken)
+    {
+        var total = await _dbContext.CompensationAdjustments
+            .Where(a => a.ServiceExecutionId == serviceExecutionId)
+            .SumAsync(a => a.Amount, cancellationToken);
+
+        var line = await _dbContext.PayrollLines
+            .FirstOrDefaultAsync(l => l.ServiceExecutionId == serviceExecutionId, cancellationToken);
+        if (line is not null)
+        {
+            var period = await _dbContext.PayrollPeriods.AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Id == line.PayrollPeriodId, cancellationToken);
+            if (period is not null && period.Status != PayrollPeriodStatus.Open)
+            {
+                return; // closed period: do not alter historical pay
+            }
+            line.SetAdjustmentsTotal(total, DateTime.UtcNow);
+        }
+
+        var execution = await _dbContext.ServiceExecutions
+            .FirstOrDefaultAsync(s => s.Id == serviceExecutionId, cancellationToken);
+        execution?.SetAdjustmentsTotal(total, DateTime.UtcNow);
     }
 
     public async Task<IReadOnlyList<NursePeriodHistoryItem>> GetNursePeriodHistoryAsync(

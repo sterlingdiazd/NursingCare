@@ -91,6 +91,17 @@ public sealed class PayrollLine
         UpdatedAtUtc = updatedAtUtc;
     }
 
+    /// <summary>Fold the latest CompensationAdjustment total into this line (keeps a manual override intact).</summary>
+    public void SetAdjustmentsTotal(decimal adjustmentsTotal, DateTime updatedAtUtc)
+    {
+        AdjustmentsTotal = Round(adjustmentsTotal);
+        if (!IsOverridden)
+        {
+            NetCompensation = Round(BaseCompensation + TransportIncentive + ComplexityBonus + MedicalSuppliesCompensation + AdjustmentsTotal);
+        }
+        UpdatedAtUtc = updatedAtUtc;
+    }
+
     public void ApplyOverride(decimal overrideAmount, DateTime updatedAtUtc)
     {
         OriginalNetCompensation ??= NetCompensation;

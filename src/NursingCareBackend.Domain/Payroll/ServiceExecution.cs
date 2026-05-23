@@ -206,6 +206,15 @@ public sealed class ServiceExecution
         UpdatedAtUtc = updatedAtUtc;
     }
 
+    /// <summary>Recompute totals after a CompensationAdjustment for this execution is added/edited/removed.</summary>
+    public void SetAdjustmentsTotal(decimal adjustmentsTotal, DateTime updatedAtUtc)
+    {
+        AdjustmentsTotal = Round(adjustmentsTotal);
+        GrossCompensation = Round(BaseCompensation + TransportIncentive + ComplexityBonus + MedicalSuppliesCompensation + AdjustmentsTotal);
+        NetCompensation = Round(ManualOverrideAmount ?? (GrossCompensation - DeductionsTotal));
+        UpdatedAtUtc = updatedAtUtc;
+    }
+
     private static string? Normalize(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
