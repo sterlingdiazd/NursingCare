@@ -152,6 +152,16 @@ public sealed class AuthController : ControllerBase
     }
 
     /// <summary>
+    /// Whether Google OAuth is configured in this environment. Lets clients hide the
+    /// "Continue with Google" button instead of navigating to a 400 (e.g. in local dev).
+    /// </summary>
+    [HttpGet("google/available")]
+    [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public IActionResult GoogleOAuthAvailable()
+        => Ok(new { available = _googleOAuthClient.IsConfigured });
+
+    /// <summary>
     /// Handle Google OAuth2 callback and redirect back to the SPA with auth details.
     /// </summary>
     [HttpGet("google/callback")]

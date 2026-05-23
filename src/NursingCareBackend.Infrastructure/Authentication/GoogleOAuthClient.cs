@@ -113,6 +113,12 @@ public sealed class GoogleOAuthClient : IGoogleOAuthClient
         return tokenResponse;
     }
 
+    public bool IsConfigured =>
+        !string.IsNullOrWhiteSpace(_options.ClientId)
+        && !string.IsNullOrWhiteSpace(_options.ClientSecret)
+        && !string.IsNullOrWhiteSpace(_options.RedirectUri)
+        && !string.IsNullOrWhiteSpace(_options.FrontendRedirectUrl);
+
     private void EnsureConfigured()
     {
         if (string.IsNullOrWhiteSpace(_options.ClientId)

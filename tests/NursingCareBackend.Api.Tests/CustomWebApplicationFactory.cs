@@ -220,6 +220,8 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
   private sealed class FakeGoogleOAuthClient : IGoogleOAuthClient
   {
+    public bool IsConfigured => true;
+
     public string BuildAuthorizationUrl(string? state = null)
       => state is null
         ? "https://accounts.google.com/o/oauth2/v2/auth?client_id=test-google-client-id"
