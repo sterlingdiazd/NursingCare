@@ -84,7 +84,8 @@ public sealed class CareRequestTransitionsApiTests : IClassFixture<CustomWebAppl
     var payload = await completeResponse.Content.ReadFromJsonAsync<CareRequestItem>();
 
     Assert.NotNull(payload);
-    Assert.Equal("Completed", payload!.Status);
+    // After complete, auto-invoice runs immediately: status transitions Completed -> Invoiced.
+    Assert.Equal("Invoiced", payload!.Status);
     Assert.NotNull(payload.CompletedAtUtc);
   }
 

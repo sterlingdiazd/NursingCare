@@ -11,11 +11,13 @@ public sealed class AdminUserManagementRepository : IAdminUserManagementReposito
 {
   private readonly NursingCareDbContext _dbContext;
   private readonly INurseCatalogService _nurseCatalog;
+  private readonly TimeProvider _timeProvider;
 
-  public AdminUserManagementRepository(NursingCareDbContext dbContext, INurseCatalogService nurseCatalog)
+  public AdminUserManagementRepository(NursingCareDbContext dbContext, INurseCatalogService nurseCatalog, TimeProvider timeProvider)
   {
     _dbContext = dbContext;
     _nurseCatalog = nurseCatalog;
+    _timeProvider = timeProvider;
   }
 
   public async Task<AdminUserListPage> GetListAsync(
@@ -63,7 +65,7 @@ public sealed class AdminUserManagementRepository : IAdminUserManagementReposito
       return null;
     }
 
-    var utcNow = DateTime.UtcNow;
+    var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
     var activeRefreshTokenCount = await _dbContext.RefreshTokens
       .AsNoTracking()
       .CountAsync(

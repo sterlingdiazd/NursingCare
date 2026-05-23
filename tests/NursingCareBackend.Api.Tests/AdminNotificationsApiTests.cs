@@ -63,10 +63,11 @@ public sealed class AdminNotificationsApiTests : IClassFixture<CustomWebApplicat
     });
     registerResponse.EnsureSuccessStatusCode();
 
-    var listResponse = await adminClient.GetAsync("/api/admin/notifications?unreadOnly=true");
+    var listResponse = await adminClient.GetAsync("/api/admin/notifications?status=Unread&pageSize=100");
     listResponse.EnsureSuccessStatusCode();
-    var items = await listResponse.Content.ReadFromJsonAsync<List<AdminNotificationDto>>();
-    Assert.NotNull(items);
+    var page = await listResponse.Content.ReadFromJsonAsync<AdminNotificationPageDto>();
+    Assert.NotNull(page);
+    var items = page!.Items;
 
     var nurseRegistration = items!.FirstOrDefault(item => item.Category == "nurse_registration_created");
     Assert.NotNull(nurseRegistration);
@@ -104,11 +105,11 @@ public sealed class AdminNotificationsApiTests : IClassFixture<CustomWebApplicat
     Assert.NotNull(created);
 
     var adminClient = CreateAdminClient();
-    var listResponse = await adminClient.GetAsync("/api/admin/notifications?unreadOnly=true");
+    var listResponse = await adminClient.GetAsync("/api/admin/notifications?status=Unread&pageSize=100");
     listResponse.EnsureSuccessStatusCode();
-    var items = await listResponse.Content.ReadFromJsonAsync<List<AdminNotificationDto>>();
-    Assert.NotNull(items);
-    Assert.Contains(items!, item =>
+    var page = await listResponse.Content.ReadFromJsonAsync<AdminNotificationPageDto>();
+    Assert.NotNull(page);
+    Assert.Contains(page!.Items, item =>
       item.Category == "care_request_created"
       && item.EntityType == "CareRequest"
       && item.EntityId == created!.Id.ToString()
@@ -142,5 +143,11 @@ public sealed class AdminNotificationsApiTests : IClassFixture<CustomWebApplicat
   {
     public int Total { get; set; }
     public int Unread { get; set; }
+  }
+
+  private sealed class AdminNotificationPageDto
+  {
+    public List<AdminNotificationDto> Items { get; set; } = new();
+    public int TotalCount { get; set; }
   }
 }

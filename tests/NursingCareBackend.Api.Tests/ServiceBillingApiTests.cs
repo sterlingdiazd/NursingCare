@@ -23,19 +23,31 @@ public sealed class ServiceBillingApiTests : IClassFixture<CustomWebApplicationF
     [Fact]
     public async Task POST_Invoice_Should_Transition_Completed_Request_To_Invoiced()
     {
+        // Auto-invoice: completing a care request now automatically invokes Invoice().
+        // Calling /invoice manually on an already-invoiced request must return 400 (invalid transition).
         var completedId = await CreateCompletedCareRequestAsync("billing-invoice-success");
 
         var adminClient = CreateAdminClient();
-        var response = await adminClient.PostAsJsonAsync($"/api/admin/care-requests/{completedId}/invoice", new
+
+        // Verify the request is already in Invoiced state after complete.
+        var detailResponse = await adminClient.GetAsync($"/api/admin/care-requests/{completedId}");
+        detailResponse.EnsureSuccessStatusCode();
+        var detail = await detailResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        var status = detail.GetProperty("status").GetString();
+        Assert.Equal("Invoiced", status);
+        // BillingInfo is the nested object; invoiceNumber lives inside it.
+        Assert.True(detail.TryGetProperty("billingInfo", out var billingInfo) && billingInfo.ValueKind == System.Text.Json.JsonValueKind.Object,
+            "Auto-invoice must populate billingInfo");
+        Assert.True(billingInfo.TryGetProperty("invoiceNumber", out var invoiceNumberEl) && !string.IsNullOrEmpty(invoiceNumberEl.GetString()),
+            "Auto-invoice should have set an invoice number");
+
+        // A second manual invoice call must be rejected.
+        var duplicateResponse = await adminClient.PostAsJsonAsync($"/api/admin/care-requests/{completedId}/invoice", new
         {
             invoiceNumber = "FAC-2026-001",
             invoiceDate = DateTime.UtcNow
         });
-
-        response.EnsureSuccessStatusCode();
-        var body = await response.Content.ReadFromJsonAsync<InvoicedResponse>();
-        Assert.NotNull(body);
-        Assert.Equal("FAC-2026-001", body!.InvoiceNumber);
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest, duplicateResponse.StatusCode);
     }
 
     [Fact]
@@ -90,8 +102,10 @@ public sealed class ServiceBillingApiTests : IClassFixture<CustomWebApplicationF
     }
 
     [Fact]
-    public async Task POST_Pay_Should_Return_BadRequest_For_Completed_Not_Invoiced()
+    public async Task POST_Pay_Should_Succeed_For_Auto_Invoiced_Request()
     {
+        // Auto-invoice: completing a request transitions it directly to Invoiced.
+        // Paying an auto-invoiced request (without a separate manual invoice step) must succeed.
         var completedId = await CreateCompletedCareRequestAsync("billing-pay-bad");
 
         var adminClient = CreateAdminClient();
@@ -100,7 +114,10 @@ public sealed class ServiceBillingApiTests : IClassFixture<CustomWebApplicationF
             bankReference = "TRF-2026-002"
         });
 
-        Assert.Equal(HttpStatusCode.BadRequest, payResponse.StatusCode);
+        payResponse.EnsureSuccessStatusCode();
+        var body = await payResponse.Content.ReadFromJsonAsync<PaidResponse>();
+        Assert.NotNull(body);
+        Assert.NotEqual(default, body!.PaidAtUtc);
     }
 
     // ---- Void ----
@@ -226,11 +243,11 @@ public sealed class ServiceBillingApiTests : IClassFixture<CustomWebApplicationF
         var periodBody = await periodResponse.Content.ReadFromJsonAsync<PeriodCreatedResponse>();
         Assert.NotNull(periodBody);
 
-        // Use a random nurse id — no lines exist so the endpoint returns 404 (no payroll data for nurse)
+        // Use a random nurse id — no lines exist; endpoint returns 200 with empty lines (period found, nurse has no data).
         var response = await adminClient.GetAsync($"/api/admin/payroll/periods/{periodBody!.Id}/nurse-detail/{Guid.NewGuid()}");
 
-        // No payroll lines for that nurse in that period — expect 404
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        // The endpoint returns 200 with empty serviceRows when the period exists but the nurse has no lines.
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     // ---- Helper methods ----

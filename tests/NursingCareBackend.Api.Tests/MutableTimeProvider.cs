@@ -2,7 +2,7 @@ namespace NursingCareBackend.Api.Tests;
 
 public sealed class MutableTimeProvider : TimeProvider
 {
-    private static readonly DateTimeOffset DefaultUtcNow = new(2026, 4, 2, 12, 0, 0, TimeSpan.Zero);
+    private static DateTimeOffset DefaultUtcNow => DateTimeOffset.UtcNow;
 
     private DateTimeOffset _utcNow = DefaultUtcNow;
 

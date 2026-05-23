@@ -94,7 +94,9 @@ internal static class CareRequestApiAuthHelper
         licenseId = "01",
         bankName = "Banco Central",
         accountNumber = "12345",
-        category = "Senior"
+        category = "Senior",
+        visitDailyRate = 2500m,
+        homeCareMonthlyRate = 50000m
       });
 
     completeResponse.EnsureSuccessStatusCode();

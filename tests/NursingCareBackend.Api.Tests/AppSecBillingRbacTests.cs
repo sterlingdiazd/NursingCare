@@ -448,20 +448,30 @@ public sealed class AppSecBillingRbacTests : IClassFixture<CustomWebApplicationF
     [Fact]
     public async Task Invoice_Response_Contains_Expected_Fields()
     {
+        // Auto-invoice: completing a care request now triggers Invoice() automatically.
+        // The admin GET detail endpoint exposes billing info; verify the auto-generated invoice
+        // fields are present and non-empty (contract validation for the invoice data shape).
         var completedId = await CreateCompletedCareRequestAsync("appsec-contract-invoice");
         var adminClient = CreateAdminClient();
 
-        var response = await adminClient.PostAsJsonAsync(
-            $"/api/admin/care-requests/{completedId}/invoice",
-            new { invoiceNumber = "FAC-CONTRACT-001" });
-
+        var response = await adminClient.GetAsync($"/api/admin/care-requests/{completedId}");
         response.EnsureSuccessStatusCode();
         var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
 
         Assert.True(payload.TryGetProperty("id", out _), "Missing 'id' field");
-        Assert.True(payload.TryGetProperty("invoiceNumber", out _), "Missing 'invoiceNumber' field");
-        Assert.True(payload.TryGetProperty("invoicedAtUtc", out _), "Missing 'invoicedAtUtc' field");
-        Assert.True(payload.TryGetProperty("totalAmount", out _), "Missing 'totalAmount' field");
+        Assert.True(payload.TryGetProperty("status", out var statusEl), "Missing 'status' field");
+        Assert.Equal("Invoiced", statusEl.GetString());
+
+        Assert.True(payload.TryGetProperty("billingInfo", out var billingInfo), "Missing 'billingInfo' field");
+        Assert.True(billingInfo.TryGetProperty("invoiceNumber", out var invNum), "Missing 'billingInfo.invoiceNumber' field");
+        Assert.False(string.IsNullOrEmpty(invNum.GetString()), "billingInfo.invoiceNumber must not be empty after auto-invoice");
+        Assert.True(billingInfo.TryGetProperty("invoicedAtUtc", out _), "Missing 'billingInfo.invoicedAtUtc' field");
+
+        // Manual /invoice must be rejected since the request is already invoiced.
+        var duplicateInvoiceResponse = await adminClient.PostAsJsonAsync(
+            $"/api/admin/care-requests/{completedId}/invoice",
+            new { invoiceNumber = "FAC-CONTRACT-001" });
+        Assert.Equal(HttpStatusCode.BadRequest, duplicateInvoiceResponse.StatusCode);
     }
 
     [Fact]

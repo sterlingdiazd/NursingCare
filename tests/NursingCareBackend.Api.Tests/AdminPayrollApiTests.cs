@@ -657,14 +657,29 @@ public sealed class AdminPayrollApiTests : IClassFixture<CustomWebApplicationFac
 
     // Active scheduled-deduction plans in the shared test DB auto-generate an installment
     // into every newly created open period, so a fresh period is not guaranteed empty.
-    // Clear its deductions to make "empty period" assertions deterministic.
-    private static async Task ClearPeriodDeductionsAsync(HttpClient client, Guid periodId)
+    // Directly remove all DeductionRecords for the period (including installment records that
+    // are not exposed by the one-time deductions API) via the EF context.
+    private async Task ClearPeriodDeductionsAsync(HttpClient client, Guid periodId)
     {
+        // Remove one-time deductions via the API.
         var list = await (await client.GetAsync($"/api/admin/payroll/deductions?periodId={periodId}"))
             .Content.ReadFromJsonAsync<JsonElement>();
         foreach (var d in list.GetProperty("items").EnumerateArray())
         {
             await client.DeleteAsync($"/api/admin/payroll/deductions/{d.GetProperty("id").GetGuid()}");
+        }
+
+        // Remove any remaining installment DeductionRecords directly (installments are not
+        // exposed by the one-time deductions GET endpoint but still count as "period activity").
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<NursingCareDbContext>();
+        var installments = db.DeductionRecords
+            .Where(d => d.PayrollPeriodId == periodId)
+            .ToList();
+        if (installments.Count > 0)
+        {
+            db.DeductionRecords.RemoveRange(installments);
+            await db.SaveChangesAsync();
         }
     }
 }

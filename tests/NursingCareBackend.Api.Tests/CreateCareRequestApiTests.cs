@@ -106,8 +106,10 @@ public sealed class CreateCareRequestApiTests : IClassFixture<CustomWebApplicati
     client.DefaultRequestHeaders.Authorization =
       new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", JwtTestTokens.CreateAdminToken(_factory.Services));
 
+    // Admin must specify the target client user; CatalogSeeding seeds a known test client.
     var response = await client.PostAsJsonAsync("/api/care-requests", new
     {
+      clientUserId = CatalogSeeding.TestClientId,
       careRequestDescription = "Admin-created request",
       careRequestType = "domicilio_24h",
       unit = 1

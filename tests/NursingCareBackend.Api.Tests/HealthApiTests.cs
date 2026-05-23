@@ -151,7 +151,10 @@ public sealed class HealthApiTests : IClassFixture<CustomWebApplicationFactory>
     var body = await response.Content.ReadFromJsonAsync<JsonElement>();
 
     var timestampStr = body.GetProperty("timestamp").GetString();
-    Assert.True(DateTime.TryParse(timestampStr, out var timestamp), "timestamp must be a parseable datetime");
+    // Parse as UTC regardless of offset notation (e.g., "-04:00") to avoid DateTime Kind mismatch.
+    Assert.True(
+      DateTime.TryParse(timestampStr, null, System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out var timestamp),
+      "timestamp must be a parseable datetime");
     Assert.True(timestamp >= before && timestamp <= after, $"timestamp {timestamp:O} should be within the test window [{before:O}, {after:O}]");
   }
 }

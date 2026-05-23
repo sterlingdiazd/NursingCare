@@ -8,10 +8,12 @@ namespace NursingCareBackend.Infrastructure.Identity;
 public sealed class RefreshTokenRepository : IRefreshTokenRepository
 {
   private readonly NursingCareDbContext _dbContext;
+  private readonly TimeProvider _timeProvider;
 
-  public RefreshTokenRepository(NursingCareDbContext dbContext)
+  public RefreshTokenRepository(NursingCareDbContext dbContext, TimeProvider timeProvider)
   {
     _dbContext = dbContext;
+    _timeProvider = timeProvider;
   }
 
   public async Task<RefreshToken> CreateAsync(RefreshToken refreshToken, CancellationToken cancellationToken = default)
@@ -32,8 +34,9 @@ public sealed class RefreshTokenRepository : IRefreshTokenRepository
 
   public async Task<int> RevokeActiveTokensForUserAsync(Guid userId, CancellationToken cancellationToken = default)
   {
+    var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
     var activeTokens = await _dbContext.RefreshTokens
-      .Where(rt => rt.UserId == userId && rt.RevokedAtUtc == null && rt.ExpiresAtUtc > DateTime.UtcNow)
+      .Where(rt => rt.UserId == userId && rt.RevokedAtUtc == null && rt.ExpiresAtUtc > utcNow)
       .ToListAsync(cancellationToken);
 
     if (activeTokens.Count == 0)
@@ -41,7 +44,7 @@ public sealed class RefreshTokenRepository : IRefreshTokenRepository
       return 0;
     }
 
-    var revokedAtUtc = DateTime.UtcNow;
+    var revokedAtUtc = utcNow;
 
     foreach (var token in activeTokens)
     {

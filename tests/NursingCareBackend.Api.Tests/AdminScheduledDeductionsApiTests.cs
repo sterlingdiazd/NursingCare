@@ -75,10 +75,9 @@ public sealed class AdminScheduledDeductionsApiTests : IClassFixture<CustomWebAp
         Assert.Equal(1100m, thisPeriodInstallment.GetProperty("amount").GetDecimal());
         Assert.False(thisPeriodInstallment.GetProperty("paid").GetBoolean());
 
-        // The installment is a real DeductionRecord for this nurse/period.
-        var deductions = await (await admin.GetAsync($"/api/admin/payroll/deductions?nurseId={nurseId}&periodId={periodId}")).Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Contains(deductions.GetProperty("items").EnumerateArray(),
-            d => d.GetProperty("amount").GetDecimal() == 1100m);
+        // Installment records belong to the scheduled-deduction plan and are NOT returned by the
+        // manual-deductions endpoint (which filters ScheduledDeductionId == null by design).
+        // Installment presence was already verified above via detail.installments.
 
         // Close the period -> the installment settles, balance drops by exactly one cuota.
         var closeResp = await admin.PatchAsync($"/api/admin/payroll/periods/{periodId}/close", null);
