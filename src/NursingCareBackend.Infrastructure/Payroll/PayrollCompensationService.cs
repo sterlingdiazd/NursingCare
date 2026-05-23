@@ -34,7 +34,7 @@ public sealed class PayrollCompensationService : IPayrollCompensationService
                 NurseCategory = user.NurseProfile != null ? user.NurseProfile.Category : null,
                 VisitDailyRate = user.NurseProfile != null ? user.NurseProfile.VisitDailyRate : 0m,
                 HomeCareMonthlyRate = user.NurseProfile != null ? user.NurseProfile.HomeCareMonthlyRate : 0m,
-                HomeCareMonthlyExpectedDays = user.NurseProfile != null ? user.NurseProfile.HomeCareMonthlyExpectedDays : 30,
+                HomeCareMonthlyExpectedDays = user.NurseProfile != null ? user.NurseProfile.HomeCareMonthlyExpectedDays : 23.83m,
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -272,7 +272,7 @@ public sealed class PayrollCompensationService : IPayrollCompensationService
         int days,
         decimal visitDailyRate,
         decimal homeCareMonthlyRate,
-        int homeCareMonthlyExpectedDays)
+        decimal homeCareMonthlyExpectedDays)
     {
         var isHogar = string.Equals(pricingCategoryCode, "hogar", StringComparison.OrdinalIgnoreCase);
         var daily = isHogar

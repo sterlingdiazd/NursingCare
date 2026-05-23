@@ -569,7 +569,7 @@ public static class CatalogSeeding
                 Category = category,
                 VisitDailyRate = 1700m,
                 HomeCareMonthlyRate = 30000m,
-                HomeCareMonthlyExpectedDays = 30
+                HomeCareMonthlyExpectedDays = 23.83m
             };
 
             db.Nurses.Add(nurseProfile);

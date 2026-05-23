@@ -100,7 +100,7 @@ public sealed class PayrollRecalculationService : IPayrollRecalculationService
         return new RecalculatePayrollResult(audit.Id, affected, totalOldNet, totalNewNet, now);
     }
 
-    private readonly record struct NurseRates(decimal VisitDailyRate, decimal HomeCareMonthlyRate, int HomeCareMonthlyExpectedDays);
+    private readonly record struct NurseRates(decimal VisitDailyRate, decimal HomeCareMonthlyRate, decimal HomeCareMonthlyExpectedDays);
 
     // Pago de la enfermera = tarifa diaria x dias del servicio, independiente del precio al cliente.
     // Los dias registrados en el servicio (Unit) se vuelven dias pagables al completarse.

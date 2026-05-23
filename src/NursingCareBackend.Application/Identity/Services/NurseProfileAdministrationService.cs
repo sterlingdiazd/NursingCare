@@ -604,7 +604,7 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
         string category,
         decimal visitDailyRate,
         decimal homeCareMonthlyRate,
-        int homeCareMonthlyExpectedDays,
+        decimal homeCareMonthlyExpectedDays,
         CancellationToken cancellationToken)
     {
         var nurse = user.NurseProfile!;

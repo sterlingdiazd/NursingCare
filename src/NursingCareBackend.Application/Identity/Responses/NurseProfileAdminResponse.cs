@@ -26,6 +26,6 @@ public sealed record NurseProfileAdminResponse(
     string? Category,
     decimal VisitDailyRate,
     decimal HomeCareMonthlyRate,
-    int HomeCareMonthlyExpectedDays,
+    decimal HomeCareMonthlyExpectedDays,
     NurseWorkloadSummary Workload
 );

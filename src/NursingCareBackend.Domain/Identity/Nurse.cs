@@ -18,5 +18,7 @@ public sealed class Nurse
   // esperados del mes (diaria = HomeCareMonthlyRate / HomeCareMonthlyExpectedDays).
   public decimal VisitDailyRate { get; set; }
   public decimal HomeCareMonthlyRate { get; set; }
-  public int HomeCareMonthlyExpectedDays { get; set; } = 30;
+  // Días laborables/mes bajo la jornada de 44h RD (5.5 días/sem × 52 ÷ 12 = 23.83). Decimal para
+  // que la diaria (= HomeCareMonthlyRate / HomeCareMonthlyExpectedDays) sea legalmente exacta.
+  public decimal HomeCareMonthlyExpectedDays { get; set; } = 23.83m;
 }
