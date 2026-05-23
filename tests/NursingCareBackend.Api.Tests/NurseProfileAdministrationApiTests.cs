@@ -22,10 +22,10 @@ public sealed class NurseProfileAdministrationApiTests : IClassFixture<CustomWeb
     var response = await adminClient.GetAsync("/api/admin/nurse-profiles/pending");
 
     response.EnsureSuccessStatusCode();
-    var payload = await response.Content.ReadFromJsonAsync<PendingNurseProfileDto[]>();
+    var payload = await response.Content.ReadFromJsonAsync<PendingNurseProfilePageDto>();
     Assert.NotNull(payload);
-    Assert.NotEmpty(payload!);
-    Assert.Contains(payload, item => item.Email.Contains("pending-list-", StringComparison.Ordinal));
+    Assert.NotEmpty(payload!.Items);
+    Assert.Contains(payload.Items, item => item.Email.Contains("pending-list-", StringComparison.Ordinal));
 
     var nurseClient = _factory.CreateClient();
     nurseClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", nurseToken);
@@ -59,10 +59,10 @@ public sealed class NurseProfileAdministrationApiTests : IClassFixture<CustomWeb
     var response = await adminClient.GetAsync("/api/admin/nurse-profiles/inactive");
 
     response.EnsureSuccessStatusCode();
-    var payload = await response.Content.ReadFromJsonAsync<NurseProfileSummaryDto[]>();
+    var payload = await response.Content.ReadFromJsonAsync<NurseProfileSummaryPageDto>();
     Assert.NotNull(payload);
-    Assert.Contains(payload!, item => item.UserId == inactive.UserId);
-    Assert.DoesNotContain(payload!, item => item.UserId == active.UserId);
+    Assert.Contains(payload!.Items, item => item.UserId == inactive.UserId);
+    Assert.DoesNotContain(payload!.Items, item => item.UserId == active.UserId);
   }
 
   [Fact]
@@ -359,6 +359,22 @@ public sealed class NurseProfileAdministrationApiTests : IClassFixture<CustomWeb
     var payload = await response.Content.ReadFromJsonAsync<AuthResponseDto>();
     Assert.NotNull(payload);
     return payload!.Token;
+  }
+
+  private sealed class PendingNurseProfilePageDto
+  {
+    public List<PendingNurseProfileDto> Items { get; set; } = [];
+    public int TotalCount { get; set; }
+    public int Page { get; set; }
+    public int PageSize { get; set; }
+  }
+
+  private sealed class NurseProfileSummaryPageDto
+  {
+    public List<NurseProfileSummaryDto> Items { get; set; } = [];
+    public int TotalCount { get; set; }
+    public int Page { get; set; }
+    public int PageSize { get; set; }
   }
 
   private sealed class PendingNurseProfileDto

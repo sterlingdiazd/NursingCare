@@ -9,7 +9,7 @@ public sealed class GetAdminUsersHandler
     _repository = repository;
   }
 
-  public Task<IReadOnlyList<AdminUserListItem>> Handle(
+  public Task<AdminUserListPage> Handle(
     AdminUserListFilter filter,
     CancellationToken cancellationToken = default)
     => _repository.GetListAsync(filter, cancellationToken);

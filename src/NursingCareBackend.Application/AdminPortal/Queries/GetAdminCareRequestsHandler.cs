@@ -9,7 +9,7 @@ public sealed class GetAdminCareRequestsHandler
     _repository = repository;
   }
 
-  public Task<IReadOnlyList<AdminCareRequestListItem>> Handle(
+  public Task<AdminCareRequestListPage> Handle(
     AdminCareRequestListFilter filter,
     CancellationToken cancellationToken)
   {

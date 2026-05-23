@@ -2,7 +2,7 @@ namespace NursingCareBackend.Application.AdminPortal.Clients;
 
 public interface IAdminClientManagementRepository
 {
-  Task<IReadOnlyList<AdminClientListItem>> GetListAsync(
+  Task<AdminClientListPage> GetListAsync(
     AdminClientListFilter filter,
     CancellationToken cancellationToken = default);
 

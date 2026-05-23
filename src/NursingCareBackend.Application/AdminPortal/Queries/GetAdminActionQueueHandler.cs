@@ -9,8 +9,8 @@ public sealed class GetAdminActionQueueHandler
     _repository = repository;
   }
 
-  public Task<IReadOnlyList<AdminActionQueueItem>> Handle(CancellationToken cancellationToken)
+  public Task<AdminActionQueuePage> Handle(AdminActionQueueFilter filter, CancellationToken cancellationToken)
   {
-    return _repository.GetItemsAsync(cancellationToken);
+    return _repository.GetItemsAsync(filter, cancellationToken);
   }
 }

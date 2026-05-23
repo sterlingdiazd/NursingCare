@@ -24,9 +24,13 @@ public sealed class NurseProfilesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    public async Task<IActionResult> GetPending(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetPending(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = NurseProfileListFilter.DefaultPageSize,
+        CancellationToken cancellationToken = default)
     {
-        var response = await _nurseProfileAdministrationService.GetPendingNurseProfilesAsync(cancellationToken);
+        var filter = NurseProfileListFilter.Sanitized(page, pageSize);
+        var response = await _nurseProfileAdministrationService.GetPendingNurseProfilesAsync(filter, cancellationToken);
         return Ok(response);
     }
 
@@ -34,9 +38,13 @@ public sealed class NurseProfilesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    public async Task<IActionResult> GetActive(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetActive(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = NurseProfileListFilter.DefaultPageSize,
+        CancellationToken cancellationToken = default)
     {
-        var response = await _nurseProfileAdministrationService.GetActiveNurseProfilesAsync(cancellationToken);
+        var filter = NurseProfileListFilter.Sanitized(page, pageSize);
+        var response = await _nurseProfileAdministrationService.GetActiveNurseProfilesAsync(filter, cancellationToken);
         return Ok(response);
     }
 
@@ -44,9 +52,13 @@ public sealed class NurseProfilesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    public async Task<IActionResult> GetInactive(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetInactive(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = NurseProfileListFilter.DefaultPageSize,
+        CancellationToken cancellationToken = default)
     {
-        var response = await _nurseProfileAdministrationService.GetInactiveNurseProfilesAsync(cancellationToken);
+        var filter = NurseProfileListFilter.Sanitized(page, pageSize);
+        var response = await _nurseProfileAdministrationService.GetInactiveNurseProfilesAsync(filter, cancellationToken);
         return Ok(response);
     }
 

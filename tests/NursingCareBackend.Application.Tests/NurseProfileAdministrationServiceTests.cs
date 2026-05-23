@@ -21,9 +21,9 @@ public sealed class NurseProfileAdministrationServiceTests
 
     var service = CreateService(new FakeUserRepository(pendingNurse, completedNurse, inactiveNurse, client));
 
-    var response = await service.GetPendingNurseProfilesAsync();
+    var response = await service.GetPendingNurseProfilesAsync(new NurseProfileListFilter());
 
-    var pending = Assert.Single(response);
+    var pending = Assert.Single(response.Items);
     Assert.Equal(pendingNurse.Id, pending.UserId);
     Assert.Equal("pending@example.com", pending.Email);
     Assert.Equal("Atencion domiciliaria", pending.Specialty);
@@ -40,9 +40,9 @@ public sealed class NurseProfileAdministrationServiceTests
 
     var service = CreateService(repository);
 
-    var response = await service.GetInactiveNurseProfilesAsync();
+    var response = await service.GetInactiveNurseProfilesAsync(new NurseProfileListFilter());
 
-    var inactive = Assert.Single(response);
+    var inactive = Assert.Single(response.Items);
     Assert.Equal(inactiveNurse.Id, inactive.UserId);
     Assert.False(inactive.IsAssignmentReady);
     Assert.Equal(3, inactive.Workload.TotalAssignedCareRequests);

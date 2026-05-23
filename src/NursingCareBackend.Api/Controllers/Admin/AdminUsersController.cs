@@ -30,18 +30,18 @@ public sealed class AdminUsersController : ControllerBase
 
   [HttpGet]
   [ProducesResponseType(StatusCodes.Status200OK)]
-  public async Task<ActionResult<IReadOnlyList<AdminUserListItem>>> Get(
+  public async Task<ActionResult<AdminUserListPage>> Get(
     [FromQuery] string? search,
     [FromQuery] string? role,
     [FromQuery] string? profileType,
     [FromQuery] string? status,
-    CancellationToken cancellationToken)
+    [FromQuery] int page = 1,
+    [FromQuery] int pageSize = AdminUserListFilter.DefaultPageSize,
+    CancellationToken cancellationToken = default)
   {
-    var items = await _getAdminUsersHandler.Handle(
-      new AdminUserListFilter(search, role, profileType, status),
-      cancellationToken);
-
-    return Ok(items);
+    var filter = AdminUserListFilter.Sanitized(search, role, profileType, status, page, pageSize);
+    var result = await _getAdminUsersHandler.Handle(filter, cancellationToken);
+    return Ok(result);
   }
 
   [HttpGet("{userId:guid}")]

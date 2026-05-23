@@ -19,6 +19,9 @@ public sealed class PayrollVoucherServiceTests
         Rnc = "123-45678-9",
     };
 
+    private static ICompanyInfoProvider CompanyProvider =>
+        new FakeCompanyInfoProvider(new CompanyInfo(DefaultCompanyInfo.Name, DefaultCompanyInfo.Rnc, null, null));
+
     private static PayrollVoucherData BuildSampleVoucherData() => new()
     {
         PeriodId = Guid.NewGuid(),
@@ -66,7 +69,7 @@ public sealed class PayrollVoucherServiceTests
     {
         var voucherData = BuildSampleVoucherData();
         var repoMock = new FakeVoucherRepository(voucherData);
-        var service = new PayrollVoucherService(repoMock, Options.Create(DefaultCompanyInfo));
+        var service = new PayrollVoucherService(repoMock, CompanyProvider);
 
         var pdfBytes = await service.GenerateVoucherAsync(voucherData.PeriodId, voucherData.NurseUserId);
 
@@ -83,7 +86,7 @@ public sealed class PayrollVoucherServiceTests
     public async Task GenerateVoucherAsync_WhenNurseNotFound_ThrowsVoucherNotFoundException()
     {
         var repoMock = new FakeVoucherRepository(null);
-        var service = new PayrollVoucherService(repoMock, Options.Create(DefaultCompanyInfo));
+        var service = new PayrollVoucherService(repoMock, CompanyProvider);
 
         await Assert.ThrowsAsync<VoucherNotFoundException>(
             () => service.GenerateVoucherAsync(Guid.NewGuid(), Guid.NewGuid()));
@@ -115,7 +118,7 @@ public sealed class PayrollVoucherServiceTests
         };
 
         var repoMock = new FakeVoucherRepository(voucherData1, [voucherData1, voucherData2]);
-        var service = new PayrollVoucherService(repoMock, Options.Create(DefaultCompanyInfo));
+        var service = new PayrollVoucherService(repoMock, CompanyProvider);
 
         var zipBytes = await service.GenerateBulkVouchersZipAsync(voucherData1.PeriodId);
 
@@ -130,7 +133,7 @@ public sealed class PayrollVoucherServiceTests
     public async Task GenerateBulkVouchersZipAsync_WhenNoPeriodData_ThrowsVoucherNotFoundException()
     {
         var repoMock = new FakeVoucherRepository(null, []);
-        var service = new PayrollVoucherService(repoMock, Options.Create(DefaultCompanyInfo));
+        var service = new PayrollVoucherService(repoMock, CompanyProvider);
 
         await Assert.ThrowsAsync<VoucherNotFoundException>(
             () => service.GenerateBulkVouchersZipAsync(Guid.NewGuid()));
@@ -161,7 +164,7 @@ public sealed class PayrollVoucherServiceTests
             NetCompensation = template.NetCompensation,
         };
         var repoMock = new FakeVoucherRepository(voucherData);
-        var service = new PayrollVoucherService(repoMock, Options.Create(DefaultCompanyInfo));
+        var service = new PayrollVoucherService(repoMock, CompanyProvider);
 
         var pdfBytes = await service.GenerateVoucherAsync(voucherData.PeriodId, voucherData.NurseUserId);
 
@@ -196,17 +199,26 @@ file sealed class FakeVoucherRepository : IAdminPayrollRepository
     public Task<AdminPayrollPeriodListResult> GetPeriodsAsync(AdminPayrollPeriodListFilter filter, CancellationToken cancellationToken) => throw new NotImplementedException();
     public Task<AdminPayrollPeriodDetail?> GetPeriodByIdAsync(Guid periodId, CancellationToken cancellationToken) => throw new NotImplementedException();
     public Task<Guid> CreatePeriodAsync(DateOnly startDate, DateOnly endDate, DateOnly cutoffDate, DateOnly paymentDate, CancellationToken cancellationToken) => throw new NotImplementedException();
-    public Task<bool> ClosePeriodAsync(Guid periodId, CancellationToken cancellationToken) => throw new NotImplementedException();
+    public Task<PeriodCloseResult> ClosePeriodAsync(Guid periodId, CancellationToken cancellationToken) => throw new NotImplementedException();
+    public Task<PeriodMutationResult> UpdatePeriodAsync(Guid periodId, DateOnly startDate, DateOnly endDate, DateOnly cutoffDate, DateOnly paymentDate, CancellationToken cancellationToken) => throw new NotImplementedException();
+    public Task<PeriodMutationResult> DeletePeriodAsync(Guid periodId, CancellationToken cancellationToken) => throw new NotImplementedException();
     public Task<IReadOnlyList<AdminPayrollLineItem>> GetPeriodLinesAsync(Guid periodId, CancellationToken cancellationToken) => throw new NotImplementedException();
     public Task<AdminDeductionListResult> GetDeductionsAsync(Guid? nurseId, Guid? periodId, CancellationToken cancellationToken) => throw new NotImplementedException();
     public Task<Guid> CreateDeductionAsync(CreateDeductionRequest request, CancellationToken cancellationToken) => throw new NotImplementedException();
     public Task<bool> UpdateDeductionAsync(Guid deductionId, UpdateDeductionRequest request, CancellationToken cancellationToken) => throw new NotImplementedException();
     public Task<bool> DeleteDeductionAsync(Guid deductionId, CancellationToken cancellationToken) => throw new NotImplementedException();
+    public Task<bool> SetDeductionPausedAsync(Guid deductionId, bool paused, CancellationToken cancellationToken) => throw new NotImplementedException();
     public Task<AdminCompensationAdjustmentListResult> GetAdjustmentsAsync(Guid? executionId, CancellationToken cancellationToken) => throw new NotImplementedException();
     public Task<Guid> CreateAdjustmentAsync(CreateCompensationAdjustmentRequest request, CancellationToken cancellationToken) => throw new NotImplementedException();
+    public Task<bool> UpdateAdjustmentAsync(Guid adjustmentId, UpdateCompensationAdjustmentRequest request, CancellationToken cancellationToken) => throw new NotImplementedException();
     public Task<bool> DeleteAdjustmentAsync(Guid adjustmentId, CancellationToken cancellationToken) => throw new NotImplementedException();
     public Task<IReadOnlyList<NursePeriodHistoryItem>> GetNursePeriodHistoryAsync(Guid nurseId, int pageNumber, int pageSize, CancellationToken cancellationToken) => throw new NotImplementedException();
     public Task<int> CountNurseLinesInOpenPeriodsAsync(Guid nurseId, CancellationToken cancellationToken) => throw new NotImplementedException();
     public Task<int> CountNurseLinesInClosedPeriodsAsync(Guid nurseId, CancellationToken cancellationToken) => throw new NotImplementedException();
     public Task<NursePeriodDetail?> GetNursePeriodDetailAsync(Guid periodId, Guid nurseId, CancellationToken cancellationToken) => throw new NotImplementedException();
+}
+
+file sealed class FakeCompanyInfoProvider(CompanyInfo info) : ICompanyInfoProvider
+{
+    public Task<CompanyInfo> GetAsync(CancellationToken cancellationToken = default) => Task.FromResult(info);
 }

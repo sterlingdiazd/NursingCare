@@ -87,7 +87,7 @@ public sealed class AdminClientsApiTests : IClassFixture<CustomWebApplicationFac
 
     var activeResponse = await adminClient.GetAsync($"/api/admin/clients?status=active&search={Uri.EscapeDataString("client-list-active")}");
     activeResponse.EnsureSuccessStatusCode();
-    var activePayload = await activeResponse.Content.ReadFromJsonAsync<AdminClientListItemDto[]>();
+    var activePayload = (await activeResponse.Content.ReadFromJsonAsync<PagedResultDto<AdminClientListItemDto>>())?.Items;
 
     Assert.NotNull(activePayload);
     Assert.Contains(activePayload!, item => item.UserId == active.UserId);
@@ -95,7 +95,7 @@ public sealed class AdminClientsApiTests : IClassFixture<CustomWebApplicationFac
 
     var inactiveResponse = await adminClient.GetAsync($"/api/admin/clients?status=inactive&search={Uri.EscapeDataString("client-list-inactive")}");
     inactiveResponse.EnsureSuccessStatusCode();
-    var inactivePayload = await inactiveResponse.Content.ReadFromJsonAsync<AdminClientListItemDto[]>();
+    var inactivePayload = (await inactiveResponse.Content.ReadFromJsonAsync<PagedResultDto<AdminClientListItemDto>>())?.Items;
 
     Assert.NotNull(inactivePayload);
     Assert.Contains(inactivePayload!, item => item.UserId == inactive.UserId && !item.IsActive);
@@ -103,7 +103,7 @@ public sealed class AdminClientsApiTests : IClassFixture<CustomWebApplicationFac
 
     var adminOnlyListResponse = await adminClient.GetAsync($"/api/admin/clients?search={Uri.EscapeDataString(adminOnlyEmail)}");
     adminOnlyListResponse.EnsureSuccessStatusCode();
-    var adminOnlyPayload = await adminOnlyListResponse.Content.ReadFromJsonAsync<AdminClientListItemDto[]>();
+    var adminOnlyPayload = (await adminOnlyListResponse.Content.ReadFromJsonAsync<PagedResultDto<AdminClientListItemDto>>())?.Items;
 
     Assert.NotNull(adminOnlyPayload);
     Assert.Empty(adminOnlyPayload!);

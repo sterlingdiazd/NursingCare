@@ -9,7 +9,7 @@ public sealed class GetAdminClientsHandler
     _repository = repository;
   }
 
-  public Task<IReadOnlyList<AdminClientListItem>> Handle(
+  public Task<AdminClientListPage> Handle(
     AdminClientListFilter filter,
     CancellationToken cancellationToken)
   {

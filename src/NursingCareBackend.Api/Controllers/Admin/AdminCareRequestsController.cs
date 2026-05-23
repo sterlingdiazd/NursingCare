@@ -92,19 +92,19 @@ public sealed class AdminCareRequestsController : ControllerBase
 
   [HttpGet]
   [ProducesResponseType(StatusCodes.Status200OK)]
-  public async Task<ActionResult<IReadOnlyList<AdminCareRequestListItem>>> Get(
+  public async Task<ActionResult<AdminCareRequestListPage>> Get(
     [FromQuery] string? view,
     [FromQuery] string? search,
     [FromQuery] DateOnly? scheduledFrom,
     [FromQuery] DateOnly? scheduledTo,
     [FromQuery] string? sort,
-    CancellationToken cancellationToken)
+    [FromQuery] int page = 1,
+    [FromQuery] int pageSize = AdminCareRequestListFilter.DefaultPageSize,
+    CancellationToken cancellationToken = default)
   {
-    var items = await _getListHandler.Handle(
-      new AdminCareRequestListFilter(view, search, scheduledFrom, scheduledTo, sort),
-      cancellationToken);
-
-    return Ok(items);
+    var filter = AdminCareRequestListFilter.Sanitized(view, search, scheduledFrom, scheduledTo, sort, page, pageSize);
+    var result = await _getListHandler.Handle(filter, cancellationToken);
+    return Ok(result);
   }
 
   [HttpGet("clients")]
@@ -128,9 +128,10 @@ public sealed class AdminCareRequestsController : ControllerBase
     [FromQuery] string? sort,
     CancellationToken cancellationToken)
   {
-    var items = await _getListHandler.Handle(
-      new AdminCareRequestListFilter(view, search, scheduledFrom, scheduledTo, sort),
-      cancellationToken);
+    // Export returns all matching rows — use page 1 with int.MaxValue to bypass pagination.
+    var exportFilter = new AdminCareRequestListFilter(view, search, scheduledFrom, scheduledTo, sort, 1, int.MaxValue);
+    var page = await _getListHandler.Handle(exportFilter, cancellationToken);
+    var items = page.Items;
 
     var csv = new StringBuilder();
     csv.AppendLine("Id,Estado,Cliente,CorreoCliente,Enfermera,CorreoEnfermera,Tipo,FechaServicio,Total,Creada,Actualizada");

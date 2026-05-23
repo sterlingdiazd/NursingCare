@@ -40,7 +40,7 @@ public sealed class AdminCareRequestsApiTests : IClassFixture<CustomWebApplicati
     var response = await adminClient.GetAsync($"/api/admin/care-requests?view=unassigned&scheduledTo={today:yyyy-MM-dd}");
 
     response.EnsureSuccessStatusCode();
-    var payload = await response.Content.ReadFromJsonAsync<List<AdminCareRequestListItemDto>>();
+    var payload = (await response.Content.ReadFromJsonAsync<PagedResultDto<AdminCareRequestListItemDto>>())?.Items;
 
     Assert.NotNull(payload);
     var matchingItems = payload!
@@ -80,7 +80,7 @@ public sealed class AdminCareRequestsApiTests : IClassFixture<CustomWebApplicati
     var response = await adminClient.GetAsync($"/api/admin/care-requests?search={scenario}-coincide&sort=value&scheduledFrom={today:yyyy-MM-dd}");
 
     response.EnsureSuccessStatusCode();
-    var payload = await response.Content.ReadFromJsonAsync<List<AdminCareRequestListItemDto>>();
+    var payload = (await response.Content.ReadFromJsonAsync<PagedResultDto<AdminCareRequestListItemDto>>())?.Items;
 
     Assert.NotNull(payload);
     var matchingItems = payload!

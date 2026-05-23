@@ -15,7 +15,7 @@ public sealed class AdminActionQueueRepository : IAdminActionQueueRepository
     _dbContext = dbContext;
   }
 
-  public async Task<IReadOnlyList<AdminActionQueueItem>> GetItemsAsync(CancellationToken cancellationToken)
+  public async Task<AdminActionQueuePage> GetItemsAsync(AdminActionQueueFilter filter, CancellationToken cancellationToken)
   {
     var utcNow = DateTime.UtcNow;
     var currentCareDate = DateOnly.FromDateTime(utcNow);
@@ -202,12 +202,20 @@ public sealed class AdminActionQueueRepository : IAdminActionQueueRepository
         detectedAtUtc: utcNow));
     }
 
-    return items
+    var sorted = items
       .OrderBy(item => GetSeverityRank(item.Severity))
       .ThenBy(item => item.State == "Unread" ? 0 : 1)
       .ThenByDescending(item => item.DetectedAtUtc)
+      .ToList();
+
+    var totalCount = sorted.Count;
+    var pageItems = sorted
+      .Skip((filter.Page - 1) * filter.PageSize)
+      .Take(filter.PageSize)
       .ToList()
       .AsReadOnly();
+
+    return new AdminActionQueuePage(pageItems, totalCount, filter.Page, filter.PageSize);
   }
 
   private static AdminActionQueueItem CreateActionItem(

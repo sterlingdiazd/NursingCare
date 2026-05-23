@@ -18,7 +18,7 @@ public sealed class AdminUserManagementRepository : IAdminUserManagementReposito
     _nurseCatalog = nurseCatalog;
   }
 
-  public async Task<IReadOnlyList<AdminUserListItem>> GetListAsync(
+  public async Task<AdminUserListPage> GetListAsync(
     AdminUserListFilter filter,
     CancellationToken cancellationToken = default)
   {
@@ -31,12 +31,19 @@ public sealed class AdminUserManagementRepository : IAdminUserManagementReposito
       .OrderByDescending(user => user.CreatedAtUtc)
       .ToListAsync(cancellationToken);
 
-    var items = users
+    var allFiltered = users
       .Select(MapListItem)
       .Where(item => MatchesFilter(item, filter))
       .ToList();
 
-    return items.AsReadOnly();
+    var totalCount = allFiltered.Count;
+    var items = allFiltered
+      .Skip((filter.Page - 1) * filter.PageSize)
+      .Take(filter.PageSize)
+      .ToList()
+      .AsReadOnly();
+
+    return new AdminUserListPage(items, totalCount, filter.Page, filter.PageSize);
   }
 
   public async Task<AdminUserDetail?> GetByIdAsync(

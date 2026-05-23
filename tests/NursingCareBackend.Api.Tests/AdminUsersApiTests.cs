@@ -27,25 +27,25 @@ public sealed class AdminUsersApiTests : IClassFixture<CustomWebApplicationFacto
       $"/api/admin/users?search={Uri.EscapeDataString(clientAccount.Email)}&role=Client&profileType=Client&status=Active");
 
     clientResponse.EnsureSuccessStatusCode();
-    var clientPayload = await clientResponse.Content.ReadFromJsonAsync<List<AdminUserListItemDto>>();
+    var clientPayload = await clientResponse.Content.ReadFromJsonAsync<AdminUserListPageDto>();
 
     Assert.NotNull(clientPayload);
-    Assert.Contains(clientPayload!, item =>
+    Assert.Contains(clientPayload!.Items, item =>
       item.Id == clientAccount.UserId
       && item.Email == clientAccount.Email
       && item.ProfileType == "CLIENT"
       && item.AccountStatus == "Active"
       && item.RoleNames.SequenceEqual(["CLIENT"]));
-    Assert.DoesNotContain(clientPayload!, item => item.Id == nurseAccount.UserId);
+    Assert.DoesNotContain(clientPayload!.Items, item => item.Id == nurseAccount.UserId);
 
     var nurseResponse = await adminClient.GetAsync(
       $"/api/admin/users?search={Uri.EscapeDataString(nurseAccount.Email)}&role=Nurse&profileType=Nurse&status=AdminReview");
 
     nurseResponse.EnsureSuccessStatusCode();
-    var nursePayload = await nurseResponse.Content.ReadFromJsonAsync<List<AdminUserListItemDto>>();
+    var nursePayload = await nurseResponse.Content.ReadFromJsonAsync<AdminUserListPageDto>();
 
     Assert.NotNull(nursePayload);
-    Assert.Contains(nursePayload!, item =>
+    Assert.Contains(nursePayload!.Items, item =>
       item.Id == nurseAccount.UserId
       && item.Email == nurseAccount.Email
       && item.ProfileType == "NURSE"
@@ -403,6 +403,14 @@ public sealed class AdminUsersApiTests : IClassFixture<CustomWebApplicationFacto
   }
 
   private sealed record UserSession(Guid UserId, string Email, string Token);
+
+  private sealed class AdminUserListPageDto
+  {
+    public List<AdminUserListItemDto> Items { get; set; } = [];
+    public int TotalCount { get; set; }
+    public int Page { get; set; }
+    public int PageSize { get; set; }
+  }
 
   private sealed class AdminUserListItemDto
   {

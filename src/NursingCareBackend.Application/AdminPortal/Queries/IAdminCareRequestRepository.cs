@@ -2,7 +2,7 @@ namespace NursingCareBackend.Application.AdminPortal.Queries;
 
 public interface IAdminCareRequestRepository
 {
-  Task<IReadOnlyList<AdminCareRequestListItem>> GetListAsync(
+  Task<AdminCareRequestListPage> GetListAsync(
     AdminCareRequestListFilter filter,
     CancellationToken cancellationToken);
 

@@ -39,10 +39,11 @@ public sealed class AdminActionItemsApiTests : IClassFixture<CustomWebApplicatio
     var inconsistentUserId = await CreateUserRequiringManualInterventionAsync();
     var adminClient = CreateAdminClient();
 
-    var response = await adminClient.GetAsync("/api/admin/action-items");
+    // Fetch the full derived queue (this assertion checks for several item types at once).
+    var response = await adminClient.GetAsync("/api/admin/action-items?pageSize=100");
 
     response.EnsureSuccessStatusCode();
-    var payload = await response.Content.ReadFromJsonAsync<List<ActionItemDto>>();
+    var payload = (await response.Content.ReadFromJsonAsync<PagedResultDto<ActionItemDto>>())?.Items;
 
     Assert.NotNull(payload);
     Assert.Contains(payload!, item =>

@@ -31,16 +31,16 @@ public sealed class AdminClientsController : ControllerBase
   [ProducesResponseType(StatusCodes.Status200OK)]
   [ProducesResponseType(StatusCodes.Status401Unauthorized)]
   [ProducesResponseType(StatusCodes.Status403Forbidden)]
-  public async Task<ActionResult<IReadOnlyList<AdminClientListItem>>> Get(
+  public async Task<ActionResult<AdminClientListPage>> Get(
     [FromQuery] string? search,
     [FromQuery] string? status,
-    CancellationToken cancellationToken)
+    [FromQuery] int page = 1,
+    [FromQuery] int pageSize = AdminClientListFilter.DefaultPageSize,
+    CancellationToken cancellationToken = default)
   {
-    var items = await _getAdminClientsHandler.Handle(
-      new AdminClientListFilter(search, status),
-      cancellationToken);
-
-    return Ok(items);
+    var filter = AdminClientListFilter.Sanitized(search, status, page, pageSize);
+    var result = await _getAdminClientsHandler.Handle(filter, cancellationToken);
+    return Ok(result);
   }
 
   [HttpGet("{userId:guid}")]

@@ -17,7 +17,7 @@ public sealed class AdminCareRequestRepository : IAdminCareRequestRepository
     _dbContext = dbContext;
   }
 
-  public async Task<IReadOnlyList<AdminCareRequestListItem>> GetListAsync(
+  public async Task<AdminCareRequestListPage> GetListAsync(
     AdminCareRequestListFilter filter,
     CancellationToken cancellationToken)
   {
@@ -35,14 +35,20 @@ public sealed class AdminCareRequestRepository : IAdminCareRequestRepository
         cancellationToken);
 
     var userLookup = await LoadUserLookupAsync(careRequests, cancellationToken);
-    var items = careRequests
+    var allFiltered = careRequests
       .Select(careRequest => ToListItem(careRequest, userLookup, utcNow))
       .Where(item => MatchesFilter(item, filter, utcNow, typeDisplayNames))
       .ToList();
 
-    return ApplySort(items, filter.Sort)
+    var sorted = ApplySort(allFiltered, filter.Sort).ToList();
+    var totalCount = sorted.Count;
+    var items = sorted
+      .Skip((filter.Page - 1) * filter.PageSize)
+      .Take(filter.PageSize)
       .ToList()
       .AsReadOnly();
+
+    return new AdminCareRequestListPage(items, totalCount, filter.Page, filter.PageSize);
   }
 
   public async Task<AdminCareRequestDetail?> GetByIdAsync(

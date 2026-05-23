@@ -21,9 +21,13 @@ public sealed class AdminActionItemsController : ControllerBase
   [ProducesResponseType(StatusCodes.Status200OK)]
   [ProducesResponseType(StatusCodes.Status401Unauthorized)]
   [ProducesResponseType(StatusCodes.Status403Forbidden)]
-  public async Task<IActionResult> Get(CancellationToken cancellationToken)
+  public async Task<IActionResult> Get(
+    [FromQuery] int page = 1,
+    [FromQuery] int pageSize = AdminActionQueueFilter.DefaultPageSize,
+    CancellationToken cancellationToken = default)
   {
-    var items = await _handler.Handle(cancellationToken);
-    return Ok(items);
+    var filter = AdminActionQueueFilter.Sanitized(page, pageSize);
+    var result = await _handler.Handle(filter, cancellationToken);
+    return Ok(result);
   }
 }

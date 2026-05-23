@@ -38,7 +38,8 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
         _notifications = notifications;
     }
 
-    public async Task<IReadOnlyList<PendingNurseProfileResponse>> GetPendingNurseProfilesAsync(
+    public async Task<PendingNurseProfilePage> GetPendingNurseProfilesAsync(
+        NurseProfileListFilter filter,
         CancellationToken cancellationToken = default)
     {
         var users = await _userRepository.GetNurseProfilesAsync(cancellationToken);
@@ -48,8 +49,14 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
             .OrderBy(user => user.CreatedAtUtc)
             .ToArray();
 
-        var results = new List<PendingNurseProfileResponse>(pending.Length);
-        foreach (var user in pending)
+        var totalCount = pending.Length;
+        var page = pending
+            .Skip((filter.Page - 1) * filter.PageSize)
+            .Take(filter.PageSize)
+            .ToArray();
+
+        var results = new List<PendingNurseProfileResponse>(page.Length);
+        foreach (var user in page)
         {
             var specialty = await _nurseCatalog.NormalizeSpecialtyAsync(user.NurseProfile?.Specialty, cancellationToken);
             results.Add(new PendingNurseProfileResponse(
@@ -64,33 +71,45 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
                 user.CreatedAtUtc));
         }
 
-        return results;
+        return new PendingNurseProfilePage(results, totalCount, filter.Page, filter.PageSize);
     }
 
-    public async Task<IReadOnlyList<AdminNurseProfileSummaryResponse>> GetActiveNurseProfilesAsync(
+    public async Task<AdminNurseProfileSummaryPage> GetActiveNurseProfilesAsync(
+        NurseProfileListFilter filter,
         CancellationToken cancellationToken = default)
     {
         var users = await _userRepository.GetNurseProfilesAsync(cancellationToken);
-        return await BuildSummariesAsync(
-            users
-                .Where(IsOperationallyActive)
-                .OrderBy(user => user.Name)
-                .ThenBy(user => user.LastName)
-                .ToArray(),
-            cancellationToken);
+        var filtered = users
+            .Where(IsOperationallyActive)
+            .OrderBy(user => user.Name)
+            .ThenBy(user => user.LastName)
+            .ToArray();
+        var totalCount = filtered.Length;
+        var pageItems = filtered
+            .Skip((filter.Page - 1) * filter.PageSize)
+            .Take(filter.PageSize)
+            .ToArray();
+        var items = await BuildSummariesAsync(pageItems, cancellationToken);
+        return new AdminNurseProfileSummaryPage(items, totalCount, filter.Page, filter.PageSize);
     }
 
-    public async Task<IReadOnlyList<AdminNurseProfileSummaryResponse>> GetInactiveNurseProfilesAsync(
+    public async Task<AdminNurseProfileSummaryPage> GetInactiveNurseProfilesAsync(
+        NurseProfileListFilter filter,
         CancellationToken cancellationToken = default)
     {
         var users = await _userRepository.GetNurseProfilesAsync(cancellationToken);
-        return await BuildSummariesAsync(
-            users
-                .Where(user => IsProfileComplete(user) && !IsOperationallyActive(user))
-                .OrderBy(user => user.Name)
-                .ThenBy(user => user.LastName)
-                .ToArray(),
-            cancellationToken);
+        var filtered = users
+            .Where(user => IsProfileComplete(user) && !IsOperationallyActive(user))
+            .OrderBy(user => user.Name)
+            .ThenBy(user => user.LastName)
+            .ToArray();
+        var totalCount = filtered.Length;
+        var pageItems = filtered
+            .Skip((filter.Page - 1) * filter.PageSize)
+            .Take(filter.PageSize)
+            .ToArray();
+        var items = await BuildSummariesAsync(pageItems, cancellationToken);
+        return new AdminNurseProfileSummaryPage(items, totalCount, filter.Page, filter.PageSize);
     }
 
     public async Task<NurseProfileAdminResponse> GetNurseProfileAsync(

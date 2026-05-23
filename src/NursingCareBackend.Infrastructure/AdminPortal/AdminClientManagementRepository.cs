@@ -15,7 +15,7 @@ public sealed class AdminClientManagementRepository : IAdminClientManagementRepo
     _dbContext = dbContext;
   }
 
-  public async Task<IReadOnlyList<AdminClientListItem>> GetListAsync(
+  public async Task<AdminClientListPage> GetListAsync(
     AdminClientListFilter filter,
     CancellationToken cancellationToken = default)
   {
@@ -48,10 +48,16 @@ public sealed class AdminClientManagementRepository : IAdminClientManagementRepo
         || (user.Phone != null && user.Phone.Contains(normalizedSearch)));
     }
 
-    var users = await query
+    var orderedQuery = query
       .OrderBy(user => user.Name)
       .ThenBy(user => user.LastName)
-      .ThenBy(user => user.Email)
+      .ThenBy(user => user.Email);
+
+    var totalCount = await orderedQuery.CountAsync(cancellationToken);
+
+    var users = await orderedQuery
+      .Skip((filter.Page - 1) * filter.PageSize)
+      .Take(filter.PageSize)
       .Select(user => new ClientUserRow(
         user.Id,
         user.Email,
@@ -67,7 +73,7 @@ public sealed class AdminClientManagementRepository : IAdminClientManagementRepo
       users.Select(user => user.UserId).ToArray(),
       cancellationToken);
 
-    return users
+    var items = users
       .Select(user =>
       {
         careRequestStats.TryGetValue(user.UserId, out var stats);
@@ -87,6 +93,8 @@ public sealed class AdminClientManagementRepository : IAdminClientManagementRepo
       })
       .ToList()
       .AsReadOnly();
+
+    return new AdminClientListPage(items, totalCount, filter.Page, filter.PageSize);
   }
 
   public async Task<AdminClientDetail?> GetByIdAsync(
