@@ -54,6 +54,7 @@ namespace NursingCareBackend.Api.Extensions
 
         EnsureSystemRoles(db);
         EnsureSystemSettings(db);
+        EnsureCatalogDisplayNames(db);
 
         try
         {
@@ -148,6 +149,18 @@ namespace NursingCareBackend.Api.Extensions
       db.Roles.AddRange(missingRoles);
       db.SaveChanges();
       Console.WriteLine($"Seeded {missingRoles.Length} missing system role(s).");
+    }
+
+    // Idempotent backfill for catalog display names. Catalogs only seed when the
+    // table is empty, so existing DBs keep older copy — correct it here on startup.
+    private static void EnsureCatalogDisplayNames(NursingCareDbContext db)
+    {
+      var medicos = db.CareRequestCategoryCatalogs.FirstOrDefault(c => c.Code == "medicos");
+      if (medicos is not null && medicos.DisplayName != "Médicos")
+      {
+        medicos.DisplayName = "Médicos";
+        db.SaveChanges();
+      }
     }
 
     private static void EnsureSystemSettings(NursingCareDbContext db)

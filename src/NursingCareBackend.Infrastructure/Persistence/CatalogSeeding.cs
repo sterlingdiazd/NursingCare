@@ -234,7 +234,7 @@ public static class CatalogSeeding
             {
                 Id = CategoryMedicosId,
                 Code = "medicos",
-                DisplayName = "Medicos",
+                DisplayName = "Médicos",
                 CategoryFactor = 1.5m,
                 IsActive = true,
                 DisplayOrder = 3,
