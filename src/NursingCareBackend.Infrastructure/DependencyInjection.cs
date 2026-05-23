@@ -165,6 +165,7 @@ public static class DependencyInjection
         services.AddScoped<IAdminPayrollOverrideRepository, AdminPayrollOverrideRepository>();
         services.AddScoped<IPayrollVoucherService, PayrollVoucherService>();
         services.AddScoped<IPayrollReportExportService, PayrollReportExportService>();
+        services.AddScoped<NursingCareBackend.Application.AdminPortal.Payroll.ICompanyInfoProvider, NursingCareBackend.Infrastructure.Payroll.CompanyInfoProvider>();
         services.AddScoped<IScheduledDeductionService, ScheduledDeductionService>();
 
         services.Configure<CompanyInfoOptions>(options =>

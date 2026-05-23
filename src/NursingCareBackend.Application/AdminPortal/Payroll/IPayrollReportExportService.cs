@@ -2,9 +2,9 @@ namespace NursingCareBackend.Application.AdminPortal.Payroll;
 
 public interface IPayrollReportExportService
 {
-    byte[] GeneratePdf(AdminPayrollPeriodDetail period);
+    byte[] GeneratePdf(AdminPayrollPeriodDetail period, CompanyInfo company);
 
-    byte[] GenerateXlsx(AdminPayrollPeriodDetail period);
+    byte[] GenerateXlsx(AdminPayrollPeriodDetail period, CompanyInfo company);
 
-    byte[] GenerateHtml(AdminPayrollPeriodDetail period);
+    byte[] GenerateHtml(AdminPayrollPeriodDetail period, CompanyInfo company);
 }

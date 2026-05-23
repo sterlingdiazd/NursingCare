@@ -198,6 +198,39 @@ namespace NursingCareBackend.Api.Extensions
           Category = "General",
           ValueType = "Number",
           ModifiedAtUtc = DateTime.UtcNow
+        },
+        // Datos de empresa (aparecen en comprobantes y reportes). Editables por el dueño.
+        new() {
+          Key = "COMPANY_NAME",
+          Value = "Sol y Luna",
+          Description = "Nombre de la empresa (aparece en comprobantes y reportes).",
+          Category = "Empresa",
+          ValueType = "Text",
+          ModifiedAtUtc = DateTime.UtcNow
+        },
+        new() {
+          Key = "COMPANY_RNC",
+          Value = "",
+          Description = "RNC de la empresa (identificación fiscal en comprobantes y reportes).",
+          Category = "Empresa",
+          ValueType = "Text",
+          ModifiedAtUtc = DateTime.UtcNow
+        },
+        new() {
+          Key = "COMPANY_PHONE",
+          Value = "",
+          Description = "Teléfono de la empresa (aparece en comprobantes y reportes).",
+          Category = "Empresa",
+          ValueType = "Text",
+          ModifiedAtUtc = DateTime.UtcNow
+        },
+        new() {
+          Key = "COMPANY_ADDRESS",
+          Value = "",
+          Description = "Dirección de la empresa (aparece en comprobantes y reportes).",
+          Category = "Empresa",
+          ValueType = "Text",
+          ModifiedAtUtc = DateTime.UtcNow
         }
       };
 

@@ -25,6 +25,7 @@ public sealed class AdminPayrollController : ControllerBase
     private readonly IScheduledDeductionService _scheduledDeductionService;
     private readonly IAuthRateLimiter _rateLimiter;
     private readonly NursingCareBackend.Application.AdminPortal.Auditing.IAdminAuditService _auditService;
+    private readonly NursingCareBackend.Application.AdminPortal.Payroll.ICompanyInfoProvider _companyProvider;
 
     public AdminPayrollController(
         IAdminPayrollRepository repository,
@@ -34,7 +35,8 @@ public sealed class AdminPayrollController : ControllerBase
         IPayrollReportExportService reportExportService,
         IScheduledDeductionService scheduledDeductionService,
         IAuthRateLimiter rateLimiter,
-        NursingCareBackend.Application.AdminPortal.Auditing.IAdminAuditService auditService)
+        NursingCareBackend.Application.AdminPortal.Auditing.IAdminAuditService auditService,
+        NursingCareBackend.Application.AdminPortal.Payroll.ICompanyInfoProvider companyProvider)
     {
         _repository = repository;
         _recalculationService = recalculationService;
@@ -44,6 +46,7 @@ public sealed class AdminPayrollController : ControllerBase
         _scheduledDeductionService = scheduledDeductionService;
         _rateLimiter = rateLimiter;
         _auditService = auditService;
+        _companyProvider = companyProvider;
     }
 
     private Guid GetAdminUserId()
@@ -306,7 +309,8 @@ public sealed class AdminPayrollController : ControllerBase
         }
 
         HttpContext.Response.Headers.Append("Access-Control-Expose-Headers", "Content-Disposition");
-        var bytes = _reportExportService.GeneratePdf(detail);
+        var company = await _companyProvider.GetAsync(cancellationToken);
+        var bytes = _reportExportService.GeneratePdf(detail, company);
         return File(bytes, "application/pdf", $"payroll-report-{id:N}.pdf");
     }
 
@@ -328,7 +332,8 @@ public sealed class AdminPayrollController : ControllerBase
         }
 
         HttpContext.Response.Headers.Append("Access-Control-Expose-Headers", "Content-Disposition");
-        var bytes = _reportExportService.GenerateXlsx(detail);
+        var company = await _companyProvider.GetAsync(cancellationToken);
+        var bytes = _reportExportService.GenerateXlsx(detail, company);
         return File(
             bytes,
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -353,7 +358,8 @@ public sealed class AdminPayrollController : ControllerBase
         }
 
         HttpContext.Response.Headers.Append("Access-Control-Expose-Headers", "Content-Disposition");
-        var bytes = _reportExportService.GenerateHtml(detail);
+        var company = await _companyProvider.GetAsync(cancellationToken);
+        var bytes = _reportExportService.GenerateHtml(detail, company);
         return File(bytes, "text/html; charset=utf-8", $"payroll-report-{id:N}.html");
     }
 

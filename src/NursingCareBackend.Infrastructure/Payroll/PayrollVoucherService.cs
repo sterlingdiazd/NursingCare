@@ -13,7 +13,7 @@ namespace NursingCareBackend.Infrastructure.Payroll;
 public sealed class PayrollVoucherService : IPayrollVoucherService
 {
     private readonly IAdminPayrollRepository _repository;
-    private readonly CompanyInfoOptions _companyInfo;
+    private readonly ICompanyInfoProvider _companyProvider;
     private static readonly CultureInfo DominicanCulture = new("es-DO");
 
     // Shared palette/format with the payroll report export for a consistent look.
@@ -29,10 +29,10 @@ public sealed class PayrollVoucherService : IPayrollVoucherService
 
     public PayrollVoucherService(
         IAdminPayrollRepository repository,
-        IOptions<CompanyInfoOptions> companyInfo)
+        ICompanyInfoProvider companyProvider)
     {
         _repository = repository;
-        _companyInfo = companyInfo.Value;
+        _companyProvider = companyProvider;
     }
 
     public async Task<byte[]> GenerateVoucherAsync(
@@ -47,7 +47,8 @@ public sealed class PayrollVoucherService : IPayrollVoucherService
             throw new VoucherNotFoundException(periodId, nurseId);
         }
 
-        return GeneratePdf(data);
+        var company = await _companyProvider.GetAsync(cancellationToken);
+        return GeneratePdf(data, company);
     }
 
     public async Task<byte[]> GenerateBulkVouchersZipAsync(
@@ -61,12 +62,13 @@ public sealed class PayrollVoucherService : IPayrollVoucherService
             throw new VoucherNotFoundException(periodId);
         }
 
+        var company = await _companyProvider.GetAsync(cancellationToken);
         using var zipStream = new MemoryStream();
         using (var archive = new ZipArchive(zipStream, ZipArchiveMode.Create, leaveOpen: true))
         {
             foreach (var data in allVoucherData)
             {
-                var pdfBytes = GeneratePdf(data);
+                var pdfBytes = GeneratePdf(data, company);
                 var entryName = $"voucher-{SanitizeName(data.NurseDisplayName)}.pdf";
                 var entry = archive.CreateEntry(entryName, CompressionLevel.Fastest);
                 using var entryStream = entry.Open();
@@ -77,7 +79,7 @@ public sealed class PayrollVoucherService : IPayrollVoucherService
         return zipStream.ToArray();
     }
 
-    private byte[] GeneratePdf(PayrollVoucherData data)
+    private byte[] GeneratePdf(PayrollVoucherData data, CompanyInfo company)
     {
         var hasAdjustments = data.TotalAdjustments != 0m;
 
@@ -95,10 +97,18 @@ public sealed class PayrollVoucherService : IPayrollVoucherService
                     // Header: company (left), then a centered document title + period.
                     // Centered/left content avoids the right-edge clipping that Row +
                     // ConstantItem().AlignRight() produces in this layout.
-                    col.Item().Text(_companyInfo.Name).Bold().FontSize(16).FontColor(Navy);
-                    if (!string.IsNullOrWhiteSpace(_companyInfo.Rnc))
+                    col.Item().Text(company.Name).Bold().FontSize(16).FontColor(Navy);
+                    if (!string.IsNullOrWhiteSpace(company.Rnc))
                     {
-                        col.Item().Text($"RNC: {_companyInfo.Rnc}").FontSize(8).FontColor(Muted);
+                        col.Item().Text($"RNC: {company.Rnc}").FontSize(8).FontColor(Muted);
+                    }
+                    if (!string.IsNullOrWhiteSpace(company.Phone))
+                    {
+                        col.Item().Text($"Tel: {company.Phone}").FontSize(8).FontColor(Muted);
+                    }
+                    if (!string.IsNullOrWhiteSpace(company.Address))
+                    {
+                        col.Item().Text(company.Address).FontSize(8).FontColor(Muted);
                     }
                     col.Item().PaddingTop(6).BorderBottom(1).BorderColor(Line).PaddingBottom(8).Column(h =>
                     {
