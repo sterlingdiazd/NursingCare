@@ -33,8 +33,27 @@ public sealed record CareRequestResponse(
   int? VolumeDiscountPercentSnapshot,
   decimal? LineBeforeVolumeDiscount,
   decimal? UnitPriceAfterVolumeDiscount,
-  decimal? SubtotalBeforeSupplies)
+  decimal? SubtotalBeforeSupplies,
+  // Billing fields — visible to the owning client (their own price + invoice/payment status only).
+  // Nurse pay, cost, and margin internals are intentionally excluded from this DTO.
+  string? InvoiceNumber,
+  DateTime? InvoicedAtUtc,
+  DateTime? PaidAtUtc,
+  DateTime? VoidedAtUtc,
+  string PaymentStatus)
 {
+  /// <summary>
+  /// Derives a human-readable payment status string from the billing timestamp fields.
+  /// "Anulado" takes precedence; then "Pagado"; then "Facturado"; else "Pendiente de factura".
+  /// </summary>
+  public static string DerivePaymentStatus(CareRequest careRequest)
+  {
+    if (careRequest.VoidedAtUtc.HasValue) return "Anulado";
+    if (careRequest.PaidAtUtc.HasValue) return "Pagado";
+    if (careRequest.InvoicedAtUtc.HasValue) return "Facturado";
+    return "Pendiente de factura";
+  }
+
   public static CareRequestResponse FromDomain(CareRequest careRequest)
   {
     return new CareRequestResponse(
@@ -68,6 +87,11 @@ public sealed record CareRequestResponse(
       careRequest.VolumeDiscountPercentSnapshot,
       careRequest.LineBeforeVolumeDiscount,
       careRequest.UnitPriceAfterVolumeDiscount,
-      careRequest.SubtotalBeforeSupplies);
+      careRequest.SubtotalBeforeSupplies,
+      careRequest.InvoiceNumber,
+      careRequest.InvoicedAtUtc,
+      careRequest.PaidAtUtc,
+      careRequest.VoidedAtUtc,
+      DerivePaymentStatus(careRequest));
   }
 }

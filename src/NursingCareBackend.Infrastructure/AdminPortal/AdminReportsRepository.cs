@@ -422,6 +422,195 @@ public sealed class AdminReportsRepository : IAdminReportsRepository
             Services: services);
     }
 
+    // ── Nurse-payments category display helper ───────────────────────────────
+
+    private static string MapPricingCategoryCode(string? code) => code switch
+    {
+        "hogar" => "Casa hogar",
+        "domicilio" => "Domicilio",
+        "medicos" => "Servicios médicos",
+        _ => code ?? "Sin categoría"
+    };
+
+    // ── ServiceExecutions date filter helper ─────────────────────────────────
+
+    private IQueryable<Domain.Payroll.ServiceExecution> FilterExecutionsByDate(DateOnly? from, DateOnly? to)
+    {
+        var query = _dbContext.ServiceExecutions.AsNoTracking();
+
+        if (from.HasValue)
+            query = query.Where(e => e.ServiceDate >= from.Value);
+
+        if (to.HasValue)
+            query = query.Where(e => e.ServiceDate <= to.Value);
+
+        return query;
+    }
+
+    // ── nurse-payments-daily ─────────────────────────────────────────────────
+
+    public async Task<NursePaymentsDailyReport> GetNursePaymentsDailyReportAsync(DateOnly? from, DateOnly? to, CancellationToken cancellationToken)
+    {
+        // Project per-date aggregates server-side, then order/accumulate in memory.
+        var dailyGroups = await FilterExecutionsByDate(from, to)
+            .GroupBy(e => e.ServiceDate)
+            .Select(g => new { Date = g.Key, Count = g.Count(), Sum = g.Sum(e => e.NetCompensation) })
+            .ToListAsync(cancellationToken);
+
+        var ordered = dailyGroups.OrderBy(g => g.Date).ToList();
+
+        var rows = new List<NursePaymentsDailyRow>(ordered.Count);
+        decimal running = 0m;
+        foreach (var g in ordered)
+        {
+            running += g.Sum;
+            rows.Add(new NursePaymentsDailyRow(
+                Date: g.Date.ToString("yyyy-MM-dd"),
+                ServiceCount: g.Count,
+                Amount: g.Sum,
+                CumulativeAmount: running));
+        }
+
+        return new NursePaymentsDailyReport(Rows: rows, TotalAccrued: running);
+    }
+
+    // ── nurse-payments-by-type ───────────────────────────────────────────────
+
+    public async Task<NursePaymentsByTypeReport> GetNursePaymentsByTypeReportAsync(DateOnly? from, DateOnly? to, CancellationToken cancellationToken)
+    {
+        var typeGroups = await FilterExecutionsByDate(from, to)
+            .GroupBy(e => e.PricingCategoryCode)
+            .Select(g => new { Key = g.Key, Count = g.Count(), Sum = g.Sum(e => e.NetCompensation) })
+            .ToListAsync(cancellationToken);
+
+        // Order by Amount desc in memory to avoid EF aggregate-ordering restriction.
+        var rows = typeGroups
+            .OrderByDescending(g => g.Sum)
+            .Select(g => new NursePaymentsByTypeRow(
+                ServiceType: MapPricingCategoryCode(g.Key),
+                ServiceCount: g.Count,
+                Amount: g.Sum))
+            .ToList();
+
+        var total = rows.Sum(r => r.Amount);
+
+        return new NursePaymentsByTypeReport(Rows: rows, Total: total);
+    }
+
+    // ── nurse-payments-by-period ─────────────────────────────────────────────
+
+    public async Task<NursePaymentsByPeriodReport> GetNursePaymentsByPeriodReportAsync(DateOnly? from, DateOnly? to, CancellationToken cancellationToken)
+    {
+        // Materialize per-date sums first, then derive quincena label and group in memory.
+        var dailyGroups = await FilterExecutionsByDate(from, to)
+            .GroupBy(e => e.ServiceDate)
+            .Select(g => new { Date = g.Key, Count = g.Count(), Sum = g.Sum(e => e.NetCompensation) })
+            .ToListAsync(cancellationToken);
+
+        // Group by quincena in memory.
+        var periodGroups = dailyGroups
+            .GroupBy(g => ResolvePeriodStart(g.Date))
+            .Select(group =>
+            {
+                var periodStart = group.Key;
+                var label = BuildPeriodLabel(periodStart);
+                return new
+                {
+                    PeriodStart = periodStart,
+                    Label = label,
+                    Count = group.Sum(g => g.Count),
+                    Sum = group.Sum(g => g.Sum)
+                };
+            })
+            .OrderBy(p => p.PeriodStart)
+            .ToList();
+
+        var rows = periodGroups
+            .Select(p => new NursePaymentsByPeriodRow(
+                PeriodLabel: p.Label,
+                ServiceCount: p.Count,
+                Amount: p.Sum))
+            .ToList();
+
+        var total = rows.Sum(r => r.Amount);
+
+        return new NursePaymentsByPeriodReport(Rows: rows, Total: total);
+    }
+
+    private static DateOnly ResolvePeriodStart(DateOnly date)
+        => date.Day <= 15
+            ? new DateOnly(date.Year, date.Month, 1)
+            : new DateOnly(date.Year, date.Month, 16);
+
+    private static readonly string[] SpanishMonths =
+    {
+        "ene", "feb", "mar", "abr", "may", "jun",
+        "jul", "ago", "sep", "oct", "nov", "dic"
+    };
+
+    private static string BuildPeriodLabel(DateOnly periodStart)
+    {
+        var month = SpanishMonths[periodStart.Month - 1];
+        var year = periodStart.Year;
+
+        if (periodStart.Day == 1)
+            return $"1–15 {month} {year}";
+
+        var lastDay = DateTime.DaysInMonth(year, periodStart.Month);
+        return $"16–{lastDay} {month} {year}";
+    }
+
+    // ── nurse-payments-ranking ───────────────────────────────────────────────
+
+    public async Task<NursePaymentsRankingReport> GetNursePaymentsRankingReportAsync(DateOnly? from, DateOnly? to, CancellationToken cancellationToken)
+    {
+        // Project per-nurse aggregates server-side; resolve nurse names separately.
+        var nurseGroups = await FilterExecutionsByDate(from, to)
+            .GroupBy(e => e.NurseUserId)
+            .Select(g => new
+            {
+                NurseUserId = g.Key,
+                ServiceCount = g.Count(),
+                DaysWorked = g.Select(e => e.ServiceDate).Distinct().Count(),
+                Amount = g.Sum(e => e.NetCompensation)
+            })
+            .ToListAsync(cancellationToken);
+
+        // Order by Amount desc, take top 15, then resolve names in memory.
+        var top = nurseGroups
+            .OrderByDescending(g => g.Amount)
+            .Take(15)
+            .ToList();
+
+        var nurseIds = top.Select(g => g.NurseUserId).ToList();
+
+        var nurses = await _dbContext.Users
+            .AsNoTracking()
+            .Where(u => nurseIds.Contains(u.Id))
+            .Select(u => new { u.Id, u.Name, u.LastName, u.Email })
+            .ToListAsync(cancellationToken);
+
+        var nurseLookup = nurses.ToDictionary(
+            u => u.Id,
+            u =>
+            {
+                var fullName = string.Join(" ", new[] { u.Name, u.LastName }.Where(v => !string.IsNullOrWhiteSpace(v)));
+                return string.IsNullOrWhiteSpace(fullName) ? u.Email : fullName;
+            });
+
+        var rows = top
+            .Select(g => new NursePaymentsRankingRow(
+                NurseName: nurseLookup.GetValueOrDefault(g.NurseUserId, g.NurseUserId.ToString()),
+                ServiceCount: g.ServiceCount,
+                DaysWorked: g.DaysWorked,
+                Amount: g.Amount))
+            .ToList();
+
+        var total = rows.Sum(r => r.Amount);
+
+        return new NursePaymentsRankingReport(Rows: rows, Total: total);
+    }
+
     private static DateOnly ResolveDefaultPayrollStart(DateOnly today)
         => today.Day <= 15
             ? new DateOnly(today.Year, today.Month, 1)

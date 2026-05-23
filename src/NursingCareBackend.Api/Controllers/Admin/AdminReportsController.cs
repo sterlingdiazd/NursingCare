@@ -27,7 +27,11 @@ public sealed class AdminReportsController : ControllerBase
         "care-request-completion",
         "price-usage-summary",
         "notification-volume",
-        "payroll-summary"
+        "payroll-summary",
+        "nurse-payments-daily",
+        "nurse-payments-by-type",
+        "nurse-payments-by-period",
+        "nurse-payments-ranking"
     };
 
     public AdminReportsController(GetAdminReportHandler handler, ILogger<AdminReportsController> logger)
@@ -207,6 +211,42 @@ public sealed class AdminReportsController : ControllerBase
                 }
                 break;
                 
+            case NursePaymentsDailyReport r:
+                sb.AppendLine("Fecha,Servicios,Monto,Acumulado");
+                foreach (var row in r.Rows)
+                {
+                    sb.AppendLine($"{EscapeCsv(row.Date)},{row.ServiceCount},{row.Amount:F2},{row.CumulativeAmount:F2}");
+                }
+                sb.AppendLine($"Total,,,{r.TotalAccrued:F2}");
+                break;
+
+            case NursePaymentsByTypeReport r:
+                sb.AppendLine("Tipo de Servicio,Servicios,Monto");
+                foreach (var row in r.Rows)
+                {
+                    sb.AppendLine($"{EscapeCsv(row.ServiceType)},{row.ServiceCount},{row.Amount:F2}");
+                }
+                sb.AppendLine($"Total,,{r.Total:F2}");
+                break;
+
+            case NursePaymentsByPeriodReport r:
+                sb.AppendLine("Periodo,Servicios,Monto");
+                foreach (var row in r.Rows)
+                {
+                    sb.AppendLine($"{EscapeCsv(row.PeriodLabel)},{row.ServiceCount},{row.Amount:F2}");
+                }
+                sb.AppendLine($"Total,,{r.Total:F2}");
+                break;
+
+            case NursePaymentsRankingReport r:
+                sb.AppendLine("Enfermera,Servicios,Dias Trabajados,Monto");
+                foreach (var row in r.Rows)
+                {
+                    sb.AppendLine($"{EscapeCsv(row.NurseName)},{row.ServiceCount},{row.DaysWorked},{row.Amount:F2}");
+                }
+                sb.AppendLine($"Total,,,{r.Total:F2}");
+                break;
+
             default:
                 sb.AppendLine("Datos no disponibles");
                 break;

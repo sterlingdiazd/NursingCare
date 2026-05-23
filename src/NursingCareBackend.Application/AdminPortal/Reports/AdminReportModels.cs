@@ -76,3 +76,51 @@ public record NotificationVolumeReport(
     Dictionary<string, int> NotificationsByCategory,
     int PendingActionItemsCount
 );
+
+// ── Nurse-payments reports ───────────────────────────────────────────────────
+
+public record NursePaymentsDailyRow(
+    string Date,
+    int ServiceCount,
+    decimal Amount,
+    decimal CumulativeAmount
+);
+
+public record NursePaymentsDailyReport(
+    IReadOnlyList<NursePaymentsDailyRow> Rows,
+    decimal TotalAccrued
+);
+
+public record NursePaymentsByTypeRow(
+    string ServiceType,
+    int ServiceCount,
+    decimal Amount
+);
+
+public record NursePaymentsByTypeReport(
+    IReadOnlyList<NursePaymentsByTypeRow> Rows,
+    decimal Total
+);
+
+public record NursePaymentsByPeriodRow(
+    string PeriodLabel,
+    int ServiceCount,
+    decimal Amount
+);
+
+public record NursePaymentsByPeriodReport(
+    IReadOnlyList<NursePaymentsByPeriodRow> Rows,
+    decimal Total
+);
+
+public record NursePaymentsRankingRow(
+    string NurseName,
+    int ServiceCount,
+    int DaysWorked,
+    decimal Amount
+);
+
+public record NursePaymentsRankingReport(
+    IReadOnlyList<NursePaymentsRankingRow> Rows,
+    decimal Total
+);

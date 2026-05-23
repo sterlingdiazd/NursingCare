@@ -23,4 +23,12 @@ public interface IAdminReportsRepository
     Task<NotificationVolumeReport> GetNotificationVolumeReportAsync(DateOnly? from, DateOnly? to, CancellationToken cancellationToken);
 
     Task<PayrollSummaryReport> GetPayrollSummaryReportAsync(DateOnly? from, DateOnly? to, CancellationToken cancellationToken);
+
+    Task<NursePaymentsDailyReport> GetNursePaymentsDailyReportAsync(DateOnly? from, DateOnly? to, CancellationToken cancellationToken);
+
+    Task<NursePaymentsByTypeReport> GetNursePaymentsByTypeReportAsync(DateOnly? from, DateOnly? to, CancellationToken cancellationToken);
+
+    Task<NursePaymentsByPeriodReport> GetNursePaymentsByPeriodReportAsync(DateOnly? from, DateOnly? to, CancellationToken cancellationToken);
+
+    Task<NursePaymentsRankingReport> GetNursePaymentsRankingReportAsync(DateOnly? from, DateOnly? to, CancellationToken cancellationToken);
 }
