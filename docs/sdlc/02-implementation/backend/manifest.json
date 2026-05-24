@@ -1,0 +1,175 @@
+{
+  "status": "completed",
+  "initiative_id": "2026-05-24-mvp-release-demo-readiness",
+  "work_package_id": "WP-MVP-003",
+  "agent": "implementation-agent",
+  "phase": "02-implementation",
+  "repository": "NursingCareBackend",
+  "initiative_branch": "main",
+  "agent_branch": "agent/2026-05-24-mvp-release-demo-readiness/02-implementation-agent-backend-readiness",
+  "base_commit": "86000a7",
+  "head_commit": "8b2579957a5864c19645598728a5cfc7a591618a",
+  "readiness_for_integration": "ready",
+  "changed_files": [
+    "src/NursingCareBackend.Api/Controllers/Admin/AdminSettingsController.cs",
+    "src/NursingCareBackend.Api/Controllers/Admin/NurseProfilesController.cs",
+    "src/NursingCareBackend.Application/CareRequests/Commands/GenerateReceipt/GenerateReceiptHandler.cs",
+    "src/NursingCareBackend.Application/CareRequests/IReceiptPdfService.cs",
+    "src/NursingCareBackend.Infrastructure/CareRequests/ReceiptPdfService.cs",
+    "tests/NursingCareBackend.Application.Tests/GenerateReceiptHandlerTests.cs"
+  ],
+  "modules": [
+    {
+      "name": "ReceiptPdfService",
+      "path": "src/NursingCareBackend.Infrastructure/CareRequests/ReceiptPdfService.cs",
+      "status": "modified",
+      "changes": [
+        "Add company name heading from ReceiptPdfData.CompanyName (sourced from CompanyInfoOptions via ICompanyInfoProvider)",
+        "Fix Spanish accents: Cédula, Número de factura, DATOS DE FACTURACIÓN, RECIBO DE PAGO DE SERVICIOS DE ENFERMERÍA, automáticamente",
+        "Replace Row+RelativeItem total layout with table layout to prevent right-edge clipping",
+        "Remove raw CareRequestId GUID from rendered PDF output",
+        "Remove redundant QuestPDF.Settings.License assignment (already set in Program.cs)"
+      ]
+    },
+    {
+      "name": "GenerateReceiptHandler",
+      "path": "src/NursingCareBackend.Application/CareRequests/Commands/GenerateReceipt/GenerateReceiptHandler.cs",
+      "status": "modified",
+      "changes": [
+        "Inject ICompanyInfoProvider into constructor",
+        "Call companyInfoProvider.GetAsync() before building ReceiptPdfData",
+        "Populate CompanyName field in ReceiptPdfData"
+      ]
+    },
+    {
+      "name": "ReceiptPdfData / IReceiptPdfService",
+      "path": "src/NursingCareBackend.Application/CareRequests/IReceiptPdfService.cs",
+      "status": "modified",
+      "changes": [
+        "Add CompanyName parameter to ReceiptPdfData with default value 'NursingCare' (backward-compatible)"
+      ]
+    },
+    {
+      "name": "RBAC constant fixes",
+      "paths": [
+        "src/NursingCareBackend.Api/Controllers/Admin/NurseProfilesController.cs",
+        "src/NursingCareBackend.Api/Controllers/Admin/AdminSettingsController.cs"
+      ],
+      "status": "modified",
+      "changes": [
+        "Replace hardcoded Roles = \"ADMIN\" with SystemRoles.Admin constant",
+        "Add using NursingCareBackend.Domain.Identity to both files"
+      ]
+    }
+  ],
+  "verification": {
+    "build": {
+      "status": "passed",
+      "warnings": 0,
+      "errors": 0,
+      "duration_ms": 14530
+    },
+    "tests": {
+      "domain": { "passed": 39, "failed": 0, "skipped": 0 },
+      "application": { "passed": 32, "failed": 0, "skipped": 0, "note": "29 pre-existing + 3 new" },
+      "api_integration": { "passed": 301, "failed": 0, "skipped": 0, "note": "Known pre-existing failures from brief (22) were already resolved upstream" }
+    },
+    "kpi_scorecard": {
+      "cat3_refactoring": "PASS",
+      "cat4_backend_logic": "PASS",
+      "cat6_tests": "PASS",
+      "cat7_general": "PASS",
+      "lowest_criterion_score": 87,
+      "gating_criteria_clear": true
+    }
+  },
+  "findings": [
+    {
+      "id": "F-001",
+      "severity": "low",
+      "category": "style",
+      "description": "NurseProfilesController and AdminSettingsController used hardcoded Roles = \"ADMIN\" instead of SystemRoles.Admin constant. Functionally equivalent but brittle.",
+      "resolution": "auto-resolved",
+      "evidence": "Both controllers updated to use SystemRoles.Admin. Build and Api.Tests confirm no regression."
+    },
+    {
+      "id": "F-002",
+      "severity": "medium",
+      "category": "pdf-branding",
+      "description": "ReceiptPdfService had no company name in the PDF header and missing Spanish accents in section labels.",
+      "resolution": "auto-resolved",
+      "evidence": "Company name now sourced from ICompanyInfoProvider (CompanyInfoOptions:Name = 'Sol y Luna'). All Spanish labels corrected."
+    },
+    {
+      "id": "F-003",
+      "severity": "low",
+      "category": "pdf-layout",
+      "description": "ReceiptPdfService used Row+RelativeItem for total row — potentially clipping on narrow viewports or PDF renderers.",
+      "resolution": "auto-resolved",
+      "evidence": "Replaced with table layout consistent with PayrollVoucherService pattern."
+    },
+    {
+      "id": "F-004",
+      "severity": "low",
+      "category": "pdf-content",
+      "description": "Raw CareRequestId GUID was displayed inline in the service-data section of the receipt.",
+      "resolution": "auto-resolved",
+      "evidence": "Raw GUID row removed. Client name and service type remain the primary identifiers."
+    }
+  ],
+  "auto_resolutions": [
+    {
+      "finding_id": "F-001",
+      "before": "Roles = \"ADMIN\" (hardcoded string in 2 controllers)",
+      "after": "Roles = SystemRoles.Admin (typed constant from Domain layer)",
+      "build_passes": true,
+      "tests_pass": true
+    },
+    {
+      "finding_id": "F-002",
+      "before": "No company name in PDF; missing Spanish accents",
+      "after": "Company name from CompanyInfoOptions shown as heading; full Spanish accent correction",
+      "build_passes": true,
+      "tests_pass": true
+    },
+    {
+      "finding_id": "F-003",
+      "before": "Row + RelativeItem for total amount in receipt",
+      "after": "Table layout with AlignRight() on amount cell",
+      "build_passes": true,
+      "tests_pass": true
+    },
+    {
+      "finding_id": "F-004",
+      "before": "CareRequestId.ToString() rendered inline as a table row",
+      "after": "Row removed; client name and service type provide identification",
+      "build_passes": true,
+      "tests_pass": true
+    }
+  ],
+  "audit": {
+    "health_endpoints": "verified-existing — /live, /ready, /health all present and correct in HealthController.cs",
+    "rbac_audit": "all 13 admin controllers checked — all protected with [Authorize(Roles = SystemRoles.Admin)] or SystemRoles.Nurse post-fix",
+    "seeding_guards": "CatalogSeeding uses insert-if-absent (EnsureCompensationRulesAsync). CareRequestSeeding guarded by AnyAsync(). FullLifecycleSeeding guarded by CountAsync() > 30. All idempotent.",
+    "ef_groupby_orderby": "AdminReportsRepository already has the materialize-then-order pattern in place (confirmed by code comment and prior fix)",
+    "questpdf_company_name": "PayrollVoucherService and PayrollReportExportService already used ICompanyInfoProvider. ReceiptPdfService was the only outlier — now fixed.",
+    "questpdf_right_edge": "PayrollReportExportService footer uses row.ConstantItem(90).AlignRight() — this is in the Footer() bounded context, lower clipping risk than Content area. Documented as low-risk; deferred."
+  },
+  "deviations_from_plan": [],
+  "execution_metrics": {
+    "started_at": "2026-05-24T20:25:00Z",
+    "completed_at": "2026-05-24T20:52:00Z",
+    "duration_ms": 1620000,
+    "tool_calls": {
+      "total": 52,
+      "read": 20,
+      "write": 2,
+      "edit": 8,
+      "bash": 22
+    },
+    "files_touched": 6,
+    "already_implemented_count": 0,
+    "test_projects_run": 3,
+    "total_tests_passing": 372
+  }
+}
