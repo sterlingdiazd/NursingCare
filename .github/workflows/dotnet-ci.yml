@@ -63,10 +63,10 @@ jobs:
         run: dotnet restore src/src.sln
 
       - name: Wait for SQL Server (poll)
-        timeout-minutes: 2
+        timeout-minutes: 6
         run: |
           echo "Waiting for SQL Server to be ready..."
-          for i in $(seq 1 24); do
+          for i in $(seq 1 48); do
             if /opt/mssql-tools18/bin/sqlcmd \
                 -S localhost,1433 \
                 -U sa \
@@ -79,7 +79,7 @@ jobs:
             echo "Attempt $i: SQL Server not ready yet, waiting 5 s..."
             sleep 5
           done
-          echo "ERROR: SQL Server did not become ready within 2 minutes."
+          echo "ERROR: SQL Server did not become ready within 4 minutes."
           exit 1
 
       - name: Build
