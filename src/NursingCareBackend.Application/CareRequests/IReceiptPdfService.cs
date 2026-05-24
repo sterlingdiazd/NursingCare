@@ -13,7 +13,8 @@ public sealed record ReceiptPdfData(
     DateTime InvoicedAtUtc,
     DateTime PaidAtUtc,
     string BankReference,
-    DateTime GeneratedAtUtc
+    DateTime GeneratedAtUtc,
+    string CompanyName = "NursingCare"
 );
 
 public interface IReceiptPdfService

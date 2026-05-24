@@ -2,11 +2,12 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NursingCareBackend.Application.AdminPortal.Settings;
 using NursingCareBackend.Application.Identity.Authentication;
+using NursingCareBackend.Domain.Identity;
 using System.Security.Claims;
 
 namespace NursingCareBackend.Api.Controllers.Admin;
 
-[Authorize(Roles = "ADMIN")]
+[Authorize(Roles = SystemRoles.Admin)]
 [ApiController]
 [Route("api/admin/settings")]
 public sealed class AdminSettingsController : ControllerBase

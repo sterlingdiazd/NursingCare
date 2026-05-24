@@ -1,4 +1,5 @@
 using NursingCareBackend.Application.AdminPortal.Auditing;
+using NursingCareBackend.Application.AdminPortal.Payroll;
 using NursingCareBackend.Application.CareRequests;
 using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
 using NursingCareBackend.Application.Identity.Repositories;
@@ -20,6 +21,7 @@ public sealed class GenerateReceiptHandler
     private readonly IReceiptPdfService _receiptPdfService;
     private readonly IUserRepository _userRepository;
     private readonly IAdminAuditService _auditService;
+    private readonly ICompanyInfoProvider _companyInfoProvider;
 
     public GenerateReceiptHandler(
         ICareRequestRepository repository,
@@ -27,7 +29,8 @@ public sealed class GenerateReceiptHandler
         IPaymentValidationRepository paymentValidationRepository,
         IReceiptPdfService receiptPdfService,
         IUserRepository userRepository,
-        IAdminAuditService auditService)
+        IAdminAuditService auditService,
+        ICompanyInfoProvider companyInfoProvider)
     {
         _repository = repository;
         _receiptRepository = receiptRepository;
@@ -35,6 +38,7 @@ public sealed class GenerateReceiptHandler
         _receiptPdfService = receiptPdfService;
         _userRepository = userRepository;
         _auditService = auditService;
+        _companyInfoProvider = companyInfoProvider;
     }
 
     public async Task<GenerateReceiptResponse> Handle(
@@ -82,6 +86,8 @@ public sealed class GenerateReceiptHandler
         var seq = await _receiptRepository.CountByDateAsync(date, cancellationToken) + 1;
         var receiptNumber = $"REC-{date:yyyyMMdd}-{seq:D4}";
 
+        var companyInfo = await _companyInfoProvider.GetAsync(cancellationToken);
+
         var pdfData = new ReceiptPdfData(
             CareRequestId: careRequest.Id,
             ReceiptNumber: receiptNumber,
@@ -95,7 +101,8 @@ public sealed class GenerateReceiptHandler
             InvoicedAtUtc: careRequest.InvoicedAtUtc!.Value,
             PaidAtUtc: careRequest.PaidAtUtc!.Value,
             BankReference: paymentValidation?.BankReference ?? string.Empty,
-            GeneratedAtUtc: generatedAtUtc);
+            GeneratedAtUtc: generatedAtUtc,
+            CompanyName: companyInfo.Name);
 
         var pdfBytes = _receiptPdfService.Generate(pdfData);
 

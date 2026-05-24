@@ -5,12 +5,13 @@ using NursingCareBackend.Api.Extensions;
 using NursingCareBackend.Api.Localization;
 using NursingCareBackend.Application.Identity.Commands;
 using NursingCareBackend.Application.Identity.Services;
+using NursingCareBackend.Domain.Identity;
 
 namespace NursingCareBackend.Api.Controllers.Admin;
 
 [ApiController]
 [Route("api/admin/nurse-profiles")]
-[Authorize(Roles = "ADMIN")]
+[Authorize(Roles = SystemRoles.Admin)]
 public sealed class NurseProfilesController : ControllerBase
 {
     private readonly INurseProfileAdministrationService _nurseProfileAdministrationService;

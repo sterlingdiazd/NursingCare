@@ -12,8 +12,6 @@ public sealed class ReceiptPdfService : IReceiptPdfService
 
     public byte[] Generate(ReceiptPdfData data)
     {
-        QuestPDF.Settings.License = LicenseType.Community;
-
         return Document.Create(container =>
         {
             container.Page(page =>
@@ -24,11 +22,14 @@ public sealed class ReceiptPdfService : IReceiptPdfService
 
                 page.Header().Column(col =>
                 {
-                    col.Item().Text("RECIBO DE PAGO DE SERVICIOS DE ENFERMERIA")
-                        .SemiBold().FontSize(14).AlignCenter();
+                    // Company name from configuration (CompanyInfo:Name), centered layout
+                    // avoids right-edge clipping that Row + ConstantItem().AlignRight() produces.
+                    col.Item().Text(data.CompanyName).Bold().FontSize(15).AlignCenter();
+                    col.Item().Text("RECIBO DE PAGO DE SERVICIOS DE ENFERMERÍA")
+                        .SemiBold().FontSize(13).AlignCenter();
                     col.Item().Text($"Recibo No: {data.ReceiptNumber}")
-                        .FontSize(12).AlignCenter();
-                    col.Item().Text($"Fecha: {data.GeneratedAtUtc:dd/MM/yyyy HH:mm} UTC")
+                        .FontSize(11).AlignCenter();
+                    col.Item().Text($"Fecha: {data.GeneratedAtUtc.ToString("dd/MM/yyyy HH:mm", DominicanCulture)} UTC")
                         .FontSize(10).AlignCenter();
                     col.Item().PaddingTop(8).LineHorizontal(1);
                 });
@@ -50,16 +51,15 @@ public sealed class ReceiptPdfService : IReceiptPdfService
                             table.Cell().Text(value);
                         }
 
-                        AddRow("Solicitud ID:", data.CareRequestId.ToString());
                         if (!string.IsNullOrWhiteSpace(data.ClientDisplayName))
                             AddRow("Cliente:", data.ClientDisplayName);
                         if (!string.IsNullOrWhiteSpace(data.ClientIdentificationNumber))
-                            AddRow("Cedula:", data.ClientIdentificationNumber);
+                            AddRow("Cédula:", data.ClientIdentificationNumber);
                         AddRow("Tipo de servicio:", data.CareRequestType);
                         AddRow("Unidades:", $"{data.Unit} {data.UnitType}");
                     });
 
-                    col.Item().PaddingTop(15).Text("DATOS DE FACTURACION").SemiBold().FontSize(12);
+                    col.Item().PaddingTop(15).Text("DATOS DE FACTURACIÓN").SemiBold().FontSize(12);
                     col.Item().PaddingTop(6).Table(table =>
                     {
                         table.ColumnsDefinition(columns =>
@@ -68,7 +68,7 @@ public sealed class ReceiptPdfService : IReceiptPdfService
                             columns.RelativeColumn(3);
                         });
 
-                        table.Cell().Text("Numero de factura:").SemiBold();
+                        table.Cell().Text("Número de factura:").SemiBold();
                         table.Cell().Text(data.InvoiceNumber);
 
                         table.Cell().Text("Fecha de factura:").SemiBold();
@@ -82,17 +82,23 @@ public sealed class ReceiptPdfService : IReceiptPdfService
                     });
 
                     col.Item().PaddingTop(15).LineHorizontal(1);
-                    col.Item().PaddingTop(8).Row(row =>
+                    // Use table for total row to keep right-aligned amount safe from edge clipping.
+                    col.Item().PaddingTop(8).Table(table =>
                     {
-                        row.RelativeItem().Text("TOTAL PAGADO:").SemiBold().FontSize(13);
-                        row.RelativeItem().Text(data.Total.ToString("C2", DominicanCulture)).SemiBold().FontSize(13).AlignRight();
+                        table.ColumnsDefinition(columns =>
+                        {
+                            columns.RelativeColumn(2);
+                            columns.RelativeColumn(3);
+                        });
+                        table.Cell().Text("TOTAL PAGADO:").SemiBold().FontSize(13);
+                        table.Cell().Text(data.Total.ToString("C2", DominicanCulture)).SemiBold().FontSize(13).AlignRight();
                     });
                     col.Item().PaddingTop(4).LineHorizontal(1);
                 });
 
                 page.Footer().AlignCenter().Text(text =>
                 {
-                    text.Span("Documento generado automaticamente el ").FontSize(8);
+                    text.Span("Documento generado automáticamente el ").FontSize(8);
                     text.Span(data.GeneratedAtUtc.ToString("dd/MM/yyyy HH:mm", DominicanCulture)).FontSize(8);
                 });
             });
