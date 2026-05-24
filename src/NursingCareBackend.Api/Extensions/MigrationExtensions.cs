@@ -17,6 +17,8 @@ namespace NursingCareBackend.Api.Extensions
     /// Applies all pending EF Core migrations at application startup.
     /// Fault-tolerant: logs warnings instead of crashing on schema-sync conflicts.
     /// Set SKIP_MIGRATIONS=true to bypass migration execution entirely (seeding still runs).
+    /// Set RESEED=true (Development only) to wipe the database before migration+seeding — useful
+    /// for a comprehensive seed refresh. RESEED is silently ignored outside Development.
     /// </summary>
     /// <param name="app">WebApplication instance</param>
     public static void ApplyMigrations(this WebApplication app)
@@ -36,6 +38,35 @@ namespace NursingCareBackend.Api.Extensions
           EnsureSystemRoles(db);
           logger.LogInformation("In-memory database created successfully.");
           return;
+        }
+
+        // RESEED: wipe and reseed the database from scratch (Development only).
+        var reseedRequested = string.Equals(
+          Environment.GetEnvironmentVariable("RESEED"),
+          "true",
+          StringComparison.OrdinalIgnoreCase);
+
+        if (reseedRequested)
+        {
+          if (app.Environment.IsDevelopment())
+          {
+            logger.LogWarning(
+              "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+            logger.LogWarning(
+              "RESEED=true — DELETING the entire database to apply a fresh seed.");
+            logger.LogWarning(
+              "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+            db.Database.EnsureDeleted();
+            logger.LogWarning("Database deleted. Recreating via migrations...");
+          }
+          else
+          {
+            logger.LogError(
+              "RESEED=true was set but the environment is not Development ({Environment}). " +
+              "The RESEED flag is ignored outside Development to prevent accidental data loss. " +
+              "No data was deleted.",
+              app.Environment.EnvironmentName);
+          }
         }
 
         var skipMigrations = string.Equals(

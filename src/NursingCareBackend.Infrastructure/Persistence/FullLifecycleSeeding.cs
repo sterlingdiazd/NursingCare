@@ -21,6 +21,11 @@ public static class FullLifecycleSeeding
     public static readonly Guid ClientLuisaId    = Guid.Parse("e0000000-0000-0000-0000-000000000014");
     public static readonly Guid ClientBeatrizId  = Guid.Parse("e0000000-0000-0000-0000-000000000015");
 
+    // Fixed GUIDs for 3 pending (IsActive=false) nurse profiles added by this seeder.
+    public static readonly Guid PendingNurse1Id  = Guid.Parse("f0000000-0000-0000-0000-000000000023");
+    public static readonly Guid PendingNurse2Id  = Guid.Parse("f0000000-0000-0000-0000-000000000024");
+    public static readonly Guid PendingNurse3Id  = Guid.Parse("f0000000-0000-0000-0000-000000000025");
+
     public static async Task SeedWithContextAsync(NursingCareDbContext db, CancellationToken cancellationToken = default)
     {
         // Idempotency guard: CareRequestSeeding inserts 22. If > 30 already exist, we already ran.
@@ -54,6 +59,18 @@ public static class FullLifecycleSeeding
 
         // ── 8. Payroll line overrides ─────────────────────────────────────────────────
         await SeedPayrollLineOverridesAsync(db, marchPeriod, cancellationToken);
+
+        // ── 9. PaymentReported status care requests ───────────────────────────────────
+        await SeedPaymentReportedRequestsAsync(db, careRequests, cancellationToken);
+
+        // ── 10. Pending nurse profiles (IsActive=false) ───────────────────────────────
+        await SeedPendingNurseProfilesAsync(db, cancellationToken);
+
+        // ── 11. Additional scheduled deduction lifecycle states ───────────────────────
+        await SeedScheduledDeductionLifecycleStatesAsync(db, cancellationToken);
+
+        // ── 12. ServiceExecutions + CompensationAdjustments ──────────────────────────
+        await SeedServiceExecutionsAndAdjustmentsAsync(db, marchPeriod, careRequests, cancellationToken);
 
         Console.WriteLine("FullLifecycleSeeding: completed successfully.");
     }
@@ -794,6 +811,334 @@ public static class FullLifecycleSeeding
             requestedAtUtc: requestedAt3);
 
         db.PayrollLineOverrides.AddRange(override1, override2, override3);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────────
+    // 9. PaymentReported care requests
+    // ─────────────────────────────────────────────────────────────────────────────────
+
+    // Minimal valid 1×1 PNG (67 bytes): PNG signature + IHDR + IDAT (1 white pixel) + IEND.
+    private static readonly byte[] MinimalPngBytes = new byte[]
+    {
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG signature
+        0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52, // IHDR length + type
+        0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, // width=1, height=1
+        0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53, // bit depth=8, colortype=2 (RGB), CRC
+        0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41, // IDAT length + type
+        0x54, 0x08, 0xD7, 0x63, 0xF8, 0xFF, 0xFF, 0x3F, // IDAT data (deflate compressed white pixel)
+        0x00, 0x05, 0xFE, 0x02, 0xFE, 0xDC, 0xCC, 0x59, // continuation
+        0xE7, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, // CRC + IEND type
+        0x44, 0xAE, 0x42, 0x60, 0x82,                   // IEND CRC
+    };
+
+    private static async Task SeedPaymentReportedRequestsAsync(
+        NursingCareDbContext db, CareRequest[] existingCareRequests, CancellationToken cancellationToken)
+    {
+        var adminId = CatalogSeeding.SeededAdminId;
+        var march8  = new DateTime(2026, 3, 8, 8, 0, 0, DateTimeKind.Utc);
+        var march9  = new DateTime(2026, 3, 9, 8, 0, 0, DateTimeKind.Utc);
+
+        var n5 = CatalogSeeding.NurseIds["Liliana"];
+        var n6 = CatalogSeeding.NurseIds["Clari"];
+
+        // Build and save two Invoiced care requests first (paymentproof needs the saved ID).
+        var pr1 = MakeInvoiced(ClientLuisaId,  n5, "Atencion domiciliaria nocturna reportada",
+            "domicilio_noche_12h", "medio_dia", 3, "cercana", "moderada", 8250m, march8,  "FAC-2026-0036");
+        var pr2 = MakeInvoiced(ClientBeatrizId, n6, "Cuidado diario con pago reportado",
+            "hogar_diario",        "dia_completo", 4, "local", "estandar", 10000m, march9, "FAC-2026-0037");
+
+        db.CareRequests.AddRange(pr1, pr2);
+        await db.SaveChangesAsync(cancellationToken);
+
+        // Create PaymentProofs (require saved care request IDs).
+        var proof1 = PaymentProof.Create(
+            careRequestId:    pr1.Id,
+            content:          MinimalPngBytes,
+            contentType:      "image/png",
+            note:             "Transferencia BHD ref. TRF-REPORT-001",
+            uploadedByUserId: adminId,
+            uploadedAtUtc:    march8.AddDays(2));
+
+        var proof2 = PaymentProof.Create(
+            careRequestId:    pr2.Id,
+            content:          MinimalPngBytes,
+            contentType:      "image/png",
+            note:             "Comprobante de pago ref. TRF-REPORT-002",
+            uploadedByUserId: adminId,
+            uploadedAtUtc:    march9.AddDays(2));
+
+        db.PaymentProofs.AddRange(proof1, proof2);
+        await db.SaveChangesAsync(cancellationToken);
+
+        // Now transition both care requests to PaymentReported.
+        pr1.ReportPayment(proof1.Id, march8.AddDays(2).AddHours(1));
+        pr2.ReportPayment(proof2.Id, march9.AddDays(2).AddHours(1));
+
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────────
+    // 10. Pending nurse profiles
+    // ─────────────────────────────────────────────────────────────────────────────────
+    // "Pending" is represented as: User.ProfileType == NURSE AND Nurse.IsActive == false.
+    // The pending-list endpoint (GET /api/admin/nurse-profiles/pending) queries:
+    //   u.ProfileType == NURSE && u.NurseProfile != null && !u.NurseProfile.IsActive
+    // ─────────────────────────────────────────────────────────────────────────────────
+
+    private static async Task SeedPendingNurseProfilesAsync(
+        NursingCareDbContext db, CancellationToken cancellationToken)
+    {
+        var pendingIds = new[] { PendingNurse1Id, PendingNurse2Id, PendingNurse3Id };
+        var existingIds = await db.Users
+            .Where(u => pendingIds.Contains(u.Id))
+            .Select(u => u.Id)
+            .ToHashSetAsync(cancellationToken);
+
+        if (existingIds.Count == pendingIds.Length)
+        {
+            return; // already seeded
+        }
+
+        var nurseRole = await db.Roles.SingleAsync(r => r.Name == SystemRoles.Nurse, cancellationToken);
+
+        var pendingData = new[]
+        {
+            (Id: PendingNurse1Id, Name: "Raquel",  LastName: "Familia Perez",   Phone: "8095560023", Cedula: "40234500023", Email: "raquel.familia@nurses.test",  License: "200023", Specialty: "Cuidado de adultos"),
+            (Id: PendingNurse2Id, Name: "Xiomara", LastName: "Reyes Sanchez",   Phone: "8295560024", Cedula: "40234500024", Email: "xiomara.reyes@nurses.test",   License: "200024", Specialty: "Cuidado geriatrico"),
+            (Id: PendingNurse3Id, Name: "Patricia",LastName: "Gomez Arias",     Phone: "8495560025", Cedula: "40234500025", Email: "patricia.gomez@nurses.test",  License: "200025", Specialty: "Cuidado pediatrico"),
+        };
+
+        foreach (var pd in pendingData)
+        {
+            if (existingIds.Contains(pd.Id))
+            {
+                continue;
+            }
+
+            var user = new User
+            {
+                Id = pd.Id,
+                Email = pd.Email,
+                ProfileType = UserProfileType.NURSE,
+                Name = pd.Name,
+                LastName = pd.LastName,
+                DisplayName = $"{pd.Name} {pd.LastName}",
+                IdentificationNumber = pd.Cedula,
+                Phone = pd.Phone,
+                PasswordHash = HashPassword("12345678"),
+                IsActive = true,   // User account is active; nurse profile is pending review.
+                CreatedAtUtc = DateTime.UtcNow,
+                FailedLoginAttemptCount = 0,
+                ResetPasswordFailedAttemptCount = 0,
+            };
+
+            user.UserRoles.Add(new UserRole
+            {
+                UserId = user.Id,
+                RoleId = nurseRole.Id,
+                Role = nurseRole,
+            });
+
+            db.Users.Add(user);
+
+            // Nurse.IsActive = false marks the profile as pending admin review.
+            db.Nurses.Add(new Nurse
+            {
+                UserId = pd.Id,
+                IsActive = false,          // <-- this is what the pending query filters on
+                HireDate = null,           // not yet hired/approved
+                Specialty = pd.Specialty,
+                LicenseId = pd.License,
+                BankName = null,
+                AccountNumber = null,
+                Category = "Junior",
+                VisitDailyRate = 1700m,
+                HomeCareMonthlyRate = 30000m,
+                HomeCareMonthlyExpectedDays = 23.83m,
+            });
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────────
+    // 11. Scheduled deduction lifecycle states (Cancelled + Completed)
+    // ─────────────────────────────────────────────────────────────────────────────────
+
+    private static async Task SeedScheduledDeductionLifecycleStatesAsync(
+        NursingCareDbContext db, CancellationToken cancellationToken)
+    {
+        var adminId  = CatalogSeeding.SeededAdminId;
+        var feb1     = new DateOnly(2026, 2, 1);
+        var now      = new DateTime(2026, 3, 31, 12, 0, 0, DateTimeKind.Utc);
+
+        // (a) Cancelled plan — Zoila: a recurring health-plan that was cancelled.
+        var cancelled = ScheduledDeduction.CreateRecurring(
+            nurseUserId:       CatalogSeeding.NurseIds["Zoila"],
+            deductionType:     DeductionType.Insurance,
+            label:             "Seguro Médico cancelado",
+            recurringAmount:   400m,
+            cadence:           DeductionCadence.Monthly,
+            startPeriodDate:   feb1,
+            endDate:           null,
+            maxOccurrences:    null,
+            notes:             "Plan cancelado por solicitud de la enfermera.",
+            createdByUserId:   adminId,
+            createdAtUtc:      now.AddDays(-30));
+        cancelled.SyncGeneratedCount(1);
+        cancelled.Cancel(adminId, "Solicitud de baja voluntaria del plan de seguro.", now);
+
+        // (b) Completed plan — Maria Isabel: amortizing advance fully settled.
+        // Principal 3,000 in 3 installments of 1,000 — settle all 3 so it completes.
+        var completed = ScheduledDeduction.CreateAmortizing(
+            nurseUserId:          CatalogSeeding.NurseIds["Maria Isabel"],
+            deductionType:        DeductionType.Advance,
+            label:                "Adelanto por emergencia — saldado",
+            principalAmount:      3000m,
+            interestRatePercent:  0m,
+            totalInstallments:    3,
+            cadence:              DeductionCadence.Monthly,
+            startPeriodDate:      new DateOnly(2026, 1, 1),
+            notes:                "Adelanto de emergencia familiar. Saldado en 3 cuotas.",
+            createdByUserId:      adminId,
+            createdAtUtc:         now.AddDays(-90));
+        completed.SyncGeneratedCount(3);
+        completed.ApplySettlement(3, 3000m, now); // fully settled → Status = Completed
+
+        db.ScheduledDeductions.AddRange(cancelled, completed);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────────
+    // 12. ServiceExecutions + CompensationAdjustments
+    // ─────────────────────────────────────────────────────────────────────────────────
+
+    private static async Task SeedServiceExecutionsAndAdjustmentsAsync(
+        NursingCareDbContext db, PayrollPeriod marchPeriod, CareRequest[] careRequests, CancellationToken cancellationToken)
+    {
+        var rules = await db.CompensationRules.AsNoTracking().ToListAsync(cancellationToken);
+        if (rules.Count == 0)
+        {
+            return;
+        }
+
+        var hogarRule = rules.FirstOrDefault(r => r.CareRequestCategoryCode == "hogar") ?? rules.First();
+        var domRule   = rules.FirstOrDefault(r => r.CareRequestCategoryCode == "domicilio") ?? rules.First();
+
+        // Use two completed care requests whose nurses we will seed executions for.
+        // Filter for completed hogar-type ones with an assigned nurse.
+        var completedHogar = careRequests
+            .Where(cr => cr.CompletedAtUtc.HasValue && cr.AssignedNurse.HasValue
+                         && (cr.CareRequestType?.StartsWith("hogar") == true))
+            .Take(2)
+            .ToList();
+
+        var completedDom = careRequests
+            .Where(cr => cr.CompletedAtUtc.HasValue && cr.AssignedNurse.HasValue
+                         && (cr.CareRequestType?.StartsWith("domicilio") == true))
+            .Take(1)
+            .ToList();
+
+        if (completedHogar.Count < 2 && completedDom.Count == 0)
+        {
+            return; // not enough data to seed executions — skip gracefully
+        }
+
+        var executions = new List<ServiceExecution>();
+        var allTargets = completedHogar.Concat(completedDom).ToList();
+
+        foreach (var cr in allTargets)
+        {
+            var rule = cr.PricingCategoryCode == "domicilio" ? domRule : hogarRule;
+            var executedAt = cr.CompletedAtUtc!.Value;
+            var subtotal = Math.Max(0m, cr.Total - (cr.MedicalSuppliesCost ?? 0m));
+
+            var baseComp      = decimal.Round(subtotal * (rule.BaseCompensationPercent / 100m), 2, MidpointRounding.AwayFromZero);
+            var transport     = decimal.Round(subtotal * Math.Max(0m, (cr.DistanceFactorMultiplierSnapshot ?? 1m) - 1m) * (rule.TransportIncentivePercent / 100m), 2, MidpointRounding.AwayFromZero);
+            var complexity    = decimal.Round(subtotal * Math.Max(0m, (cr.ComplexityMultiplierSnapshot ?? 1m) - 1m) * (rule.ComplexityBonusPercent / 100m), 2, MidpointRounding.AwayFromZero);
+            var supplies      = decimal.Round((cr.MedicalSuppliesCost ?? 0m) * (rule.MedicalSuppliesPercent / 100m), 2, MidpointRounding.AwayFromZero);
+
+            var exec = ServiceExecution.Create(
+                careRequestId:                cr.Id,
+                nurseUserId:                  cr.AssignedNurse!.Value,
+                shiftRecordId:                null,
+                compensationRuleId:           rule.Id,
+                employmentType:               CompensationEmploymentType.PerService,
+                variant:                      ServiceExecutionVariant.Standard,
+                executedAtUtc:                executedAt,
+                careRequestType:              cr.CareRequestType,
+                unitType:                     cr.UnitType,
+                unit:                         cr.Unit,
+                pricingCategoryCode:          cr.PricingCategoryCode,
+                distanceFactorCode:           cr.DistanceFactor,
+                complexityLevelCode:          cr.ComplexityLevel,
+                basePrice:                    cr.Price,
+                careRequestTotal:             cr.Total,
+                clientBasePrice:              cr.ClientBasePrice ?? cr.Price,
+                categoryFactorSnapshot:       cr.CategoryFactorSnapshot ?? 1m,
+                distanceMultiplierSnapshot:   cr.DistanceFactorMultiplierSnapshot ?? 1m,
+                complexityMultiplierSnapshot: cr.ComplexityMultiplierSnapshot ?? 1m,
+                volumeDiscountPercentSnapshot:cr.VolumeDiscountPercentSnapshot ?? 0,
+                subtotalBeforeSupplies:       subtotal,
+                medicalSuppliesCost:          cr.MedicalSuppliesCost ?? 0m,
+                ruleBaseCompensationPercent:  rule.BaseCompensationPercent,
+                ruleFixedAmountPerUnit:       rule.FixedAmountPerUnit,
+                ruleTransportIncentivePercent:rule.TransportIncentivePercent,
+                ruleComplexityBonusPercent:   rule.ComplexityBonusPercent,
+                ruleMedicalSuppliesPercent:   rule.MedicalSuppliesPercent,
+                ruleVariantPercent:           rule.BaseCompensationPercent,
+                baseCompensation:             baseComp,
+                transportIncentive:           transport,
+                complexityBonus:              complexity,
+                medicalSuppliesCompensation:  supplies,
+                adjustmentsTotal:             0m,
+                deductionsTotal:              0m,
+                manualOverrideAmount:         null,
+                notes:                        "Ejecucion seed — lifecycle",
+                createdAtUtc:                 executedAt);
+
+            executions.Add(exec);
+        }
+
+        db.ServiceExecutions.AddRange(executions);
+        await db.SaveChangesAsync(cancellationToken);
+
+        // Now add CompensationAdjustments and update AdjustmentsTotal on each execution.
+        if (executions.Count < 1)
+        {
+            return;
+        }
+
+        var now = new DateTime(2026, 3, 31, 14, 0, 0, DateTimeKind.Utc);
+
+        // Adjustment 1: bonus for an extra shift on the first execution.
+        var adj1 = CompensationAdjustment.Create(
+            serviceExecutionId: executions[0].Id,
+            label:              "Bono por turno extra",
+            amount:             500m,
+            notes:              "Enfermera cubrió turno adicional no registrado en sistema.",
+            createdAtUtc:       now);
+
+        executions[0].SetAdjustmentsTotal(500m, now);
+
+        db.CompensationAdjustments.Add(adj1);
+
+        if (executions.Count >= 2)
+        {
+            // Adjustment 2: negative penalty on the second execution.
+            var adj2 = CompensationAdjustment.Create(
+                serviceExecutionId: executions[1].Id,
+                label:              "Penalización por retraso",
+                amount:             -300m,
+                notes:              "Retraso documentado superior a 30 minutos en inicio del turno.",
+                createdAtUtc:       now.AddHours(1));
+
+            executions[1].SetAdjustmentsTotal(-300m, now.AddHours(1));
+
+            db.CompensationAdjustments.Add(adj2);
+        }
+
         await db.SaveChangesAsync(cancellationToken);
     }
 
