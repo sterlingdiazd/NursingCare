@@ -4,6 +4,7 @@ using NursingCareBackend.Application.AdminPortal.Queries;
 using NursingCareBackend.Application.AdminPortal.Shifts;
 using NursingCareBackend.Application.AdminPortal.Users;
 using NursingCareBackend.Application.CareRequests.Commands.AssignCareRequestNurse;
+using NursingCareBackend.Application.CareRequests.Commands.CompleteByAdmin;
 using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
 using NursingCareBackend.Application.CareRequests.Commands.GenerateReceipt;
 using NursingCareBackend.Application.CareRequests.Commands.InvoiceCareRequest;
@@ -20,6 +21,7 @@ public static class DependencyInjection
   public static IServiceCollection AddApplicationServices(this IServiceCollection services)
   {
     services.AddScoped<AssignCareRequestNurseHandler>();
+    services.AddScoped<CompleteByAdminHandler>();
     services.AddScoped<CreateCareRequestHandler>();
     services.AddScoped<TransitionCareRequestHandler>();
     services.AddScoped<GetCareRequestsHandler>();

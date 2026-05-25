@@ -127,6 +127,9 @@ public static class DependencyInjection
         });
         services.AddScoped<IPushTokenService, PushTokenService>();
         services.AddHostedService<PushDispatcherWorker>();
+        services.AddHostedService<OverdueNotificationWorker>();
+        services.Configure<OverdueNotificationOptions>(
+            configuration.GetSection(OverdueNotificationOptions.SectionName));
         services.AddScoped<IAdminReportsRepository, AdminReportsRepository>();
         services.AddScoped<AdminPayrollRepository>();
         services.AddScoped<IAdminPayrollRepository>(sp => sp.GetRequiredService<AdminPayrollRepository>());
@@ -150,6 +153,7 @@ public static class DependencyInjection
                 serviceProvider.GetRequiredService<IOptions<GoogleOAuthOptions>>()));
         services.AddScoped<IAuthenticationService, AuthenticationService>();
         services.AddScoped<IEmailService, AcsEmailService>();
+        services.AddSingleton<IEmailTemplateRenderer, Email.MarkdownEmailTemplateRenderer>();
         services.AddScoped<IAdminBootstrapPolicy, AdminBootstrapPolicy>();
         services.AddScoped<INurseProfileAdministrationService, NurseProfileAdministrationService>();
 

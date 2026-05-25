@@ -236,15 +236,17 @@ public sealed class AdminCareRequestsApiTests : IClassFixture<CustomWebApplicati
   }
 
   [Fact]
-  public async Task POST_AdminCareRequests_Should_Create_On_Behalf_Of_Client()
+  public async Task POST_AdminCareRequests_Should_Create_On_Behalf_Of_Client_With_Assigned_Nurse()
   {
     var scenario = $"admin-create-{Guid.NewGuid():N}";
     var (_, clientUserId) = await CareRequestApiAuthHelper.CreateClientTokenAsync(_factory, $"{scenario}-client");
+    var (_, nurseUserId) = await CareRequestApiAuthHelper.CreateCompletedNurseTokenAsync(_factory, $"{scenario}-nurse");
     var adminClient = CreateAdminClient();
 
     var response = await adminClient.PostAsJsonAsync("/api/admin/care-requests", new
     {
       clientUserId,
+      assignedNurseId = nurseUserId,
       careRequestDescription = $"{scenario}-solicitud",
       careRequestType = "domicilio_24h",
       unit = 1,
@@ -262,6 +264,26 @@ public sealed class AdminCareRequestsApiTests : IClassFixture<CustomWebApplicati
 
     Assert.Equal(clientUserId, created.UserID);
     Assert.Equal($"{scenario}-solicitud", created.Description);
+    Assert.Equal(nurseUserId, created.AssignedNurse);
+  }
+
+  [Fact]
+  public async Task POST_AdminCareRequests_Should_Return_BadRequest_When_No_Nurse_Provided()
+  {
+    var scenario = $"admin-create-no-nurse-{Guid.NewGuid():N}";
+    var (_, clientUserId) = await CareRequestApiAuthHelper.CreateClientTokenAsync(_factory, $"{scenario}-client");
+    var adminClient = CreateAdminClient();
+
+    var response = await adminClient.PostAsJsonAsync("/api/admin/care-requests", new
+    {
+      clientUserId,
+      assignedNurseId = Guid.Empty,
+      careRequestDescription = $"{scenario}-solicitud",
+      careRequestType = "domicilio_24h",
+      unit = 1,
+    });
+
+    Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
   }
 
   [Fact]
@@ -320,6 +342,79 @@ public sealed class AdminCareRequestsApiTests : IClassFixture<CustomWebApplicati
     });
 
     Assert.Equal(HttpStatusCode.BadRequest, createResponse.StatusCode);
+  }
+
+  [Fact]
+  public async Task POST_AdminCareRequests_Approve_And_Complete_Should_Advance_Lifecycle()
+  {
+    var scenario = $"admin-lifecycle-{Guid.NewGuid():N}";
+    var today = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1)); // yesterday — completion can happen
+    var (_, clientUserId) = await CareRequestApiAuthHelper.CreateClientTokenAsync(_factory, $"{scenario}-client");
+    var (_, nurseUserId) = await CareRequestApiAuthHelper.CreateCompletedNurseTokenAsync(_factory, $"{scenario}-nurse");
+    var adminClient = CreateAdminClient();
+
+    // Create with assigned nurse.
+    var createResponse = await adminClient.PostAsJsonAsync("/api/admin/care-requests", new
+    {
+      clientUserId,
+      assignedNurseId = nurseUserId,
+      careRequestDescription = $"{scenario}-solicitud",
+      careRequestType = "domicilio_24h",
+      unit = 1,
+      careRequestDate = today.ToString("yyyy-MM-dd"),
+    });
+    Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+    var createPayload = await createResponse.Content.ReadFromJsonAsync<CreateResponse>();
+    Assert.NotNull(createPayload);
+    var careRequestId = createPayload!.Id;
+
+    // Approve via admin endpoint.
+    var approveResponse = await adminClient.PostAsync($"/api/admin/care-requests/{careRequestId}/approve", null);
+    Assert.Equal(HttpStatusCode.OK, approveResponse.StatusCode);
+
+    // Complete via admin endpoint.
+    var completeResponse = await adminClient.PostAsync($"/api/admin/care-requests/{careRequestId}/complete", null);
+    Assert.Equal(HttpStatusCode.OK, completeResponse.StatusCode);
+
+    // Verify final state in DB.
+    using var scope = _factory.Services.CreateScope();
+    var dbContext = scope.ServiceProvider.GetRequiredService<NursingCareDbContext>();
+    var finalRequest = await dbContext.CareRequests.FirstAsync(r => r.Id == careRequestId);
+    // After complete, TransitionHandler auto-invoices — so status is Invoiced.
+    Assert.True(
+      finalRequest.Status == NursingCareBackend.Domain.CareRequests.CareRequestStatus.Invoiced,
+      $"Expected Invoiced but was {finalRequest.Status}");
+  }
+
+  [Fact]
+  public async Task POST_AdminCareRequests_Reject_Should_Mark_Request_Rejected()
+  {
+    var scenario = $"admin-reject-{Guid.NewGuid():N}";
+    var (_, clientUserId) = await CareRequestApiAuthHelper.CreateClientTokenAsync(_factory, $"{scenario}-client");
+    var (_, nurseUserId) = await CareRequestApiAuthHelper.CreateCompletedNurseTokenAsync(_factory, $"{scenario}-nurse");
+    var adminClient = CreateAdminClient();
+
+    var createResponse = await adminClient.PostAsJsonAsync("/api/admin/care-requests", new
+    {
+      clientUserId,
+      assignedNurseId = nurseUserId,
+      careRequestDescription = $"{scenario}-solicitud",
+      careRequestType = "curas",
+      unit = 1,
+    });
+    Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+    var createPayload = await createResponse.Content.ReadFromJsonAsync<CreateResponse>();
+    Assert.NotNull(createPayload);
+
+    var rejectResponse = await adminClient.PostAsJsonAsync(
+      $"/api/admin/care-requests/{createPayload!.Id}/reject",
+      new { reason = "No hay disponibilidad para este servicio." });
+    Assert.Equal(HttpStatusCode.OK, rejectResponse.StatusCode);
+
+    using var scope = _factory.Services.CreateScope();
+    var dbContext = scope.ServiceProvider.GetRequiredService<NursingCareDbContext>();
+    var finalRequest = await dbContext.CareRequests.FirstAsync(r => r.Id == createPayload.Id);
+    Assert.Equal(NursingCareBackend.Domain.CareRequests.CareRequestStatus.Rejected, finalRequest.Status);
   }
 
   [Fact]

@@ -13,6 +13,12 @@ public sealed class CreateAdminCareRequestRequest
   [Required]
   public string CareRequestType { get; set; } = default!;
 
+  /// <summary>
+  /// La enfermera que se asignará a la solicitud. Obligatorio para solicitudes creadas por el administrador.
+  /// </summary>
+  [Required]
+  public Guid AssignedNurseId { get; set; }
+
   public int Unit { get; set; } = 1;
   public string? SuggestedNurse { get; set; }
   public decimal? Price { get; set; }
