@@ -1,5 +1,6 @@
 using System.Globalization;
 using Microsoft.Extensions.Logging;
+using NursingCareBackend.Application.AdminPortal.Payroll.Validation;
 using NursingCareBackend.Application.Email;
 using NursingCareBackend.Application.Exceptions;
 using NursingCareBackend.Application.Identity.Repositories;
@@ -12,6 +13,8 @@ public sealed class ConfirmNursePeriodPaymentHandler
     private readonly IAdminPayrollRepository _payrollRepository;
     private readonly INursePeriodPaymentRepository _paymentRepository;
     private readonly IPayrollVoucherService _voucherService;
+    private readonly IFinancialOutputValidator _financialOutputValidator;
+    private readonly ICompanyInfoProvider _companyProvider;
     private readonly IEmailService _emailService;
     private readonly IUserRepository _userRepository;
     private readonly ILogger<ConfirmNursePeriodPaymentHandler> _logger;
@@ -20,6 +23,8 @@ public sealed class ConfirmNursePeriodPaymentHandler
         IAdminPayrollRepository payrollRepository,
         INursePeriodPaymentRepository paymentRepository,
         IPayrollVoucherService voucherService,
+        IFinancialOutputValidator financialOutputValidator,
+        ICompanyInfoProvider companyProvider,
         IEmailService emailService,
         IUserRepository userRepository,
         ILogger<ConfirmNursePeriodPaymentHandler> logger)
@@ -27,6 +32,8 @@ public sealed class ConfirmNursePeriodPaymentHandler
         _payrollRepository = payrollRepository;
         _paymentRepository = paymentRepository;
         _voucherService = voucherService;
+        _financialOutputValidator = financialOutputValidator;
+        _companyProvider = companyProvider;
         _emailService = emailService;
         _userRepository = userRepository;
         _logger = logger;
@@ -81,17 +88,41 @@ public sealed class ConfirmNursePeriodPaymentHandler
         var recipientEmail = admin?.Email;
         var whatsappUrl = BuildWhatsappUrl(admin?.Phone, periodLabel);
 
-        // 5. Generate the voucher PDF and email it to the admin (best-effort).
+        // 5. Generate the voucher PDF, GATE it through the financial-output validator, and only
+        //    then email it to the admin. Delivery is best-effort for the demo, but a financial
+        //    document that fails validation is BLOCKED from being sent (fail-closed) so a corrupt
+        //    or unreconciled comprobante never leaves the system. The confirmation itself still
+        //    succeeds; re-confirming re-runs the gate, enabling retry once the data is fixed.
         var emailSent = false;
+        string? deliveryDetail = null;
         try
         {
             var pdfBytes = await _voucherService.GenerateVoucherAsync(
                 command.PeriodId, command.NurseUserId, cancellationToken);
 
-            if (string.IsNullOrWhiteSpace(recipientEmail))
+            // Build reconciliation data from the same voucher data and validate BEFORE sending.
+            var company = await _companyProvider.GetAsync(cancellationToken);
+            var financialData = FinancialDocumentData.ForPayrollVoucher(
+                voucherData, company.Name, VoucherDocumentTitle, periodLabel);
+            var validation = _financialOutputValidator.Validate(
+                FinancialDocumentKind.PayrollVoucher, pdfBytes, financialData);
+
+            if (!validation.IsValid)
+            {
+                // Blocked delivery: do not send (and therefore do not archive) an invalid document.
+                _logger.LogWarning(
+                    "Blocked payroll voucher delivery for period {PeriodId} nurse {NurseId}: {Reason}",
+                    command.PeriodId,
+                    command.NurseUserId,
+                    validation.ReasonSummary);
+                payment.MarkVoucherFailed(validation.ReasonSummary, now);
+                deliveryDetail = validation.ReasonSummary;
+            }
+            else if (string.IsNullOrWhiteSpace(recipientEmail))
             {
                 payment.MarkVoucherFailed(
                     "El administrador no tiene un correo registrado para recibir el comprobante.", now);
+                deliveryDetail = payment.DeliveryError;
             }
             else
             {
@@ -105,6 +136,7 @@ public sealed class ConfirmNursePeriodPaymentHandler
 
                 payment.MarkVoucherDelivered(now);
                 emailSent = true;
+                deliveryDetail = "El comprobante superó la validación financiera y se envió por correo.";
             }
         }
         catch (Exception ex)
@@ -117,6 +149,7 @@ public sealed class ConfirmNursePeriodPaymentHandler
                 command.NurseUserId,
                 command.AdminUserId);
             payment.MarkVoucherFailed(ex.Message, now);
+            deliveryDetail = payment.DeliveryError;
         }
 
         // 6. Persist.
@@ -136,8 +169,12 @@ public sealed class ConfirmNursePeriodPaymentHandler
             BankReference: payment.BankReference,
             VoucherEmailSent: emailSent,
             WhatsappUrl: whatsappUrl,
-            RecipientLabel: "Modo demo: el comprobante se envió al correo y número del administrador.");
+            RecipientLabel: "Modo demo: el comprobante se envió al correo y número del administrador.",
+            VoucherDeliveryDetail: deliveryDetail);
     }
+
+    /// <summary>The document title printed on the voucher PDF; the validator requires it to be present.</summary>
+    private const string VoucherDocumentTitle = "COMPROBANTE DE PAGO";
 
     private static string BuildPeriodLabel(DateOnly start, DateOnly end) =>
         $"{start.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)} al {end.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)}";

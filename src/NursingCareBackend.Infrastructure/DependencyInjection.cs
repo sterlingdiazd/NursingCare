@@ -182,6 +182,8 @@ public static class DependencyInjection
         services.AddScoped<IPayrollRecalculationService, PayrollRecalculationService>();
         services.AddScoped<IAdminPayrollOverrideRepository, AdminPayrollOverrideRepository>();
         services.AddScoped<IPayrollVoucherService, PayrollVoucherService>();
+        services.AddScoped<NursingCareBackend.Application.AdminPortal.Payroll.Validation.IFinancialOutputValidator,
+            NursingCareBackend.Infrastructure.Payroll.Validation.FinancialOutputValidator>();
         services.AddScoped<INursePeriodPaymentRepository, NursePeriodPaymentRepository>();
         services.AddScoped<IPayrollReportExportService, PayrollReportExportService>();
         services.AddScoped<NursingCareBackend.Application.AdminPortal.Payroll.ICompanyInfoProvider, NursingCareBackend.Infrastructure.Payroll.CompanyInfoProvider>();

@@ -11,4 +11,5 @@ public sealed record ConfirmNursePeriodPaymentResult(
     string? BankReference,
     bool VoucherEmailSent,
     string WhatsappUrl,
-    string RecipientLabel);
+    string RecipientLabel,
+    string? VoucherDeliveryDetail);

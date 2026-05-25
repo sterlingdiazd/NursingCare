@@ -59,6 +59,7 @@ public static class Messages
         ["errors.periodo_zip_no_encontrado"] = "Período no encontrado",
         ["errors.periodo_zip_no_encontrado_detalle"] = "No se encontraron datos de nómina para el período especificado.",
         ["errors.detalle_no_encontrado"] = "Detalle no encontrado",
+        ["errors.comprobante_no_valido"] = "El comprobante no superó la validación financiera",
 
         // Users
         ["errors.usuario_no_encontrado"] = "Usuario no encontrado",

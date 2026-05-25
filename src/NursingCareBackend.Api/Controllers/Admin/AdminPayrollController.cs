@@ -26,6 +26,7 @@ public sealed class AdminPayrollController : ControllerBase
     private readonly IAuthRateLimiter _rateLimiter;
     private readonly NursingCareBackend.Application.AdminPortal.Auditing.IAdminAuditService _auditService;
     private readonly NursingCareBackend.Application.AdminPortal.Payroll.ICompanyInfoProvider _companyProvider;
+    private readonly NursingCareBackend.Application.AdminPortal.Payroll.Validation.IFinancialOutputValidator _financialOutputValidator;
     private readonly NursingCareBackend.Application.AdminPortal.Payroll.Commands.ConfirmNursePeriodPayment.ConfirmNursePeriodPaymentHandler _confirmPaymentHandler;
 
     public AdminPayrollController(
@@ -38,6 +39,7 @@ public sealed class AdminPayrollController : ControllerBase
         IAuthRateLimiter rateLimiter,
         NursingCareBackend.Application.AdminPortal.Auditing.IAdminAuditService auditService,
         NursingCareBackend.Application.AdminPortal.Payroll.ICompanyInfoProvider companyProvider,
+        NursingCareBackend.Application.AdminPortal.Payroll.Validation.IFinancialOutputValidator financialOutputValidator,
         NursingCareBackend.Application.AdminPortal.Payroll.Commands.ConfirmNursePeriodPayment.ConfirmNursePeriodPaymentHandler confirmPaymentHandler)
     {
         _repository = repository;
@@ -49,6 +51,7 @@ public sealed class AdminPayrollController : ControllerBase
         _rateLimiter = rateLimiter;
         _auditService = auditService;
         _companyProvider = companyProvider;
+        _financialOutputValidator = financialOutputValidator;
         _confirmPaymentHandler = confirmPaymentHandler;
     }
 
@@ -845,6 +848,7 @@ public sealed class AdminPayrollController : ControllerBase
     [Produces("application/pdf")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     public async Task<IActionResult> GetNurseVoucher(
         Guid periodId,
         Guid nurseId,
@@ -853,6 +857,30 @@ public sealed class AdminPayrollController : ControllerBase
         try
         {
             var pdfBytes = await _voucherService.GenerateVoucherAsync(periodId, nurseId, cancellationToken);
+
+            // Financial-output gate: validate the generated PDF before handing it to the client.
+            // A document that fails validation is BLOCKED (422) with a precise Spanish reason so the
+            // download can be retried once the underlying data/render is corrected.
+            var voucherData = await _repository.GetVoucherDataAsync(periodId, nurseId, cancellationToken);
+            if (voucherData is not null)
+            {
+                var company = await _companyProvider.GetAsync(cancellationToken);
+                var periodLabel = $"{voucherData.PeriodStartDate:dd/MM/yyyy} al {voucherData.PeriodEndDate:dd/MM/yyyy}";
+                var financialData = NursingCareBackend.Application.AdminPortal.Payroll.Validation.FinancialDocumentData.ForPayrollVoucher(
+                    voucherData, company.Name, "COMPROBANTE DE PAGO", periodLabel);
+                var validation = _financialOutputValidator.Validate(
+                    NursingCareBackend.Application.AdminPortal.Payroll.Validation.FinancialDocumentKind.PayrollVoucher,
+                    pdfBytes,
+                    financialData);
+
+                if (!validation.IsValid)
+                {
+                    return this.ProblemResponse(
+                        StatusCodes.Status422UnprocessableEntity,
+                        Messages.Get("errors.comprobante_no_valido"),
+                        validation.ReasonSummary);
+                }
+            }
 
             var period = await _repository.GetPeriodByIdAsync(periodId, cancellationToken);
             var fileName = period is not null
