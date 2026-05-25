@@ -40,7 +40,9 @@ public sealed class GenerateReceiptHandlerTests
             DistanceFactor = "local",
             ComplexityLevel = "estandar",
             MedicalSuppliesCost = null,
-            CareRequestDate = DateOnly.FromDateTime(DateTime.UtcNow),
+            // Scheduled 2 days ago so completion (12h ago) is never before the care-request date,
+            // regardless of the current time of day (the domain forbids completing before the date).
+            CareRequestDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-2)),
             PricingCategoryCode = "hogar",
             CategoryFactorSnapshot = 1.0m,
             DistanceFactorMultiplierSnapshot = 1.0m,
@@ -49,10 +51,10 @@ public sealed class GenerateReceiptHandlerTests
             LineBeforeVolumeDiscount = null,
             UnitPriceAfterVolumeDiscount = null,
             SubtotalBeforeSupplies = null,
-            CreatedAtUtc = DateTime.UtcNow.AddDays(-1),
+            CreatedAtUtc = DateTime.UtcNow.AddDays(-2),
         });
 
-        request.Approve(DateTime.UtcNow.AddDays(-1));
+        request.Approve(DateTime.UtcNow.AddDays(-2));
         request.Complete(DateTime.UtcNow.AddHours(-12), request.AssignedNurse!.Value);
         request.Invoice("FAC-20260101-0001", DateTime.UtcNow.AddHours(-6));
         request.Pay("REF-BANCO-001", DateTime.UtcNow.AddHours(-1));
