@@ -42,7 +42,7 @@ public static class FullLifecycleSeeding
         db.CareRequests.AddRange(careRequests);
         await db.SaveChangesAsync(cancellationToken);
 
-        // ── 3. Additional payroll periods ─────────────────────────────────────────────
+        // ── 3. Additional payroll periods (March Closed + July future Open) ──────────
         var (marchPeriod, _) = await EnsureAdditionalPayrollPeriodsAsync(db, cancellationToken);
 
         // ── 4. Payroll lines for the closed March 2026 period ─────────────────────────
@@ -69,8 +69,8 @@ public static class FullLifecycleSeeding
         // ── 11. Additional scheduled deduction lifecycle states ───────────────────────
         await SeedScheduledDeductionLifecycleStatesAsync(db, cancellationToken);
 
-        // ── 12. ServiceExecutions + CompensationAdjustments ──────────────────────────
-        await SeedServiceExecutionsAndAdjustmentsAsync(db, marchPeriod, careRequests, cancellationToken);
+        // ── 12. Future scheduled care requests ────────────────────────────────────────
+        await SeedFutureScheduledRequestsAsync(db, cancellationToken);
 
         Console.WriteLine("FullLifecycleSeeding: completed successfully.");
     }
@@ -156,6 +156,7 @@ public static class FullLifecycleSeeding
         var april5  = new DateTime(2026, 4, 5,  8, 0, 0, DateTimeKind.Utc);
         var april10 = new DateTime(2026, 4, 10, 8, 0, 0, DateTimeKind.Utc);
 
+        // All 22 nurses from the roster — distributed across lifecycle statuses.
         var n1  = CatalogSeeding.NurseIds["Lorea"];
         var n2  = CatalogSeeding.NurseIds["Charleny"];
         var n3  = CatalogSeeding.NurseIds["Valentin"];
@@ -168,6 +169,16 @@ public static class FullLifecycleSeeding
         var n10 = CatalogSeeding.NurseIds["Cristina"];
         var n11 = CatalogSeeding.NurseIds["Figueredo"];
         var n12 = CatalogSeeding.NurseIds["Annie"];
+        var n13 = CatalogSeeding.NurseIds["Zoila"];
+        var n14 = CatalogSeeding.NurseIds["Maria Isabel"];
+        var n15 = CatalogSeeding.NurseIds["Emilina"];
+        var n16 = CatalogSeeding.NurseIds["Cindy"];
+        var n17 = CatalogSeeding.NurseIds["Agustina"];
+        var n18 = CatalogSeeding.NurseIds["Johanna"];
+        var n19 = CatalogSeeding.NurseIds["Miranda"];
+        var n20 = CatalogSeeding.NurseIds["Miguelina"];
+        var n21 = CatalogSeeding.NurseIds["Celai"];
+        var n22 = CatalogSeeding.NurseIds["De Los Santos"];
 
         var testClient = CatalogSeeding.TestClientId;
 
@@ -180,12 +191,12 @@ public static class FullLifecycleSeeding
         list.Add(Make(ClientRosaId,    null, "Administracion de medicamentos IV",          "medicamentos",       "sesion",       2, "local",   "estandar",  4000m, april10.AddHours(6)));
         list.Add(Make(ClientLuisaId,   null, "Curacion de heridas post-cirugia",           "curas",              "sesion",       3, "cercana", "moderada",  6600m, april10.AddHours(8)));
 
-        // ── Approved (5) ──────────────────────────────────────────────────────────────
-        list.Add(MakeApproved(testClient,      n1,  "Cuidado intensivo domiciliario 24h",      "domicilio_24h",      "dia_completo", 7, "media",  "alta",     29400m, april5));
-        list.Add(MakeApproved(ClientBeatrizId, n2,  "Enfermeria general diaria",                "hogar_diario",       "dia_completo", 5, "local",  "estandar", 12500m, april5.AddHours(2)));
-        list.Add(MakeApproved(ClientCarmenId,  n3,  "Cuidado nocturno 12 horas",                "domicilio_noche_12h","medio_dia",    4, "cercana","moderada", 11000m, april5.AddHours(4)));
-        list.Add(MakeApproved(ClientAnaId,     n4,  "Sonda nasogastrica y cuidados",            "sonda_nasogastrica", "sesion",       2, "local",  "alta",      7200m, april5.AddHours(6)));
-        list.Add(MakeApproved(ClientRosaId,    n5,  "Hogar basico primer mes",                  "hogar_basico",       "mes",          1, "local",  "estandar", 55000m, april5.AddHours(8)));
+        // ── Approved (5) — nurses n13-n17 ─────────────────────────────────────────────
+        list.Add(MakeApproved(testClient,      n13, "Cuidado intensivo domiciliario 24h",      "domicilio_24h",      "dia_completo", 7, "media",  "alta",     29400m, april5));
+        list.Add(MakeApproved(ClientBeatrizId, n14, "Enfermeria general diaria",                "hogar_diario",       "dia_completo", 5, "local",  "estandar", 12500m, april5.AddHours(2)));
+        list.Add(MakeApproved(ClientCarmenId,  n15, "Cuidado nocturno 12 horas",                "domicilio_noche_12h","medio_dia",    4, "cercana","moderada", 11000m, april5.AddHours(4)));
+        list.Add(MakeApproved(ClientAnaId,     n16, "Sonda nasogastrica y cuidados",            "sonda_nasogastrica", "sesion",       2, "local",  "alta",      7200m, april5.AddHours(6)));
+        list.Add(MakeApproved(ClientRosaId,    n17, "Hogar basico primer mes",                  "hogar_basico",       "mes",          1, "local",  "estandar", 55000m, april5.AddHours(8)));
 
         // ── Rejected (3) ──────────────────────────────────────────────────────────────
         list.Add(MakeRejected(testClient,
@@ -198,37 +209,37 @@ public static class FullLifecycleSeeding
             "Colocacion de sonda vesical urgente",              "sonda_vesical","sesion",       1, "local",  "estandar",  2000m, march25.AddHours(6),
             "Documentacion medica incompleta. Adjunte orden medica firmada."));
 
-        // ── Completed (5) ─────────────────────────────────────────────────────────────
-        list.Add(MakeCompleted(testClient,      n6,  "Cuidado post-parto en hogar",              "hogar_diario", "dia_completo", 6, "local",  "estandar", 15000m, march15));
-        list.Add(MakeCompleted(ClientAnaId,     n7,  "Cuidado de adulto mayor con demencia",     "domicilio_24h","dia_completo", 5, "cercana","moderada", 19250m, march15.AddHours(2)));
-        list.Add(MakeCompleted(ClientRosaId,    n8,  "Inyecciones y curaciones diarias",         "curas",        "sesion",       4, "local",  "estandar",  8000m, march15.AddHours(4)));
-        list.Add(MakeCompleted(ClientLuisaId,   n9,  "Rehabilitacion post-operatoria en hogar",  "hogar_diario", "dia_completo", 5, "media",  "alta",     15000m, march15.AddHours(6)));
-        list.Add(MakeCompleted(ClientBeatrizId, n10, "Terapia intravenosa ambulatoria",          "suero",        "sesion",       3, "cercana","moderada",  8250m, march15.AddHours(8)));
+        // ── Completed (5) — nurses n18-n22 ───────────────────────────────────────────
+        list.Add(MakeCompleted(testClient,      n18, "Cuidado post-parto en hogar",              "hogar_diario", "dia_completo", 6, "local",  "estandar", 15000m, march15));
+        list.Add(MakeCompleted(ClientAnaId,     n19, "Cuidado de adulto mayor con demencia",     "domicilio_24h","dia_completo", 5, "cercana","moderada", 19250m, march15.AddHours(2)));
+        list.Add(MakeCompleted(ClientRosaId,    n20, "Inyecciones y curaciones diarias",         "curas",        "sesion",       4, "local",  "estandar",  8000m, march15.AddHours(4)));
+        list.Add(MakeCompleted(ClientLuisaId,   n21, "Rehabilitacion post-operatoria en hogar",  "hogar_diario", "dia_completo", 5, "media",  "alta",     15000m, march15.AddHours(6)));
+        list.Add(MakeCompleted(ClientBeatrizId, n22, "Terapia intravenosa ambulatoria",          "suero",        "sesion",       3, "cercana","moderada",  8250m, march15.AddHours(8)));
 
         // ── Cancelled (3) ─────────────────────────────────────────────────────────────
         list.Add(MakeCancelled(testClient,      "Cuidado preventivo adulto mayor",       "hogar_diario",      "dia_completo", 5, "local","estandar", 12500m, march20));
         list.Add(MakeCancelled(ClientCarmenId,  "Servicio nocturno domiciliario",        "domicilio_noche_12h","medio_dia",   3, "local","estandar",  7500m, march20.AddHours(3)));
         list.Add(MakeCancelled(ClientLuisaId,   "Control de sonda PEG en domicilio",    "sonda_peg",         "sesion",       1, "cercana","estandar", 4400m, march20.AddHours(6)));
 
-        // ── Invoiced (5) ──────────────────────────────────────────────────────────────
-        list.Add(MakeInvoiced(testClient,      n11, "Cuidado intensivo dia completo",            "domicilio_24h","dia_completo", 7, "local", "alta",      24500m, march10,            "FAC-2026-0031"));
-        list.Add(MakeInvoiced(ClientAnaId,     n12, "Cuidado basico mensual hogar",              "hogar_basico", "mes",          1, "local", "estandar",  55000m, march10.AddHours(2), "FAC-2026-0032"));
-        list.Add(MakeInvoiced(ClientRosaId,    n1,  "Administracion de medicamentos inyectables","medicamentos", "sesion",       3, "cercana","moderada",  7260m, march10.AddHours(4), "FAC-2026-0033"));
-        list.Add(MakeInvoiced(ClientBeatrizId, n2,  "Cuidado diario estandar hogar",             "hogar_diario", "dia_completo", 5, "local", "estandar",  12500m, march10.AddHours(6), "FAC-2026-0034"));
-        list.Add(MakeInvoiced(ClientLuisaId,   n3,  "Terapia nocturna domiciliaria",             "domicilio_noche_12h","medio_dia",4,"media","estandar", 12000m, march10.AddHours(8), "FAC-2026-0035"));
+        // ── Invoiced (5) — nurses n1-n5 ───────────────────────────────────────────────
+        list.Add(MakeInvoiced(testClient,      n1,  "Cuidado intensivo dia completo",            "domicilio_24h","dia_completo", 7, "local", "alta",      24500m, march10,            "FAC-2026-0031"));
+        list.Add(MakeInvoiced(ClientAnaId,     n2,  "Cuidado basico mensual hogar",              "hogar_basico", "mes",          1, "local", "estandar",  55000m, march10.AddHours(2), "FAC-2026-0032"));
+        list.Add(MakeInvoiced(ClientRosaId,    n3,  "Administracion de medicamentos inyectables","medicamentos", "sesion",       3, "cercana","moderada",  7260m, march10.AddHours(4), "FAC-2026-0033"));
+        list.Add(MakeInvoiced(ClientBeatrizId, n4,  "Cuidado diario estandar hogar",             "hogar_diario", "dia_completo", 5, "local", "estandar",  12500m, march10.AddHours(6), "FAC-2026-0034"));
+        list.Add(MakeInvoiced(ClientLuisaId,   n5,  "Terapia nocturna domiciliaria",             "domicilio_noche_12h","medio_dia",4,"media","estandar", 12000m, march10.AddHours(8), "FAC-2026-0035"));
 
-        // ── Paid (4) ──────────────────────────────────────────────────────────────────
-        list.Add(MakePaid(testClient,      n4,  "Servicio diario adulto mayor Marzo",  "hogar_diario",     "dia_completo", 5, "local",  "estandar", 12500m, march10,            "FAC-2026-0021", "TRF-BHD-00201"));
-        list.Add(MakePaid(ClientCarmenId,  n5,  "Cuidado 24h paciente oncologico",     "domicilio_24h",    "dia_completo", 6, "media",  "alta",     25200m, march10.AddHours(2), "FAC-2026-0022", "TRF-BHD-00202"));
-        list.Add(MakePaid(ClientAnaId,     n6,  "Enfermeria domiciliaria dia Marzo",   "domicilio_dia_12h","medio_dia",    5, "cercana","moderada", 15125m, march10.AddHours(4), "FAC-2026-0023", "TRF-BHD-00203"));
-        list.Add(MakePaid(ClientRosaId,    n7,  "Curaciones post-cirugia Marzo",       "curas",            "sesion",       4, "local",  "estandar",  8000m, march10.AddHours(6), "FAC-2026-0024", "TRF-BHD-00204"));
+        // ── Paid (4) — nurses n6-n9 ───────────────────────────────────────────────────
+        list.Add(MakePaid(testClient,      n6,  "Servicio diario adulto mayor Marzo",  "hogar_diario",     "dia_completo", 5, "local",  "estandar", 12500m, march10,            "FAC-2026-0021", "TRF-BHD-00201"));
+        list.Add(MakePaid(ClientCarmenId,  n7,  "Cuidado 24h paciente oncologico",     "domicilio_24h",    "dia_completo", 6, "media",  "alta",     25200m, march10.AddHours(2), "FAC-2026-0022", "TRF-BHD-00202"));
+        list.Add(MakePaid(ClientAnaId,     n8,  "Enfermeria domiciliaria dia Marzo",   "domicilio_dia_12h","medio_dia",    5, "cercana","moderada", 15125m, march10.AddHours(4), "FAC-2026-0023", "TRF-BHD-00203"));
+        list.Add(MakePaid(ClientRosaId,    n9,  "Curaciones post-cirugia Marzo",       "curas",            "sesion",       4, "local",  "estandar",  8000m, march10.AddHours(6), "FAC-2026-0024", "TRF-BHD-00204"));
 
-        // ── Voided (2) ────────────────────────────────────────────────────────────────
+        // ── Voided (2) — nurses n10-n11 ───────────────────────────────────────────────
         // Void is allowed from Completed or Invoiced status.
-        list.Add(MakeVoidedFromCompleted(testClient,     n8, "Servicio cancelado por hospitalizacion",
+        list.Add(MakeVoidedFromCompleted(testClient,     n10, "Servicio cancelado por hospitalizacion",
             "hogar_diario","dia_completo", 3, "local","estandar", 7500m, march10,
             "Paciente ingresado a hospital de emergencia. Servicio no ejecutado."));
-        list.Add(MakeVoidedFromCompleted(ClientBeatrizId,n9, "Suero anulado por cambio de tratamiento",
+        list.Add(MakeVoidedFromCompleted(ClientBeatrizId,n11, "Suero anulado por cambio de tratamiento",
             "suero","sesion", 2, "local","estandar", 4000m, march10.AddHours(3),
             "Medico tratante cambio protocolo. Solicitud anulada de comun acuerdo con cliente."));
 
@@ -391,13 +402,16 @@ public static class FullLifecycleSeeding
     // 3. Additional payroll periods
     // ─────────────────────────────────────────────────────────────────────────────────
 
-    private static async Task<(PayrollPeriod March, PayrollPeriod May)> EnsureAdditionalPayrollPeriodsAsync(
+    private static async Task<(PayrollPeriod March, PayrollPeriod Future)> EnsureAdditionalPayrollPeriodsAsync(
         NursingCareDbContext db, CancellationToken cancellationToken)
     {
-        var marchStart = new DateOnly(2026, 3, 1);
-        var marchEnd   = new DateOnly(2026, 3, 31);
-        var mayStart   = new DateOnly(2026, 5, 1);
-        var mayEnd     = new DateOnly(2026, 5, 31);
+        var marchStart  = new DateOnly(2026, 3, 1);
+        var marchEnd    = new DateOnly(2026, 3, 31);
+
+        // Future period: July 2026 — first quincena (1–15). Open status so it appears as
+        // an upcoming period in the payroll calendar alongside the current-month Open period.
+        var futureStart = new DateOnly(2026, 7, 1);
+        var futureEnd   = new DateOnly(2026, 7, 15);
 
         var march = await db.PayrollPeriods
             .SingleOrDefaultAsync(p => p.StartDate == marchStart && p.EndDate == marchEnd, cancellationToken);
@@ -415,22 +429,22 @@ public static class FullLifecycleSeeding
             await db.SaveChangesAsync(cancellationToken);
         }
 
-        var may = await db.PayrollPeriods
-            .SingleOrDefaultAsync(p => p.StartDate == mayStart && p.EndDate == mayEnd, cancellationToken);
+        var future = await db.PayrollPeriods
+            .SingleOrDefaultAsync(p => p.StartDate == futureStart && p.EndDate == futureEnd, cancellationToken);
 
-        if (may is null)
+        if (future is null)
         {
-            may = PayrollPeriod.Create(
-                startDate: mayStart,
-                endDate: mayEnd,
-                cutoffDate: new DateOnly(2026, 5, 28),
-                paymentDate: new DateOnly(2026, 6, 5),
+            future = PayrollPeriod.Create(
+                startDate: futureStart,
+                endDate: futureEnd,
+                cutoffDate: new DateOnly(2026, 7, 13),
+                paymentDate: new DateOnly(2026, 7, 18),
                 createdAtUtc: DateTime.UtcNow);
-            db.PayrollPeriods.Add(may);
+            db.PayrollPeriods.Add(future);
             await db.SaveChangesAsync(cancellationToken);
         }
 
-        return (march, may);
+        return (march, future);
     }
 
     // ─────────────────────────────────────────────────────────────────────────────────
@@ -457,8 +471,18 @@ public static class FullLifecycleSeeding
             return;
         }
 
-        var lines = new List<PayrollLine>();
-        foreach (var cr in completedRequests)
+        // The first two completed requests get a ServiceExecution + linked PayrollLine + adjustment.
+        // All remaining completed requests get unlinked PayrollLines (serviceExecutionId: null).
+        // This satisfies the unique constraint on ServiceExecution.CareRequestId while keeping
+        // the adjustment data surfaced properly in both the execution and the payroll line.
+
+        var adjustedRequests   = completedRequests.Take(2).ToList();
+        var unadjustedRequests = completedRequests.Skip(2).ToList();
+
+        var now = new DateTime(2026, 3, 31, 14, 0, 0, DateTimeKind.Utc);
+
+        // ── Adjusted requests: ServiceExecution + linked PayrollLine + adjustment ─────
+        foreach (var (cr, idx) in adjustedRequests.Select((c, i) => (c, i)))
         {
             var rule       = ruleLookup.GetValueOrDefault(cr.PricingCategoryCode ?? "") ?? rules.First();
             var executedAt = cr.CompletedAtUtc!.Value;
@@ -469,22 +493,115 @@ public static class FullLifecycleSeeding
             var complexity = decimal.Round(subtotal * Math.Max(0m, (cr.ComplexityMultiplierSnapshot ?? 1m) - 1m) * (rule.ComplexityBonusPercent / 100m), 2, MidpointRounding.AwayFromZero);
             var supplies   = decimal.Round((cr.MedicalSuppliesCost ?? 0m) * (rule.MedicalSuppliesPercent / 100m), 2, MidpointRounding.AwayFromZero);
 
-            lines.Add(PayrollLine.Create(
-                payrollPeriodId: marchPeriod.Id,
-                nurseUserId: cr.AssignedNurse!.Value,
-                serviceExecutionId: null,
-                description: $"Servicio {cr.CareRequestType} — lifecycle seed",
-                baseCompensation: baseComp,
-                transportIncentive: transport,
-                complexityBonus: complexity,
-                medicalSuppliesCompensation: supplies,
-                adjustmentsTotal: 0m,
-                deductionsTotal: 0m,
-                createdAtUtc: executedAt));
+            // Adjustment amounts: index 0 → +500 (Bono por turno extra), index 1 → -300 (Penalización por retraso).
+            var (adjLabel, adjAmount, adjNotes, adjAt) = idx == 0
+                ? ("Bono por turno extra",      500m,  "Enfermera cubrió turno adicional no registrado en sistema.", now)
+                : ("Penalización por retraso",  -300m, "Retraso documentado superior a 30 minutos en inicio del turno.", now.AddHours(1));
+
+            var exec = ServiceExecution.Create(
+                careRequestId:                cr.Id,
+                nurseUserId:                  cr.AssignedNurse!.Value,
+                shiftRecordId:                null,
+                compensationRuleId:           rule.Id,
+                employmentType:               CompensationEmploymentType.PerService,
+                variant:                      ServiceExecutionVariant.Standard,
+                executedAtUtc:                executedAt,
+                careRequestType:              cr.CareRequestType,
+                unitType:                     cr.UnitType,
+                unit:                         cr.Unit,
+                pricingCategoryCode:          cr.PricingCategoryCode,
+                distanceFactorCode:           cr.DistanceFactor,
+                complexityLevelCode:          cr.ComplexityLevel,
+                basePrice:                    cr.Price,
+                careRequestTotal:             cr.Total,
+                clientBasePrice:              cr.ClientBasePrice ?? cr.Price,
+                categoryFactorSnapshot:       cr.CategoryFactorSnapshot ?? 1m,
+                distanceMultiplierSnapshot:   cr.DistanceFactorMultiplierSnapshot ?? 1m,
+                complexityMultiplierSnapshot: cr.ComplexityMultiplierSnapshot ?? 1m,
+                volumeDiscountPercentSnapshot:cr.VolumeDiscountPercentSnapshot ?? 0,
+                subtotalBeforeSupplies:       subtotal,
+                medicalSuppliesCost:          cr.MedicalSuppliesCost ?? 0m,
+                ruleBaseCompensationPercent:  rule.BaseCompensationPercent,
+                ruleFixedAmountPerUnit:       rule.FixedAmountPerUnit,
+                ruleTransportIncentivePercent:rule.TransportIncentivePercent,
+                ruleComplexityBonusPercent:   rule.ComplexityBonusPercent,
+                ruleMedicalSuppliesPercent:   rule.MedicalSuppliesPercent,
+                ruleVariantPercent:           rule.BaseCompensationPercent,
+                baseCompensation:             baseComp,
+                transportIncentive:           transport,
+                complexityBonus:              complexity,
+                medicalSuppliesCompensation:  supplies,
+                adjustmentsTotal:             0m,
+                deductionsTotal:              0m,
+                manualOverrideAmount:         null,
+                notes:                        "Ejecucion seed — lifecycle con ajuste",
+                createdAtUtc:                 executedAt);
+
+            db.ServiceExecutions.Add(exec);
+            await db.SaveChangesAsync(cancellationToken); // persist exec to get a stable Id
+
+            // Apply the adjustment to the execution.
+            exec.SetAdjustmentsTotal(adjAmount, adjAt);
+
+            var adj = CompensationAdjustment.Create(
+                serviceExecutionId: exec.Id,
+                label:              adjLabel,
+                amount:             adjAmount,
+                notes:              adjNotes,
+                createdAtUtc:       adjAt);
+
+            db.CompensationAdjustments.Add(adj);
+
+            // PayrollLine is linked to this execution and carries the same adjustment.
+            var line = PayrollLine.Create(
+                payrollPeriodId:            marchPeriod.Id,
+                nurseUserId:                cr.AssignedNurse!.Value,
+                serviceExecutionId:         exec.Id,
+                description:                $"Servicio {cr.CareRequestType} — lifecycle seed (ajustado)",
+                baseCompensation:           baseComp,
+                transportIncentive:         transport,
+                complexityBonus:            complexity,
+                medicalSuppliesCompensation:supplies,
+                adjustmentsTotal:           adjAmount,
+                deductionsTotal:            0m,
+                createdAtUtc:               executedAt);
+
+            db.PayrollLines.Add(line);
+            await db.SaveChangesAsync(cancellationToken);
         }
 
-        db.PayrollLines.AddRange(lines);
-        await db.SaveChangesAsync(cancellationToken);
+        // ── Remaining completed requests: unlinked PayrollLines ───────────────────────
+        var unadjustedLines = new List<PayrollLine>();
+        foreach (var cr in unadjustedRequests)
+        {
+            var rule       = ruleLookup.GetValueOrDefault(cr.PricingCategoryCode ?? "") ?? rules.First();
+            var executedAt = cr.CompletedAtUtc!.Value;
+            var subtotal   = Math.Max(0m, cr.Total - (cr.MedicalSuppliesCost ?? 0m));
+
+            var baseComp   = decimal.Round(subtotal * (rule.BaseCompensationPercent / 100m), 2, MidpointRounding.AwayFromZero);
+            var transport  = decimal.Round(subtotal * Math.Max(0m, (cr.DistanceFactorMultiplierSnapshot ?? 1m) - 1m) * (rule.TransportIncentivePercent / 100m), 2, MidpointRounding.AwayFromZero);
+            var complexity = decimal.Round(subtotal * Math.Max(0m, (cr.ComplexityMultiplierSnapshot ?? 1m) - 1m) * (rule.ComplexityBonusPercent / 100m), 2, MidpointRounding.AwayFromZero);
+            var supplies   = decimal.Round((cr.MedicalSuppliesCost ?? 0m) * (rule.MedicalSuppliesPercent / 100m), 2, MidpointRounding.AwayFromZero);
+
+            unadjustedLines.Add(PayrollLine.Create(
+                payrollPeriodId:            marchPeriod.Id,
+                nurseUserId:                cr.AssignedNurse!.Value,
+                serviceExecutionId:         null,
+                description:                $"Servicio {cr.CareRequestType} — lifecycle seed",
+                baseCompensation:           baseComp,
+                transportIncentive:         transport,
+                complexityBonus:            complexity,
+                medicalSuppliesCompensation:supplies,
+                adjustmentsTotal:           0m,
+                deductionsTotal:            0m,
+                createdAtUtc:               executedAt));
+        }
+
+        if (unadjustedLines.Count > 0)
+        {
+            db.PayrollLines.AddRange(unadjustedLines);
+            await db.SaveChangesAsync(cancellationToken);
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────────────
@@ -1011,134 +1128,49 @@ public static class FullLifecycleSeeding
     }
 
     // ─────────────────────────────────────────────────────────────────────────────────
-    // 12. ServiceExecutions + CompensationAdjustments
+    // 12. Future scheduled care requests (Approved + Pending)
+    // ─────────────────────────────────────────────────────────────────────────────────
+    // Represents upcoming scheduled visits in the next 1-2 months. These are NOT
+    // completed, so they generate no payroll lines.
     // ─────────────────────────────────────────────────────────────────────────────────
 
-    private static async Task SeedServiceExecutionsAndAdjustmentsAsync(
-        NursingCareDbContext db, PayrollPeriod marchPeriod, CareRequest[] careRequests, CancellationToken cancellationToken)
+    private static async Task SeedFutureScheduledRequestsAsync(
+        NursingCareDbContext db, CancellationToken cancellationToken)
     {
-        var rules = await db.CompensationRules.AsNoTracking().ToListAsync(cancellationToken);
-        if (rules.Count == 0)
+        // Use a date anchor in the future relative to DateTime.UtcNow.
+        var future1 = DateTime.UtcNow.AddDays(10).Date.ToUniversalTime().AddHours(8);
+        var future2 = DateTime.UtcNow.AddDays(14).Date.ToUniversalTime().AddHours(8);
+        var future3 = DateTime.UtcNow.AddDays(21).Date.ToUniversalTime().AddHours(8);
+        var future4 = DateTime.UtcNow.AddDays(28).Date.ToUniversalTime().AddHours(8);
+        var future5 = DateTime.UtcNow.AddDays(35).Date.ToUniversalTime().AddHours(8);
+        var future6 = DateTime.UtcNow.AddDays(42).Date.ToUniversalTime().AddHours(8);
+
+        // Nurses distributed across the roster for variety in upcoming visits.
+        var n12 = CatalogSeeding.NurseIds["Annie"];
+        var n13 = CatalogSeeding.NurseIds["Zoila"];
+        var n14 = CatalogSeeding.NurseIds["Maria Isabel"];
+        var n15 = CatalogSeeding.NurseIds["Emilina"];
+
+        var futureRequests = new[]
         {
-            return;
-        }
+            // Approved — 4 upcoming scheduled visits, nurse assigned.
+            MakeApproved(ClientBeatrizId, n12, "Cuidado domiciliario programado — turno dia",
+                "domicilio_dia_12h", "medio_dia",   4, "local",  "estandar", 10000m, future1),
+            MakeApproved(ClientCarmenId,  n13, "Rehabilitacion hogar post-cirugia programada",
+                "hogar_diario",     "dia_completo", 5, "cercana","moderada", 13750m, future2),
+            MakeApproved(ClientAnaId,     n14, "Sonda vesical programada",
+                "sonda_vesical",    "sesion",       1, "local",  "estandar",  2000m, future3),
+            MakeApproved(ClientLuisaId,   n15, "Atencion domiciliaria nocturna programada",
+                "domicilio_noche_12h","medio_dia",  3, "media",  "moderada",  9900m, future4),
 
-        var hogarRule = rules.FirstOrDefault(r => r.CareRequestCategoryCode == "hogar") ?? rules.First();
-        var domRule   = rules.FirstOrDefault(r => r.CareRequestCategoryCode == "domicilio") ?? rules.First();
+            // Pending — no nurse assigned yet.
+            Make(ClientRosaId, null, "Cuidado post-operatorio programado — sin asignar",
+                "hogar_diario",     "dia_completo", 6, "local",  "estandar", 15000m, future5),
+            Make(CatalogSeeding.TestClientId, null, "Suero intravenoso programado — pendiente enfermera",
+                "suero",            "sesion",       2, "cercana","estandar",  4400m, future6),
+        };
 
-        // Use two completed care requests whose nurses we will seed executions for.
-        // Filter for completed hogar-type ones with an assigned nurse.
-        var completedHogar = careRequests
-            .Where(cr => cr.CompletedAtUtc.HasValue && cr.AssignedNurse.HasValue
-                         && (cr.CareRequestType?.StartsWith("hogar") == true))
-            .Take(2)
-            .ToList();
-
-        var completedDom = careRequests
-            .Where(cr => cr.CompletedAtUtc.HasValue && cr.AssignedNurse.HasValue
-                         && (cr.CareRequestType?.StartsWith("domicilio") == true))
-            .Take(1)
-            .ToList();
-
-        if (completedHogar.Count < 2 && completedDom.Count == 0)
-        {
-            return; // not enough data to seed executions — skip gracefully
-        }
-
-        var executions = new List<ServiceExecution>();
-        var allTargets = completedHogar.Concat(completedDom).ToList();
-
-        foreach (var cr in allTargets)
-        {
-            var rule = cr.PricingCategoryCode == "domicilio" ? domRule : hogarRule;
-            var executedAt = cr.CompletedAtUtc!.Value;
-            var subtotal = Math.Max(0m, cr.Total - (cr.MedicalSuppliesCost ?? 0m));
-
-            var baseComp      = decimal.Round(subtotal * (rule.BaseCompensationPercent / 100m), 2, MidpointRounding.AwayFromZero);
-            var transport     = decimal.Round(subtotal * Math.Max(0m, (cr.DistanceFactorMultiplierSnapshot ?? 1m) - 1m) * (rule.TransportIncentivePercent / 100m), 2, MidpointRounding.AwayFromZero);
-            var complexity    = decimal.Round(subtotal * Math.Max(0m, (cr.ComplexityMultiplierSnapshot ?? 1m) - 1m) * (rule.ComplexityBonusPercent / 100m), 2, MidpointRounding.AwayFromZero);
-            var supplies      = decimal.Round((cr.MedicalSuppliesCost ?? 0m) * (rule.MedicalSuppliesPercent / 100m), 2, MidpointRounding.AwayFromZero);
-
-            var exec = ServiceExecution.Create(
-                careRequestId:                cr.Id,
-                nurseUserId:                  cr.AssignedNurse!.Value,
-                shiftRecordId:                null,
-                compensationRuleId:           rule.Id,
-                employmentType:               CompensationEmploymentType.PerService,
-                variant:                      ServiceExecutionVariant.Standard,
-                executedAtUtc:                executedAt,
-                careRequestType:              cr.CareRequestType,
-                unitType:                     cr.UnitType,
-                unit:                         cr.Unit,
-                pricingCategoryCode:          cr.PricingCategoryCode,
-                distanceFactorCode:           cr.DistanceFactor,
-                complexityLevelCode:          cr.ComplexityLevel,
-                basePrice:                    cr.Price,
-                careRequestTotal:             cr.Total,
-                clientBasePrice:              cr.ClientBasePrice ?? cr.Price,
-                categoryFactorSnapshot:       cr.CategoryFactorSnapshot ?? 1m,
-                distanceMultiplierSnapshot:   cr.DistanceFactorMultiplierSnapshot ?? 1m,
-                complexityMultiplierSnapshot: cr.ComplexityMultiplierSnapshot ?? 1m,
-                volumeDiscountPercentSnapshot:cr.VolumeDiscountPercentSnapshot ?? 0,
-                subtotalBeforeSupplies:       subtotal,
-                medicalSuppliesCost:          cr.MedicalSuppliesCost ?? 0m,
-                ruleBaseCompensationPercent:  rule.BaseCompensationPercent,
-                ruleFixedAmountPerUnit:       rule.FixedAmountPerUnit,
-                ruleTransportIncentivePercent:rule.TransportIncentivePercent,
-                ruleComplexityBonusPercent:   rule.ComplexityBonusPercent,
-                ruleMedicalSuppliesPercent:   rule.MedicalSuppliesPercent,
-                ruleVariantPercent:           rule.BaseCompensationPercent,
-                baseCompensation:             baseComp,
-                transportIncentive:           transport,
-                complexityBonus:              complexity,
-                medicalSuppliesCompensation:  supplies,
-                adjustmentsTotal:             0m,
-                deductionsTotal:              0m,
-                manualOverrideAmount:         null,
-                notes:                        "Ejecucion seed — lifecycle",
-                createdAtUtc:                 executedAt);
-
-            executions.Add(exec);
-        }
-
-        db.ServiceExecutions.AddRange(executions);
-        await db.SaveChangesAsync(cancellationToken);
-
-        // Now add CompensationAdjustments and update AdjustmentsTotal on each execution.
-        if (executions.Count < 1)
-        {
-            return;
-        }
-
-        var now = new DateTime(2026, 3, 31, 14, 0, 0, DateTimeKind.Utc);
-
-        // Adjustment 1: bonus for an extra shift on the first execution.
-        var adj1 = CompensationAdjustment.Create(
-            serviceExecutionId: executions[0].Id,
-            label:              "Bono por turno extra",
-            amount:             500m,
-            notes:              "Enfermera cubrió turno adicional no registrado en sistema.",
-            createdAtUtc:       now);
-
-        executions[0].SetAdjustmentsTotal(500m, now);
-
-        db.CompensationAdjustments.Add(adj1);
-
-        if (executions.Count >= 2)
-        {
-            // Adjustment 2: negative penalty on the second execution.
-            var adj2 = CompensationAdjustment.Create(
-                serviceExecutionId: executions[1].Id,
-                label:              "Penalización por retraso",
-                amount:             -300m,
-                notes:              "Retraso documentado superior a 30 minutos en inicio del turno.",
-                createdAtUtc:       now.AddHours(1));
-
-            executions[1].SetAdjustmentsTotal(-300m, now.AddHours(1));
-
-            db.CompensationAdjustments.Add(adj2);
-        }
-
+        db.CareRequests.AddRange(futureRequests);
         await db.SaveChangesAsync(cancellationToken);
     }
 

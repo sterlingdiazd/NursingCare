@@ -557,10 +557,14 @@ public static class CatalogSeeding
             var category = categoryRotation[nurseIndex % categoryRotation.Length];
             var specialty = specialtyRotation[nurseIndex % specialtyRotation.Length];
 
+            // Nurse "De Los Santos" (the last entry in NurseIds) is seeded as inactive
+            // so the admin Inactive tab is non-empty. All other nurses remain active.
+            var isNurseActive = nurseName != "De Los Santos";
+
             var nurseProfile = new Nurse
             {
                 UserId = nurseId,
-                IsActive = true,
+                IsActive = isNurseActive,
                 HireDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(-6)),
                 Specialty = specialty,
                 LicenseId = $"{nurseIndex + 100000}",
