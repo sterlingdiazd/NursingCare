@@ -12,6 +12,8 @@ using NursingCareBackend.Application.CareRequests.Commands.PayCareRequest;
 using NursingCareBackend.Application.CareRequests.Commands.TransitionCareRequest;
 using NursingCareBackend.Application.CareRequests.Commands.VoidCareRequest;
 using NursingCareBackend.Application.CareRequests.Queries;
+using NursingCareBackend.Application.CareRequests.Queries.GetClientReceipt;
+using NursingCareBackend.Application.Identity.ClientProfiles;
 using NursingCareBackend.Application.CareRequests.Queries.GetReceipt;
 
 namespace NursingCareBackend.Application;
@@ -43,10 +45,13 @@ public static class DependencyInjection
     services.AddScoped<CareRequests.Commands.ReportPayment.ReportPaymentHandler>();
     services.AddScoped<VoidCareRequestHandler>();
     services.AddScoped<GenerateReceiptHandler>();
+    services.AddScoped<AdminPortal.Payroll.Commands.ConfirmNursePeriodPayment.ConfirmNursePeriodPaymentHandler>();
     services.AddScoped<GetReceiptHandler>();
+    services.AddScoped<GetClientReceiptHandler>();
     services.AddScoped<IAdminAccountProvisioningService, AdminAccountProvisioningService>();
     services.AddScoped<IAdminClientManagementService, AdminClientManagementService>();
     services.AddScoped<IAdminUserManagementService, AdminUserManagementService>();
+    services.AddScoped<IClientSelfProfileService, ClientSelfProfileService>();
 
     return services;
   }

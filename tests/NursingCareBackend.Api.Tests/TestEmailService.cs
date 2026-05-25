@@ -15,4 +15,15 @@ public sealed class TestEmailService : IEmailService
         SentEmails.Add((recipientEmail, subject, htmlBody));
         return Task.CompletedTask;
     }
+
+    public Task SendWithAttachmentsAsync(
+        string recipientEmail,
+        string subject,
+        string htmlBody,
+        IReadOnlyCollection<EmailAttachmentData> attachments,
+        CancellationToken cancellationToken = default)
+    {
+        SentEmails.Add((recipientEmail, subject, htmlBody));
+        return Task.CompletedTask;
+    }
 }

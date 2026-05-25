@@ -2,6 +2,7 @@ using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
 using NursingCareBackend.Application.CareRequests;
 using NursingCareBackend.Application.AdminPortal.Auditing;
 using NursingCareBackend.Application.AdminPortal.Notifications;
+using NursingCareBackend.Application.Notifications;
 using NursingCareBackend.Domain.CareRequests;
 using NursingCareBackend.Application.Payroll;
 
@@ -11,6 +12,7 @@ public sealed class TransitionCareRequestHandler
 {
   private readonly ICareRequestRepository _repository;
   private readonly IAdminNotificationPublisher _notifications;
+  private readonly IUserNotificationPublisher _userNotifications;
   private readonly IPayrollCompensationService _payrollCompensationService;
   private readonly IAdminAuditService _auditService;
   private readonly IInvoiceNumberGenerator _invoiceNumbers;
@@ -18,12 +20,14 @@ public sealed class TransitionCareRequestHandler
   public TransitionCareRequestHandler(
     ICareRequestRepository repository,
     IAdminNotificationPublisher notifications,
+    IUserNotificationPublisher userNotifications,
     IPayrollCompensationService payrollCompensationService,
     IAdminAuditService auditService,
     IInvoiceNumberGenerator invoiceNumbers)
   {
     _repository = repository;
     _notifications = notifications;
+    _userNotifications = userNotifications;
     _payrollCompensationService = payrollCompensationService;
     _auditService = auditService;
     _invoiceNumbers = invoiceNumbers;
@@ -103,6 +107,23 @@ public sealed class TransitionCareRequestHandler
         cancellationToken);
     }
 
+    if (command.Action == CareRequestTransitionAction.Approve)
+    {
+      await _userNotifications.PublishToUserAsync(
+        new UserNotificationPublishRequest(
+          RecipientUserId: careRequest.UserID,
+          Category: "care_request_approved",
+          Severity: "Medium",
+          Title: "Solicitud aprobada",
+          Body: $"Tu solicitud \"{careRequest.Description}\" fue aprobada. Te avisaremos cuando el servicio sea completado.",
+          EntityType: "CareRequest",
+          EntityId: careRequest.Id.ToString(),
+          DeepLinkPath: $"/care-requests/{careRequest.Id}",
+          Source: "Solicitudes",
+          RequiresAction: false),
+        cancellationToken);
+    }
+
     if (command.Action == CareRequestTransitionAction.Reject)
     {
       await _notifications.PublishToAdminsAsync(
@@ -116,6 +137,23 @@ public sealed class TransitionCareRequestHandler
           DeepLinkPath: $"/admin/care-requests/{careRequest.Id}",
           Source: "Administracion",
           RequiresAction: true),
+        cancellationToken);
+
+      var rejectionDetail = string.IsNullOrWhiteSpace(command.Reason)
+        ? "Comunícate con el equipo de soporte si necesitas más información."
+        : $"Motivo: {command.Reason}";
+      await _userNotifications.PublishToUserAsync(
+        new UserNotificationPublishRequest(
+          RecipientUserId: careRequest.UserID,
+          Category: "care_request_rejected",
+          Severity: "High",
+          Title: "Solicitud rechazada",
+          Body: $"Tu solicitud \"{careRequest.Description}\" fue rechazada. {rejectionDetail}",
+          EntityType: "CareRequest",
+          EntityId: careRequest.Id.ToString(),
+          DeepLinkPath: $"/care-requests/{careRequest.Id}",
+          Source: "Solicitudes",
+          RequiresAction: false),
         cancellationToken);
     }
 
@@ -133,6 +171,20 @@ public sealed class TransitionCareRequestHandler
           Source: "Operacion de enfermeria",
           RequiresAction: false),
         cancellationToken);
+
+      await _userNotifications.PublishToUserAsync(
+        new UserNotificationPublishRequest(
+          RecipientUserId: careRequest.UserID,
+          Category: "care_request_invoiced",
+          Severity: "High",
+          Title: "Servicio completado y facturado",
+          Body: $"Tu servicio \"{careRequest.Description}\" fue completado. La factura {careRequest.InvoiceNumber} está disponible para pago.",
+          EntityType: "CareRequest",
+          EntityId: careRequest.Id.ToString(),
+          DeepLinkPath: $"/care-requests/{careRequest.Id}",
+          Source: "Facturación",
+          RequiresAction: true),
+        cancellationToken);
     }
 
     if (command.Action == CareRequestTransitionAction.Cancel)
@@ -147,6 +199,20 @@ public sealed class TransitionCareRequestHandler
           EntityId: careRequest.Id.ToString(),
           DeepLinkPath: $"/admin/care-requests/{careRequest.Id}",
           Source: "Cliente",
+          RequiresAction: false),
+        cancellationToken);
+
+      await _userNotifications.PublishToUserAsync(
+        new UserNotificationPublishRequest(
+          RecipientUserId: careRequest.UserID,
+          Category: "care_request_cancelled",
+          Severity: "Medium",
+          Title: "Solicitud cancelada",
+          Body: $"Tu solicitud \"{careRequest.Description}\" fue cancelada.",
+          EntityType: "CareRequest",
+          EntityId: careRequest.Id.ToString(),
+          DeepLinkPath: $"/care-requests/{careRequest.Id}",
+          Source: "Solicitudes",
           RequiresAction: false),
         cancellationToken);
     }

@@ -8,6 +8,7 @@ using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
 using NursingCareBackend.Application.CareRequests.Commands.TransitionCareRequest;
 using NursingCareBackend.Application.CareRequests.Commands.ReportPayment;
 using NursingCareBackend.Application.CareRequests.Queries;
+using NursingCareBackend.Application.CareRequests.Queries.GetClientReceipt;
 using NursingCareBackend.Application.Identity.Repositories;
 using NursingCareBackend.Api.Extensions;
 using NursingCareBackend.Domain.Identity;
@@ -25,6 +26,7 @@ public sealed class CareRequestsController : ControllerBase
     private readonly GetCareRequestByIdHandler _getByIdHandler;
     private readonly VerifyPricingHandler _verifyPricingHandler;
     private readonly ReportPaymentHandler _reportPaymentHandler;
+    private readonly GetClientReceiptHandler _getClientReceiptHandler;
     private readonly IUserRepository _userRepository;
 
     public CareRequestsController(
@@ -35,6 +37,7 @@ public sealed class CareRequestsController : ControllerBase
         GetCareRequestByIdHandler getByIdHandler,
         VerifyPricingHandler verifyPricingHandler,
         ReportPaymentHandler reportPaymentHandler,
+        GetClientReceiptHandler getClientReceiptHandler,
         IUserRepository userRepository)
     {
         _assignNurseHandler = assignNurseHandler;
@@ -44,7 +47,45 @@ public sealed class CareRequestsController : ControllerBase
         _getByIdHandler = getByIdHandler;
         _verifyPricingHandler = verifyPricingHandler;
         _reportPaymentHandler = reportPaymentHandler;
+        _getClientReceiptHandler = getClientReceiptHandler;
         _userRepository = userRepository;
+    }
+
+    [HttpGet("{id:guid}/receipt")]
+    [Authorize(Roles = SystemRoles.Client)]
+    public async Task<IActionResult> GetClientReceipt(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var userId = ResolveCurrentUserId();
+        if (!userId.HasValue)
+        {
+            return this.ProblemResponse(
+                StatusCodes.Status401Unauthorized,
+                Messages.Get("errors.no_autorizado"),
+                Messages.Get("errors.sesion_sin_usuario"));
+        }
+
+        try
+        {
+            var receipt = await _getClientReceiptHandler.Handle(id, userId.Value, cancellationToken);
+            if (receipt is null)
+            {
+                return this.ProblemResponse(
+                    StatusCodes.Status404NotFound,
+                    Messages.Get("errors.recibo_no_encontrado"),
+                    $"No existe recibo disponible para la solicitud '{id}'.");
+            }
+
+            return File(receipt.Content, receipt.ContentType, receipt.FileName);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return this.ProblemResponse(
+                StatusCodes.Status400BadRequest,
+                Messages.Get("errors.estado_invalido"),
+                ex.Message);
+        }
     }
 
     [HttpPost]

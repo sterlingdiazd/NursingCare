@@ -2,6 +2,7 @@ using NursingCareBackend.Application.AdminPortal.Auditing;
 using NursingCareBackend.Application.CareRequests;
 using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
 using NursingCareBackend.Application.CareRequests.Commands.TransitionCareRequest;
+using NursingCareBackend.Application.Notifications;
 using NursingCareBackend.Domain.CareRequests;
 using NursingCareBackend.Application.Payroll;
 
@@ -50,7 +51,7 @@ public sealed class TransitionCareRequestHandlerTests
   {
     var careRequest = CreateDomicilioSample(Guid.NewGuid(), "Approve me");
     var repository = new FakeCareRequestRepository(careRequest);
-    var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher(), new FakePayrollCompensationService(), new FakeAdminAuditService(), new FakeInvoiceNumberGenerator());
+    var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher(), new FakeUserNotificationPublisher(), new FakePayrollCompensationService(), new FakeAdminAuditService(), new FakeInvoiceNumberGenerator());
 
     var result = await handler.Handle(
       new TransitionCareRequestCommand(careRequest.Id, CareRequestTransitionAction.Approve),
@@ -66,7 +67,7 @@ public sealed class TransitionCareRequestHandlerTests
   {
     var careRequest = CreateDomicilioSample(Guid.NewGuid(), "Reject me");
     var repository = new FakeCareRequestRepository(careRequest);
-    var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher(), new FakePayrollCompensationService(), new FakeAdminAuditService(), new FakeInvoiceNumberGenerator());
+    var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher(), new FakeUserNotificationPublisher(), new FakePayrollCompensationService(), new FakeAdminAuditService(), new FakeInvoiceNumberGenerator());
 
     var result = await handler.Handle(
       new TransitionCareRequestCommand(careRequest.Id, CareRequestTransitionAction.Reject),
@@ -85,7 +86,7 @@ public sealed class TransitionCareRequestHandlerTests
 
     var repository = new FakeCareRequestRepository(careRequest);
     var payrollService = new FakePayrollCompensationService();
-    var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher(), payrollService, new FakeAdminAuditService(), new FakeInvoiceNumberGenerator());
+    var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher(), new FakeUserNotificationPublisher(), payrollService, new FakeAdminAuditService(), new FakeInvoiceNumberGenerator());
 
     var result = await handler.Handle(
       new TransitionCareRequestCommand(careRequest.Id, CareRequestTransitionAction.Complete, AssignedNurseId),
@@ -109,7 +110,7 @@ public sealed class TransitionCareRequestHandlerTests
     careRequest.Approve(DateTime.UtcNow.AddMinutes(-5));
 
     var repository = new FakeCareRequestRepository(careRequest);
-    var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher(), new FakePayrollCompensationService(), new FakeAdminAuditService(), new FakeInvoiceNumberGenerator());
+    var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher(), new FakeUserNotificationPublisher(), new FakePayrollCompensationService(), new FakeAdminAuditService(), new FakeInvoiceNumberGenerator());
 
     var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => handler.Handle(
       new TransitionCareRequestCommand(careRequest.Id, CareRequestTransitionAction.Complete, AssignedNurseId),
@@ -122,7 +123,7 @@ public sealed class TransitionCareRequestHandlerTests
   public async Task Handle_Should_Throw_When_Request_Does_Not_Exist()
   {
     var repository = new FakeCareRequestRepository();
-    var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher(), new FakePayrollCompensationService(), new FakeAdminAuditService(), new FakeInvoiceNumberGenerator());
+    var handler = new TransitionCareRequestHandler(repository, new FakeAdminNotificationPublisher(), new FakeUserNotificationPublisher(), new FakePayrollCompensationService(), new FakeAdminAuditService(), new FakeInvoiceNumberGenerator());
 
     var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() => handler.Handle(
       new TransitionCareRequestCommand(Guid.NewGuid(), CareRequestTransitionAction.Approve),
@@ -204,6 +205,19 @@ public sealed class TransitionCareRequestHandlerTests
     public Task RecordExecutionForCompletedCareRequestAsync(CareRequest careRequest, CancellationToken cancellationToken)
     {
       LastRecordedCareRequestId = careRequest.Id;
+      return Task.CompletedTask;
+    }
+  }
+
+  private sealed class FakeUserNotificationPublisher : IUserNotificationPublisher
+  {
+    public List<UserNotificationPublishRequest> PublishedRequests { get; } = [];
+
+    public Task PublishToUserAsync(
+      UserNotificationPublishRequest request,
+      CancellationToken cancellationToken = default)
+    {
+      PublishedRequests.Add(request);
       return Task.CompletedTask;
     }
   }

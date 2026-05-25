@@ -28,6 +28,7 @@ public sealed class NursingCareDbContext : DbContext
        public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
        public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
        public DbSet<AdminNotification> AdminNotifications => Set<AdminNotification>();
+       public DbSet<UserNotification> UserNotifications => Set<UserNotification>();
        public DbSet<UserPushToken> UserPushTokens => Set<UserPushToken>();
        public DbSet<NotificationOutbox> NotificationOutbox => Set<NotificationOutbox>();
 
@@ -51,6 +52,7 @@ public sealed class NursingCareDbContext : DbContext
        public DbSet<ScheduledDeduction> ScheduledDeductions => Set<ScheduledDeduction>();
        public DbSet<PayrollRecalculationAudit> PayrollRecalculationAudits => Set<PayrollRecalculationAudit>();
        public DbSet<PayrollLineOverride> PayrollLineOverrides => Set<PayrollLineOverride>();
+       public DbSet<NursePeriodPayment> NursePeriodPayments => Set<NursePeriodPayment>();
 
        protected override void OnModelCreating(ModelBuilder modelBuilder)
        {
@@ -395,6 +397,9 @@ public sealed class NursingCareDbContext : DbContext
                       .HasConversion<string>()
                       .HasMaxLength(32);
 
+                     builder.Property(x => x.ReopenReason)
+                      .HasMaxLength(500);
+
                      builder.HasIndex(x => new { x.StartDate, x.EndDate })
                       .IsUnique();
               });
@@ -536,6 +541,24 @@ public sealed class NursingCareDbContext : DbContext
                             .HasMaxLength(32);
               });
 
+              modelBuilder.Entity<NursePeriodPayment>(builder =>
+              {
+                     builder.ToTable("NursePeriodPayments");
+                     builder.HasKey(x => x.Id);
+
+                     builder.Property(x => x.BankReference).HasMaxLength(200);
+
+                     builder.Property(x => x.VoucherDeliveryStatus)
+                            .HasConversion<string>()
+                            .HasMaxLength(32);
+
+                     builder.Property(x => x.DeliveryError).HasMaxLength(1000);
+
+                     // One confirmation per (period, nurse); the idempotent re-confirm path updates it.
+                     builder.HasIndex(x => new { x.PayrollPeriodId, x.NurseUserId })
+                            .IsUnique();
+              });
+
               modelBuilder.Entity<Role>(builder =>
               {
                      builder.ToTable("Roles");
@@ -663,6 +686,46 @@ public sealed class NursingCareDbContext : DbContext
                      builder.HasIndex(x => new { x.RecipientUserId, x.ArchivedAtUtc, x.ReadAtUtc });
               });
 
+              modelBuilder.Entity<UserNotification>(builder =>
+              {
+                     builder.ToTable("UserNotifications");
+
+                     builder.HasKey(x => x.Id);
+
+                     builder.Property(x => x.Category)
+                  .IsRequired()
+                  .HasMaxLength(80);
+
+                     builder.Property(x => x.Severity)
+                  .IsRequired()
+                  .HasMaxLength(20);
+
+                     builder.Property(x => x.Title)
+                  .IsRequired()
+                  .HasMaxLength(220);
+
+                     builder.Property(x => x.Body)
+                  .IsRequired()
+                  .HasMaxLength(2000);
+
+                     builder.Property(x => x.EntityType)
+                  .HasMaxLength(80);
+
+                     builder.Property(x => x.EntityId)
+                  .HasMaxLength(120);
+
+                     builder.Property(x => x.DeepLinkPath)
+                  .HasMaxLength(600);
+
+                     builder.Property(x => x.Source)
+                  .HasMaxLength(180);
+
+                     builder.Property(x => x.CreatedAtUtc)
+                  .IsRequired();
+
+                     builder.HasIndex(x => new { x.RecipientUserId, x.ArchivedAtUtc, x.ReadAtUtc });
+              });
+
               modelBuilder.Entity<UserPushToken>(builder =>
               {
                      builder.ToTable("UserPushTokens");
@@ -691,7 +754,11 @@ public sealed class NursingCareDbContext : DbContext
                      builder.HasKey(x => x.Id);
 
                      builder.Property(x => x.NotificationId).IsRequired();
+                     builder.Property(x => x.Kind)
+                            .IsRequired()
+                            .HasConversion<int>();
                      builder.Property(x => x.RecipientUserId).IsRequired();
+                     builder.Property(x => x.Source).HasMaxLength(180);
                      builder.Property(x => x.Status)
                             .IsRequired()
                             .HasConversion<int>();

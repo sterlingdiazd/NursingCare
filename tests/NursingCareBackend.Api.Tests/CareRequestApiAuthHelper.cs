@@ -10,14 +10,16 @@ internal static class CareRequestApiAuthHelper
     string scenario)
   {
     var email = $"{scenario}-{Guid.NewGuid():N}@nursingcare.local";
+    var identificationNumber = UniqueDigits("001", 11);
+    var phone = UniqueDigits("809", 10);
     var client = factory.CreateClient();
 
     var registerResponse = await client.PostAsJsonAsync("/api/auth/register", new
     {
       name = "Carla",
       lastName = "Jimenez",
-      identificationNumber = "00122334456",
-      phone = "8095550101",
+      identificationNumber,
+      phone,
       email,
       password = "Pass123!",
       confirmPassword = "Pass123!",
@@ -52,14 +54,16 @@ internal static class CareRequestApiAuthHelper
     string scenario)
   {
     var email = $"{scenario}-{Guid.NewGuid():N}@nursingcare.local";
+    var identificationNumber = UniqueDigits("001", 11);
+    var phone = UniqueDigits("809", 10);
     var client = factory.CreateClient();
 
     var registerResponse = await client.PostAsJsonAsync("/api/auth/register", new
     {
       name = "Luisa",
       lastName = "Martinez",
-      identificationNumber = "00133445567",
-      phone = "8095550103",
+      identificationNumber,
+      phone,
       email,
       password = "Pass123!",
       confirmPassword = "Pass123!",
@@ -86,8 +90,8 @@ internal static class CareRequestApiAuthHelper
       {
         name = "Luisa",
         lastName = "Martinez",
-        identificationNumber = "00133445567",
-        phone = "8095550103",
+        identificationNumber,
+        phone,
         email,
         hireDate = "2026-03-21",
         specialty = "Atencion domiciliaria",
@@ -122,5 +126,16 @@ internal static class CareRequestApiAuthHelper
   {
     public Guid UserId { get; set; }
     public string Token { get; set; } = string.Empty;
+  }
+
+  private static string UniqueDigits(string prefix, int length)
+  {
+    var digits = string.Concat(Guid.NewGuid().ToString("N").Where(char.IsDigit));
+    while (digits.Length < length)
+    {
+      digits += string.Concat(Guid.NewGuid().ToString("N").Where(char.IsDigit));
+    }
+
+    return (prefix + digits)[..length];
   }
 }

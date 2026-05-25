@@ -215,6 +215,70 @@ public sealed class ServiceBillingApiTests : IClassFixture<CustomWebApplicationF
         Assert.NotEmpty(body!.ReceiptNumber);
     }
 
+    [Fact]
+    public async Task GET_ClientReceipt_Returns_Pdf_For_Own_Paid_Request()
+    {
+        var (completedId, clientToken) = await CreateCompletedCareRequestWithClientAsync("billing-client-receipt-200");
+
+        var adminClient = CreateAdminClient();
+        await adminClient.PostAsJsonAsync($"/api/admin/care-requests/{completedId}/pay", new
+        {
+            bankReference = "TRF-CLIENT-RECEIPT-001"
+        });
+
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", clientToken);
+
+        var response = await client.GetAsync($"/api/care-requests/{completedId}/receipt");
+
+        response.EnsureSuccessStatusCode();
+        Assert.Equal("application/pdf", response.Content.Headers.ContentType?.MediaType);
+        var bytes = await response.Content.ReadAsByteArrayAsync();
+        Assert.NotEmpty(bytes);
+    }
+
+    [Fact]
+    public async Task GET_ClientReceipt_Rejects_Other_Client()
+    {
+        var (completedId, _) = await CreateCompletedCareRequestWithClientAsync("billing-client-receipt-other");
+        var (otherClientToken, _) = await CareRequestApiAuthHelper.CreateClientTokenAsync(
+            _factory,
+            $"billing-client-receipt-other-token-{Guid.NewGuid():N}");
+
+        var adminClient = CreateAdminClient();
+        await adminClient.PostAsJsonAsync($"/api/admin/care-requests/{completedId}/pay", new
+        {
+            bankReference = "TRF-CLIENT-RECEIPT-OTHER"
+        });
+
+        var otherClient = _factory.CreateClient();
+        otherClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", otherClientToken);
+
+        var response = await otherClient.GetAsync($"/api/care-requests/{completedId}/receipt");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GET_ClientReceipt_Returns_BadRequest_When_Request_Is_Not_Paid()
+    {
+        var (completedId, clientToken) = await CreateCompletedCareRequestWithClientAsync("billing-client-receipt-unpaid");
+
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", clientToken);
+
+        var response = await client.GetAsync($"/api/care-requests/{completedId}/receipt");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GET_ClientReceipt_Rejects_Non_Client_Roles()
+    {
+        var response = await CreateAdminClient().GetAsync($"/api/care-requests/{Guid.NewGuid()}/receipt");
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
     // ---- GET Nurse Detail ----
 
     [Fact]
@@ -280,6 +344,12 @@ public sealed class ServiceBillingApiTests : IClassFixture<CustomWebApplicationF
 
     private async Task<Guid> CreateCompletedCareRequestAsync(string seed)
     {
+        var (id, _) = await CreateCompletedCareRequestWithClientAsync(seed);
+        return id;
+    }
+
+    private async Task<(Guid Id, string ClientToken)> CreateCompletedCareRequestWithClientAsync(string seed)
+    {
         var (clientToken, _) = await CareRequestApiAuthHelper.CreateClientTokenAsync(_factory, seed + "-client");
         var (nurseToken, nurseUserId) = await CareRequestApiAuthHelper.CreateCompletedNurseTokenAsync(_factory, seed + "-nurse");
         var adminClient = CreateAdminClient();
@@ -310,7 +380,7 @@ public sealed class ServiceBillingApiTests : IClassFixture<CustomWebApplicationF
         var completeResponse = await nurseClient.PostAsync($"/api/care-requests/{id}/complete", null);
         completeResponse.EnsureSuccessStatusCode();
 
-        return id;
+        return (id, clientToken);
     }
 
     private sealed class CreateResponse

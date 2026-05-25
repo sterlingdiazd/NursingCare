@@ -44,26 +44,51 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
             .ToListAsync(cancellationToken);
 
         var periodIds = periods.Select(p => p.Id).ToList();
-        var lineCounts = periodIds.Count == 0
-            ? new Dictionary<Guid, int>()
-            : await _dbContext.PayrollLines
+
+        // Per-period line count and gross payout (sum of line components incl. adjustments).
+        var lineAggregates = periodIds.Count == 0
+            ? new Dictionary<Guid, (int Count, decimal Gross)>()
+            : (await _dbContext.PayrollLines
                 .AsNoTracking()
                 .Where(l => periodIds.Contains(l.PayrollPeriodId))
                 .GroupBy(l => l.PayrollPeriodId)
-                .Select(g => new { PeriodId = g.Key, Count = g.Count() })
-                .ToDictionaryAsync(x => x.PeriodId, x => x.Count, cancellationToken);
+                .Select(g => new
+                {
+                    PeriodId = g.Key,
+                    Count = g.Count(),
+                    Gross = g.Sum(l => l.BaseCompensation + l.TransportIncentive + l.ComplexityBonus + l.MedicalSuppliesCompensation + l.AdjustmentsTotal),
+                })
+                .ToListAsync(cancellationToken))
+                .ToDictionary(x => x.PeriodId, x => (x.Count, x.Gross));
+
+        // Period-level deductions (per nurse, subtracted once) — summed per period for the net.
+        var deductionsByPeriod = periodIds.Count == 0
+            ? new Dictionary<Guid, decimal>()
+            : await _dbContext.DeductionRecords
+                .AsNoTracking()
+                .Where(d => d.PayrollPeriodId != null && periodIds.Contains(d.PayrollPeriodId.Value))
+                .GroupBy(d => d.PayrollPeriodId!.Value)
+                .Select(g => new { PeriodId = g.Key, Total = g.Sum(d => d.Amount) })
+                .ToDictionaryAsync(x => x.PeriodId, x => x.Total, cancellationToken);
 
         var items = periods
-            .Select(p => new AdminPayrollPeriodListItem(
-                p.Id,
-                p.StartDate,
-                p.EndDate,
-                p.CutoffDate,
-                p.PaymentDate,
-                p.Status.ToString(),
-                p.CreatedAtUtc,
-                p.ClosedAtUtc,
-                lineCounts.GetValueOrDefault(p.Id, 0)))
+            .Select(p =>
+            {
+                var agg = lineAggregates.GetValueOrDefault(p.Id, (Count: 0, Gross: 0m));
+                var deductions = deductionsByPeriod.GetValueOrDefault(p.Id, 0m);
+                return new AdminPayrollPeriodListItem(
+                    p.Id,
+                    p.StartDate,
+                    p.EndDate,
+                    p.CutoffDate,
+                    p.PaymentDate,
+                    p.Status.ToString(),
+                    p.CreatedAtUtc,
+                    p.ClosedAtUtc,
+                    agg.Count,
+                    agg.Gross,
+                    agg.Gross - deductions);
+            })
             .ToList()
             .AsReadOnly();
 
@@ -153,7 +178,10 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
             period.ClosedAtUtc,
             lineItems,
             staffSummary,
-            canModify);
+            canModify,
+            period.ReopenedAtUtc,
+            period.ReopenReason,
+            period.ReopenCount);
     }
 
     public async Task<Guid> CreatePeriodAsync(
@@ -210,6 +238,75 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
         period.Close(DateTime.UtcNow);
         await _dbContext.SaveChangesAsync(cancellationToken);
         return PeriodCloseResult.Success;
+    }
+
+    public async Task<PeriodCloseWarnings> GetCloseWarningsAsync(Guid periodId, CancellationToken cancellationToken)
+    {
+        var period = await _dbContext.PayrollPeriods
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Id == periodId, cancellationToken);
+
+        if (period is null) return new PeriodCloseWarnings(0, 0);
+
+        // Nurses whose net pay (gross − period deductions) is zero or negative.
+        var grossByNurse = await _dbContext.PayrollLines
+            .AsNoTracking()
+            .Where(l => l.PayrollPeriodId == periodId)
+            .GroupBy(l => l.NurseUserId)
+            .Select(g => new
+            {
+                NurseUserId = g.Key,
+                Gross = g.Sum(l => l.BaseCompensation + l.TransportIncentive + l.ComplexityBonus + l.MedicalSuppliesCompensation + l.AdjustmentsTotal),
+            })
+            .ToListAsync(cancellationToken);
+
+        var deductionsByNurse = await _dbContext.DeductionRecords
+            .AsNoTracking()
+            .Where(d => d.PayrollPeriodId == periodId)
+            .GroupBy(d => d.NurseUserId)
+            .Select(g => new { NurseUserId = g.Key, Total = g.Sum(d => d.Amount) })
+            .ToDictionaryAsync(x => x.NurseUserId, x => x.Total, cancellationToken);
+
+        var negativeNetNurses = grossByNurse
+            .Count(n => n.Gross - deductionsByNurse.GetValueOrDefault(n.NurseUserId, 0m) <= 0m);
+
+        // Completed service executions inside the window with no payroll line in this period.
+        var executionsInWindow = await _dbContext.ServiceExecutions
+            .AsNoTracking()
+            .Where(e => e.ServiceDate >= period.StartDate && e.ServiceDate <= period.EndDate)
+            .Select(e => e.Id)
+            .ToListAsync(cancellationToken);
+
+        var unliquidatedServices = 0;
+        if (executionsInWindow.Count > 0)
+        {
+            var postedExecutionIds = await _dbContext.PayrollLines
+                .AsNoTracking()
+                .Where(l => l.PayrollPeriodId == periodId && l.ServiceExecutionId != null)
+                .Select(l => l.ServiceExecutionId!.Value)
+                .ToListAsync(cancellationToken);
+
+            unliquidatedServices = executionsInWindow.Except(postedExecutionIds).Count();
+        }
+
+        return new PeriodCloseWarnings(negativeNetNurses, unliquidatedServices);
+    }
+
+    public async Task<PeriodReopenResult> ReopenPeriodAsync(
+        Guid periodId,
+        string reason,
+        Guid? reopenedByUserId,
+        CancellationToken cancellationToken)
+    {
+        var period = await _dbContext.PayrollPeriods
+            .FirstOrDefaultAsync(p => p.Id == periodId, cancellationToken);
+
+        if (period is null) return PeriodReopenResult.NotFound;
+        if (!period.IsClosed) return PeriodReopenResult.NotClosed;
+
+        period.Reopen(reason, reopenedByUserId, DateTime.UtcNow);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return PeriodReopenResult.Success;
     }
 
     public async Task<PeriodMutationResult> UpdatePeriodAsync(

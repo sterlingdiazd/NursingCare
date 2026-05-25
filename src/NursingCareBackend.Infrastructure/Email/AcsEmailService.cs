@@ -39,27 +39,7 @@ public sealed class AcsEmailService : IEmailService
     {
         try
         {
-            var client = _client.Value;
-            if (client is null || string.IsNullOrWhiteSpace(_options.SenderAddress))
-            {
-                _logger.LogWarning(
-                    "Skipping email delivery to {Recipient} because ACS email configuration is incomplete.",
-                    recipientEmail);
-                return;
-            }
-
-            var emailSendOperation = await client.SendAsync(
-                Azure.WaitUntil.Started,
-                senderAddress: _options.SenderAddress,
-                recipientAddress: recipientEmail,
-                subject: subject,
-                htmlContent: htmlBody,
-                cancellationToken: cancellationToken);
-
-            _logger.LogInformation(
-                "Email queued to {Recipient} (operationId={OperationId})",
-                recipientEmail,
-                emailSendOperation.Id);
+            await SendCoreAsync(recipientEmail, subject, htmlBody, attachments: null, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -72,5 +52,68 @@ public sealed class AcsEmailService : IEmailService
             // Don't leak email failures to the caller — the forgot-password
             // endpoint should always return 200 for security reasons.
         }
+    }
+
+    public Task SendWithAttachmentsAsync(
+        string recipientEmail,
+        string subject,
+        string htmlBody,
+        IReadOnlyCollection<EmailAttachmentData> attachments,
+        CancellationToken cancellationToken = default)
+    {
+        // Unlike SendAsync, exceptions here propagate to the caller so it can record the
+        // delivery outcome (e.g. the payment-confirmation flow sets voucherEmailSent).
+        return SendCoreAsync(recipientEmail, subject, htmlBody, attachments, cancellationToken);
+    }
+
+    private async Task SendCoreAsync(
+        string recipientEmail,
+        string subject,
+        string htmlBody,
+        IReadOnlyCollection<EmailAttachmentData>? attachments,
+        CancellationToken cancellationToken)
+    {
+        var client = _client.Value;
+        if (client is null || string.IsNullOrWhiteSpace(_options.SenderAddress))
+        {
+            _logger.LogWarning(
+                "Skipping email delivery to {Recipient} because ACS email configuration is incomplete.",
+                recipientEmail);
+
+            // The transport is not configured. For the attachment path the caller treats a
+            // thrown exception as a delivery failure; signal that explicitly here.
+            if (attachments is { Count: > 0 })
+            {
+                throw new InvalidOperationException("La configuración de correo (ACS) está incompleta; no se pudo enviar el comprobante.");
+            }
+
+            return;
+        }
+
+        var message = new EmailMessage(
+            senderAddress: _options.SenderAddress,
+            recipientAddress: recipientEmail,
+            content: new EmailContent(subject) { Html = htmlBody });
+
+        if (attachments is { Count: > 0 })
+        {
+            foreach (var attachment in attachments)
+            {
+                message.Attachments.Add(new EmailAttachment(
+                    attachment.FileName,
+                    attachment.ContentType,
+                    BinaryData.FromBytes(attachment.Content)));
+            }
+        }
+
+        var emailSendOperation = await client.SendAsync(
+            Azure.WaitUntil.Started,
+            message,
+            cancellationToken);
+
+        _logger.LogInformation(
+            "Email queued to {Recipient} (operationId={OperationId})",
+            recipientEmail,
+            emailSendOperation.Id);
     }
 }

@@ -1,5 +1,6 @@
 using NursingCareBackend.Application.AdminPortal.Auditing;
 using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
+using NursingCareBackend.Application.Notifications;
 using NursingCareBackend.Domain.CareRequests;
 
 namespace NursingCareBackend.Application.CareRequests.Commands.VoidCareRequest;
@@ -14,13 +15,16 @@ public sealed class VoidCareRequestHandler
 {
     private readonly ICareRequestRepository _repository;
     private readonly IAdminAuditService _auditService;
+    private readonly IUserNotificationPublisher _userNotifications;
 
     public VoidCareRequestHandler(
         ICareRequestRepository repository,
-        IAdminAuditService auditService)
+        IAdminAuditService auditService,
+        IUserNotificationPublisher userNotifications)
     {
         _repository = repository;
         _auditService = auditService;
+        _userNotifications = userNotifications;
     }
 
     public async Task<VoidedCareRequestResponse> Handle(
@@ -50,7 +54,21 @@ public sealed class VoidCareRequestHandler
                 EntityType: "CareRequest",
                 EntityId: careRequest.Id.ToString(),
                 Notes: command.VoidReason,
-                MetadataJson: null),
+            MetadataJson: null),
+            cancellationToken);
+
+        await _userNotifications.PublishToUserAsync(
+            new UserNotificationPublishRequest(
+                RecipientUserId: careRequest.UserID,
+                Category: "care_request_voided",
+                Severity: "Medium",
+                Title: "Solicitud anulada",
+                Body: $"Tu solicitud \"{careRequest.Description}\" fue anulada. Motivo: {careRequest.VoidReason}",
+                EntityType: "CareRequest",
+                EntityId: careRequest.Id.ToString(),
+                DeepLinkPath: $"/care-requests/{careRequest.Id}",
+                Source: "Solicitudes",
+                RequiresAction: false),
             cancellationToken);
 
         return new VoidedCareRequestResponse(

@@ -1,25 +1,29 @@
 using Microsoft.EntityFrameworkCore;
-using NursingCareBackend.Application.AdminPortal.Notifications;
-using NursingCareBackend.Domain.Admin;
+using NursingCareBackend.Application.Notifications;
 using NursingCareBackend.Domain.Identity;
 using NursingCareBackend.Domain.Notifications;
 using NursingCareBackend.Infrastructure.Persistence;
 
-namespace NursingCareBackend.Infrastructure.AdminPortal;
+namespace NursingCareBackend.Infrastructure.Notifications;
 
-public sealed class AdminNotificationPublisher : IAdminNotificationPublisher
+public sealed class UserNotificationPublisher : IUserNotificationPublisher
 {
   private readonly NursingCareDbContext _dbContext;
 
-  public AdminNotificationPublisher(NursingCareDbContext dbContext)
+  public UserNotificationPublisher(NursingCareDbContext dbContext)
   {
     _dbContext = dbContext;
   }
 
-  public async Task PublishToAdminsAsync(
-    AdminNotificationPublishRequest request,
+  public async Task PublishToUserAsync(
+    UserNotificationPublishRequest request,
     CancellationToken cancellationToken = default)
   {
+    if (request.RecipientUserId == Guid.Empty)
+    {
+      throw new ArgumentException("Recipient user identifier is required.", nameof(request.RecipientUserId));
+    }
+
     if (string.IsNullOrWhiteSpace(request.Category))
     {
       throw new ArgumentException("Notification category is required.", nameof(request.Category));
@@ -40,23 +44,24 @@ public sealed class AdminNotificationPublisher : IAdminNotificationPublisher
       throw new ArgumentException("Notification body is required.", nameof(request.Body));
     }
 
-    var adminRecipientIds = await _dbContext.Users
+    var recipientExists = await _dbContext.Users
       .AsNoTracking()
-      .Where(user => user.IsActive && user.UserRoles.Any(userRole => userRole.Role.Name == SystemRoles.Admin))
-      .Select(user => user.Id)
-      .Distinct()
-      .ToListAsync(cancellationToken);
+      .AnyAsync(user =>
+        user.Id == request.RecipientUserId
+        && user.IsActive
+        && user.UserRoles.Any(userRole => userRole.Role.Name == SystemRoles.Client),
+        cancellationToken);
 
-    if (adminRecipientIds.Count == 0)
+    if (!recipientExists)
     {
       return;
     }
 
     var createdAtUtc = DateTime.UtcNow;
-    var notifications = adminRecipientIds.Select(adminUserId => new AdminNotification
+    var notification = new UserNotification
     {
       Id = Guid.NewGuid(),
-      RecipientUserId = adminUserId,
+      RecipientUserId = request.RecipientUserId,
       Category = request.Category.Trim(),
       Severity = request.Severity.Trim(),
       Title = request.Title.Trim(),
@@ -71,26 +76,22 @@ public sealed class AdminNotificationPublisher : IAdminNotificationPublisher
       ReadAtUtc = null,
       ArchivedAtUtc = null,
       CreatedBySystem = request.CreatedBySystem,
-    }).ToList();
+    };
 
-    // Outbox row per (notification, recipient). Worker drains these and pushes
-    // via Expo. Same SaveChangesAsync transaction as the inbox rows so a push
-    // failure never leaves an orphaned inbox entry — and an inbox row never
-    // exists without a corresponding push attempt scheduled.
-    var outboxRows = notifications.Select(n => new NotificationOutbox
+    var outboxRow = new NotificationOutbox
     {
       Id = Guid.NewGuid(),
-      NotificationId = n.Id,
-      Kind = NotificationOutboxKind.Admin,
-      RecipientUserId = n.RecipientUserId,
-      Source = n.Source,
+      NotificationId = notification.Id,
+      Kind = NotificationOutboxKind.User,
+      RecipientUserId = notification.RecipientUserId,
+      Source = notification.Source,
       Status = NotificationOutboxStatus.Pending,
       Attempts = 0,
       CreatedAtUtc = createdAtUtc,
-    }).ToList();
+    };
 
-    await _dbContext.AdminNotifications.AddRangeAsync(notifications, cancellationToken);
-    await _dbContext.NotificationOutbox.AddRangeAsync(outboxRows, cancellationToken);
+    await _dbContext.UserNotifications.AddAsync(notification, cancellationToken);
+    await _dbContext.NotificationOutbox.AddAsync(outboxRow, cancellationToken);
     await _dbContext.SaveChangesAsync(cancellationToken);
   }
 }

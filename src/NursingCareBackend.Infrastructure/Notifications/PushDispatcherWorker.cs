@@ -81,11 +81,50 @@ public sealed class PushDispatcherWorker : BackgroundService
     }
     await db.SaveChangesAsync(cancellationToken);
 
-    var notificationIds = pending.Select(o => o.NotificationId).Distinct().ToList();
-    var notifications = await db.AdminNotifications
+    var adminNotificationIds = pending
+      .Where(o => o.Kind == NotificationOutboxKind.Admin)
+      .Select(o => o.NotificationId)
+      .Distinct()
+      .ToList();
+    var userNotificationIds = pending
+      .Where(o => o.Kind == NotificationOutboxKind.User)
+      .Select(o => o.NotificationId)
+      .Distinct()
+      .ToList();
+
+    var adminNotifications = await db.AdminNotifications
       .AsNoTracking()
-      .Where(n => notificationIds.Contains(n.Id))
-      .ToDictionaryAsync(n => n.Id, cancellationToken);
+      .Where(n => adminNotificationIds.Contains(n.Id))
+      .Select(n => new PushNotificationEnvelope(
+        n.Id,
+        n.Category,
+        n.Severity,
+        n.Title,
+        n.Body,
+        n.DeepLinkPath,
+        n.EntityType,
+        n.EntityId,
+        n.Source))
+      .ToListAsync(cancellationToken);
+    var userNotifications = await db.UserNotifications
+      .AsNoTracking()
+      .Where(n => userNotificationIds.Contains(n.Id))
+      .Select(n => new PushNotificationEnvelope(
+        n.Id,
+        n.Category,
+        n.Severity,
+        n.Title,
+        n.Body,
+        n.DeepLinkPath,
+        n.EntityType,
+        n.EntityId,
+        n.Source))
+      .ToListAsync(cancellationToken);
+
+    var notifications = adminNotifications
+      .Select(n => (Kind: NotificationOutboxKind.Admin, Notification: n))
+      .Concat(userNotifications.Select(n => (Kind: NotificationOutboxKind.User, Notification: n)))
+      .ToDictionary(item => (item.Kind, item.Notification.Id), item => item.Notification);
 
     var recipientIds = pending.Select(o => o.RecipientUserId).Distinct().ToList();
     var tokensByUser = await db.UserPushTokens
@@ -99,7 +138,7 @@ public sealed class PushDispatcherWorker : BackgroundService
     var messages = new List<(NotificationOutbox Row, UserPushToken Token, ExpoPushMessage Message)>();
     foreach (var row in pending)
     {
-      if (!notifications.TryGetValue(row.NotificationId, out var notif))
+      if (!notifications.TryGetValue((row.Kind, row.NotificationId), out var notif))
       {
         row.Status = NotificationOutboxStatus.Failed;
         row.LastError = "NotificationMissing";
@@ -121,6 +160,8 @@ public sealed class PushDispatcherWorker : BackgroundService
           ["deepLinkPath"] = notif.DeepLinkPath,
           ["entityType"] = notif.EntityType,
           ["entityId"] = notif.EntityId,
+          ["kind"] = row.Kind.ToString(),
+          ["source"] = notif.Source,
         };
         messages.Add((row, t, new ExpoPushMessage(
           To: t.ExpoPushToken,
@@ -215,4 +256,15 @@ public sealed class PushDispatcherWorker : BackgroundService
     db.NotificationOutbox.UpdateRange(pendingReceipts);
     await db.SaveChangesAsync(cancellationToken);
   }
+
+  private sealed record PushNotificationEnvelope(
+    Guid Id,
+    string Category,
+    string Severity,
+    string Title,
+    string Body,
+    string? DeepLinkPath,
+    string? EntityType,
+    string? EntityId,
+    string? Source);
 }

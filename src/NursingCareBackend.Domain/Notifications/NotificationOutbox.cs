@@ -8,6 +8,12 @@ public enum NotificationOutboxStatus
   Failed = 3,
 }
 
+public enum NotificationOutboxKind
+{
+  Admin = 0,
+  User = 1,
+}
+
 /// <summary>
 /// One row per notification × recipient. Written in the same SaveChangesAsync
 /// transaction as the inbox row so the notification persists even if push
@@ -19,10 +25,14 @@ public sealed class NotificationOutbox
 {
   public Guid Id { get; set; }
 
-  /// <summary>FK to the AdminNotification row (will become UserNotification in P1) the outbox row delivers.</summary>
+  /// <summary>FK to the notification inbox row identified by <see cref="Kind"/>.</summary>
   public Guid NotificationId { get; set; }
 
+  public NotificationOutboxKind Kind { get; set; } = NotificationOutboxKind.Admin;
+
   public Guid RecipientUserId { get; set; }
+
+  public string? Source { get; set; }
 
   public NotificationOutboxStatus Status { get; set; } = NotificationOutboxStatus.Pending;
 

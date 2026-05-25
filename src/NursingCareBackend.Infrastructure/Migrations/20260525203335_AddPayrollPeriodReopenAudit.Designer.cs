@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NursingCareBackend.Infrastructure.Persistence;
 
@@ -11,9 +12,11 @@ using NursingCareBackend.Infrastructure.Persistence;
 namespace NursingCareBackend.Infrastructure.Migrations
 {
     [DbContext(typeof(NursingCareDbContext))]
-    partial class NursingCareDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260525203335_AddPayrollPeriodReopenAudit")]
+    partial class AddPayrollPeriodReopenAudit
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -885,9 +888,6 @@ namespace NursingCareBackend.Infrastructure.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("nvarchar(64)");
 
-                    b.Property<int>("Kind")
-                        .HasColumnType("int");
-
                     b.Property<DateTime?>("LastAttemptAtUtc")
                         .HasColumnType("datetime2");
 
@@ -901,10 +901,6 @@ namespace NursingCareBackend.Infrastructure.Migrations
                     b.Property<Guid>("RecipientUserId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<string>("Source")
-                        .HasMaxLength(180)
-                        .HasColumnType("nvarchar(180)");
-
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
@@ -915,76 +911,6 @@ namespace NursingCareBackend.Infrastructure.Migrations
                     b.HasIndex("Status", "CreatedAtUtc");
 
                     b.ToTable("NotificationOutbox", (string)null);
-                });
-
-            modelBuilder.Entity("NursingCareBackend.Domain.Notifications.UserNotification", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime?>("ArchivedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Body")
-                        .IsRequired()
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
-
-                    b.Property<string>("Category")
-                        .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("nvarchar(80)");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<bool>("CreatedBySystem")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("DeepLinkPath")
-                        .HasMaxLength(600)
-                        .HasColumnType("nvarchar(600)");
-
-                    b.Property<string>("EntityId")
-                        .HasMaxLength(120)
-                        .HasColumnType("nvarchar(120)");
-
-                    b.Property<string>("EntityType")
-                        .HasMaxLength(80)
-                        .HasColumnType("nvarchar(80)");
-
-                    b.Property<bool>("IsDismissed")
-                        .HasColumnType("bit");
-
-                    b.Property<DateTime?>("ReadAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<Guid>("RecipientUserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<bool>("RequiresAction")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Severity")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<string>("Source")
-                        .HasMaxLength(180)
-                        .HasColumnType("nvarchar(180)");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(220)
-                        .HasColumnType("nvarchar(220)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("RecipientUserId", "ArchivedAtUtc", "ReadAtUtc");
-
-                    b.ToTable("UserNotifications", (string)null);
                 });
 
             modelBuilder.Entity("NursingCareBackend.Domain.Notifications.UserPushToken", b =>
@@ -1195,54 +1121,6 @@ namespace NursingCareBackend.Infrastructure.Migrations
                         .HasFilter("[ScheduledDeductionId] IS NOT NULL");
 
                     b.ToTable("DeductionRecords", (string)null);
-                });
-
-            modelBuilder.Entity("NursingCareBackend.Domain.Payroll.NursePeriodPayment", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("BankReference")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<DateTime>("ConfirmedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<Guid>("ConfirmedByUserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("DeliveryError")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<Guid>("NurseUserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("PayrollPeriodId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("VoucherDeliveredAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("VoucherDeliveryStatus")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PayrollPeriodId", "NurseUserId")
-                        .IsUnique();
-
-                    b.ToTable("NursePeriodPayments", (string)null);
                 });
 
             modelBuilder.Entity("NursingCareBackend.Domain.Payroll.PayrollLine", b =>

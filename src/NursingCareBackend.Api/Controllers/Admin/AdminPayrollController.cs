@@ -26,6 +26,7 @@ public sealed class AdminPayrollController : ControllerBase
     private readonly IAuthRateLimiter _rateLimiter;
     private readonly NursingCareBackend.Application.AdminPortal.Auditing.IAdminAuditService _auditService;
     private readonly NursingCareBackend.Application.AdminPortal.Payroll.ICompanyInfoProvider _companyProvider;
+    private readonly NursingCareBackend.Application.AdminPortal.Payroll.Commands.ConfirmNursePeriodPayment.ConfirmNursePeriodPaymentHandler _confirmPaymentHandler;
 
     public AdminPayrollController(
         IAdminPayrollRepository repository,
@@ -36,7 +37,8 @@ public sealed class AdminPayrollController : ControllerBase
         IScheduledDeductionService scheduledDeductionService,
         IAuthRateLimiter rateLimiter,
         NursingCareBackend.Application.AdminPortal.Auditing.IAdminAuditService auditService,
-        NursingCareBackend.Application.AdminPortal.Payroll.ICompanyInfoProvider companyProvider)
+        NursingCareBackend.Application.AdminPortal.Payroll.ICompanyInfoProvider companyProvider,
+        NursingCareBackend.Application.AdminPortal.Payroll.Commands.ConfirmNursePeriodPayment.ConfirmNursePeriodPaymentHandler confirmPaymentHandler)
     {
         _repository = repository;
         _recalculationService = recalculationService;
@@ -47,6 +49,7 @@ public sealed class AdminPayrollController : ControllerBase
         _rateLimiter = rateLimiter;
         _auditService = auditService;
         _companyProvider = companyProvider;
+        _confirmPaymentHandler = confirmPaymentHandler;
     }
 
     private Guid GetAdminUserId()
@@ -135,13 +138,46 @@ public sealed class AdminPayrollController : ControllerBase
         }
     }
 
+    // GET /api/admin/payroll/periods/{id}/close-warnings
+    // Pre-close advisory checks the UI surfaces before asking the admin to confirm.
+    [HttpGet("periods/{id:guid}/close-warnings")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult<PeriodCloseWarnings>> GetCloseWarnings(Guid id, CancellationToken cancellationToken)
+    {
+        var warnings = await _repository.GetCloseWarningsAsync(id, cancellationToken);
+        return Ok(warnings);
+    }
+
     // PATCH /api/admin/payroll/periods/{id}/close
     [HttpPatch("periods/{id:guid}/close")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> ClosePeriod(Guid id, CancellationToken cancellationToken)
+    public async Task<IActionResult> ClosePeriod(
+        Guid id,
+        [FromBody] ClosePeriodRequest? request,
+        CancellationToken cancellationToken)
     {
+        // Closing is irreversible-by-default: surface unliquidated services and zero/negative
+        // net pay, and require explicit acknowledgement before locking the period.
+        if (request?.AcknowledgeWarnings != true)
+        {
+            var warnings = await _repository.GetCloseWarningsAsync(id, cancellationToken);
+            if (warnings.HasWarnings)
+            {
+                var parts = new List<string>();
+                if (warnings.UnliquidatedServices > 0)
+                    parts.Add($"{warnings.UnliquidatedServices} servicio(s) completado(s) en el período sin línea de nómina (quedarían sin pagar)");
+                if (warnings.NegativeNetNurses > 0)
+                    parts.Add($"{warnings.NegativeNetNurses} enfermera(s) con pago neto en cero o negativo");
+
+                return this.ProblemResponse(
+                    StatusCodes.Status409Conflict,
+                    Messages.Get("errors.periodo_requiere_confirmacion"),
+                    $"Antes de cerrar revisa: {string.Join("; ", parts)}. Confirma para cerrar de todas formas (es irreversible).");
+            }
+        }
+
         var result = await _repository.ClosePeriodAsync(id, cancellationToken);
 
         if (result == PeriodCloseResult.NotFound)
@@ -162,6 +198,63 @@ public sealed class AdminPayrollController : ControllerBase
 
         // Closing settles each scheduled-deduction installment that lived in this period.
         await _scheduledDeductionService.SettlePeriodInstallmentsAsync(id, cancellationToken);
+
+        return NoContent();
+    }
+
+    // POST /api/admin/payroll/periods/{id}/reopen
+    // Reopens a closed period for correction (audited). Reverts to Open and recomputes
+    // installment settlement so cuotas in this period are no longer counted as paid.
+    [HttpPost("periods/{id:guid}/reopen")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> ReopenPeriod(
+        Guid id,
+        [FromBody] ReopenPeriodRequest? request,
+        CancellationToken cancellationToken)
+    {
+        var reason = request?.Reason?.Trim();
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            return this.ProblemResponse(
+                StatusCodes.Status400BadRequest,
+                Messages.Get("errors.razon_requerida"),
+                Messages.Get("errors.razon_reapertura_detalle"));
+        }
+
+        var result = await _repository.ReopenPeriodAsync(id, reason, GetAdminUserId(), cancellationToken);
+
+        if (result == PeriodReopenResult.NotFound)
+        {
+            return this.ProblemResponse(
+                StatusCodes.Status404NotFound,
+                Messages.Get("errors.periodo_no_encontrado"),
+                $"No se encontró el período de nómina con id '{id}'.");
+        }
+
+        if (result == PeriodReopenResult.NotClosed)
+        {
+            return this.ProblemResponse(
+                StatusCodes.Status409Conflict,
+                Messages.Get("errors.periodo_no_cerrado"),
+                Messages.Get("errors.periodo_no_cerrado_detalle"));
+        }
+
+        // Recompute installment settlement: cuotas living in the now-open period drop out of "paid".
+        await _scheduledDeductionService.SettlePeriodInstallmentsAsync(id, cancellationToken);
+
+        await _auditService.WriteAsync(
+            new NursingCareBackend.Application.AdminPortal.Auditing.AdminAuditRecord(
+                ActorUserId: GetAdminUserId(),
+                ActorRole: "Admin",
+                Action: "ReopenPeriod",
+                EntityType: "PayrollPeriod",
+                EntityId: id.ToString(),
+                Notes: reason,
+                MetadataJson: null),
+            cancellationToken);
 
         return NoContent();
     }
@@ -199,7 +292,7 @@ public sealed class AdminPayrollController : ControllerBase
         return MapPeriodMutation(result, id) ?? NoContent();
     }
 
-    // Standard period date rules (start ≤ end, start ≤ cutoff, cutoff ≤ payment).
+    // Standard period date rules (start ≤ cutoff ≤ end, and cutoff ≤ payment).
     // Returns a 400 problem-details response on violation, or null when the dates are valid.
     private IActionResult? ValidatePeriodDates(CreatePayrollPeriodRequest request)
     {
@@ -211,7 +304,9 @@ public sealed class AdminPayrollController : ControllerBase
                 Messages.Get("errors.rango_fechas_detalle"));
         }
 
-        if (request.CutoffDate < request.StartDate || request.PaymentDate < request.CutoffDate)
+        if (request.CutoffDate < request.StartDate
+            || request.CutoffDate > request.EndDate
+            || request.PaymentDate < request.CutoffDate)
         {
             return this.ProblemResponse(
                 StatusCodes.Status400BadRequest,
@@ -828,6 +923,45 @@ public sealed class AdminPayrollController : ControllerBase
         return Ok(detail);
     }
 
+    // POST /api/admin/payroll/periods/{periodId}/nurses/{nurseId}/confirm-payment
+    // Demo: admin confirms the nurse's bank transfer for a period. Generates the nurse's
+    // voucher PDF, emails it to the logged-in admin, and returns a wa.me link to the
+    // admin's own phone with a prefilled Spanish message. All delivery is routed to the
+    // admin (never to the nurse). Idempotent on (period, nurse).
+    [HttpPost("periods/{periodId:guid}/nurses/{nurseId:guid}/confirm-payment")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ConfirmNursePeriodPayment(
+        Guid periodId,
+        Guid nurseId,
+        [FromBody] ConfirmNursePeriodPaymentRequest? request,
+        CancellationToken cancellationToken)
+    {
+        var adminId = GetAdminUserId();
+        if (adminId == Guid.Empty)
+            return Unauthorized();
+
+        try
+        {
+            var result = await _confirmPaymentHandler.Handle(
+                new NursingCareBackend.Application.AdminPortal.Payroll.Commands.ConfirmNursePeriodPayment.ConfirmNursePeriodPaymentCommand(
+                    periodId,
+                    nurseId,
+                    adminId,
+                    request?.BankReference),
+                cancellationToken);
+
+            return Ok(result);
+        }
+        catch (VoucherNotFoundException)
+        {
+            return this.ProblemResponse(
+                StatusCodes.Status404NotFound,
+                Messages.Get("errors.periodo_enfermera_no_encontrado"),
+                Messages.Get("errors.periodo_enfermera_no_encontrado_detalle"));
+        }
+    }
+
     private static string EscapeCsv(object? value)
     {
         if (value is null) return "\"\"";
@@ -836,10 +970,27 @@ public sealed class AdminPayrollController : ControllerBase
     }
 }
 
+public sealed class ConfirmNursePeriodPaymentRequest
+{
+    public string? BankReference { get; set; }
+}
+
 public sealed class CreatePayrollPeriodRequest
 {
     public DateOnly StartDate { get; set; }
     public DateOnly EndDate { get; set; }
     public DateOnly CutoffDate { get; set; }
     public DateOnly PaymentDate { get; set; }
+}
+
+public sealed class ClosePeriodRequest
+{
+    // When true the admin has reviewed and accepted the pre-close warnings (unliquidated
+    // services, zero/negative net pay) and the period is closed anyway.
+    public bool AcknowledgeWarnings { get; set; }
+}
+
+public sealed class ReopenPeriodRequest
+{
+    public string? Reason { get; set; }
 }

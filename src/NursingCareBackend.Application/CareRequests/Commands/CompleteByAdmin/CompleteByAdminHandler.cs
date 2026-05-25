@@ -1,6 +1,7 @@
 using NursingCareBackend.Application.AdminPortal.Auditing;
 using NursingCareBackend.Application.AdminPortal.Notifications;
 using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
+using NursingCareBackend.Application.Notifications;
 using NursingCareBackend.Application.Payroll;
 using NursingCareBackend.Domain.CareRequests;
 
@@ -10,6 +11,7 @@ public sealed class CompleteByAdminHandler
 {
     private readonly ICareRequestRepository _repository;
     private readonly IAdminNotificationPublisher _notifications;
+    private readonly IUserNotificationPublisher _userNotifications;
     private readonly IPayrollCompensationService _payrollCompensationService;
     private readonly IAdminAuditService _auditService;
     private readonly IInvoiceNumberGenerator _invoiceNumbers;
@@ -17,12 +19,14 @@ public sealed class CompleteByAdminHandler
     public CompleteByAdminHandler(
         ICareRequestRepository repository,
         IAdminNotificationPublisher notifications,
+        IUserNotificationPublisher userNotifications,
         IPayrollCompensationService payrollCompensationService,
         IAdminAuditService auditService,
         IInvoiceNumberGenerator invoiceNumbers)
     {
         _repository = repository;
         _notifications = notifications;
+        _userNotifications = userNotifications;
         _payrollCompensationService = payrollCompensationService;
         _auditService = auditService;
         _invoiceNumbers = invoiceNumbers;
@@ -91,6 +95,20 @@ public sealed class CompleteByAdminHandler
                 DeepLinkPath: $"/admin/care-requests/{careRequest.Id}",
                 Source: "Administracion",
                 RequiresAction: false),
+            cancellationToken);
+
+        await _userNotifications.PublishToUserAsync(
+            new UserNotificationPublishRequest(
+                RecipientUserId: careRequest.UserID,
+                Category: "care_request_invoiced",
+                Severity: "High",
+                Title: "Servicio completado y facturado",
+                Body: $"Tu servicio \"{careRequest.Description}\" fue completado. La factura {careRequest.InvoiceNumber} está disponible para pago.",
+                EntityType: "CareRequest",
+                EntityId: careRequest.Id.ToString(),
+                DeepLinkPath: $"/care-requests/{careRequest.Id}",
+                Source: "Facturación",
+                RequiresAction: true),
             cancellationToken);
 
         return careRequest;

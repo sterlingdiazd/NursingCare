@@ -114,6 +114,8 @@ public static class DependencyInjection
         services.AddScoped<IAdminNotificationService, AdminNotificationService>();
         services.AddScoped<IAdminNotificationPublisher, AdminNotificationPublisher>();
         services.AddScoped<IAdminEmailNotifier, AdminEmailNotifier>();
+        services.AddScoped<IUserNotificationService, UserNotificationService>();
+        services.AddScoped<IUserNotificationPublisher, UserNotificationPublisher>();
 
         // Push delivery: HttpClient + worker. The worker is a long-running
         // BackgroundService that drains NotificationOutbox; the HttpClient
@@ -168,6 +170,7 @@ public static class DependencyInjection
         services.AddScoped<IPayrollRecalculationService, PayrollRecalculationService>();
         services.AddScoped<IAdminPayrollOverrideRepository, AdminPayrollOverrideRepository>();
         services.AddScoped<IPayrollVoucherService, PayrollVoucherService>();
+        services.AddScoped<INursePeriodPaymentRepository, NursePeriodPaymentRepository>();
         services.AddScoped<IPayrollReportExportService, PayrollReportExportService>();
         services.AddScoped<NursingCareBackend.Application.AdminPortal.Payroll.ICompanyInfoProvider, NursingCareBackend.Infrastructure.Payroll.CompanyInfoProvider>();
         services.AddScoped<IScheduledDeductionService, ScheduledDeductionService>();

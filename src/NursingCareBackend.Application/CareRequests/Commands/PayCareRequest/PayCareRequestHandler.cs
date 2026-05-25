@@ -1,6 +1,7 @@
 using NursingCareBackend.Application.AdminPortal.Auditing;
 using NursingCareBackend.Application.CareRequests;
 using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
+using NursingCareBackend.Application.Notifications;
 using NursingCareBackend.Domain.CareRequests;
 
 namespace NursingCareBackend.Application.CareRequests.Commands.PayCareRequest;
@@ -16,15 +17,18 @@ public sealed class PayCareRequestHandler
     private readonly ICareRequestRepository _repository;
     private readonly IPaymentValidationRepository _paymentValidationRepository;
     private readonly IAdminAuditService _auditService;
+    private readonly IUserNotificationPublisher _userNotifications;
 
     public PayCareRequestHandler(
         ICareRequestRepository repository,
         IPaymentValidationRepository paymentValidationRepository,
-        IAdminAuditService auditService)
+        IAdminAuditService auditService,
+        IUserNotificationPublisher userNotifications)
     {
         _repository = repository;
         _paymentValidationRepository = paymentValidationRepository;
         _auditService = auditService;
+        _userNotifications = userNotifications;
     }
 
     public async Task<PaidCareRequestResponse> Handle(
@@ -63,7 +67,21 @@ public sealed class PayCareRequestHandler
                 EntityType: "CareRequest",
                 EntityId: careRequest.Id.ToString(),
                 Notes: $"Bank reference: {command.BankReference}",
-                MetadataJson: null),
+            MetadataJson: null),
+            cancellationToken);
+
+        await _userNotifications.PublishToUserAsync(
+            new UserNotificationPublishRequest(
+                RecipientUserId: careRequest.UserID,
+                Category: "payment_confirmed",
+                Severity: "Medium",
+                Title: "Pago confirmado",
+                Body: $"Confirmamos el pago de tu solicitud \"{careRequest.Description}\". Gracias por usar NursingCare.",
+                EntityType: "CareRequest",
+                EntityId: careRequest.Id.ToString(),
+                DeepLinkPath: $"/care-requests/{careRequest.Id}",
+                Source: "Cobros",
+                RequiresAction: false),
             cancellationToken);
 
         return new PaidCareRequestResponse(
