@@ -595,20 +595,30 @@ public sealed class AdminPayrollController : ControllerBase
     public async Task<ActionResult<object>> GetMobileSummary(CancellationToken cancellationToken)
     {
         var openPeriods = await _repository.GetPeriodsAsync(
-            new AdminPayrollPeriodListFilter(1, 1, "Open"),
+            new AdminPayrollPeriodListFilter(1, 20, "Open"),
             cancellationToken);
-        
+
         var closedPeriods = await _repository.GetPeriodsAsync(
             new AdminPayrollPeriodListFilter(1, 5, "Closed"),
             cancellationToken);
 
         decimal currentTotal = 0;
         var allNurseIds = new List<Guid>();
-        
-        if (openPeriods.Items.FirstOrDefault() is var openPeriod && openPeriod != null)
+
+        // "Current" period = the most recent open period that has already started. Future-dated
+        // open periods (scheduled ahead of time) carry no lines yet, so they must not be treated
+        // as the current period — otherwise the compensation metric reads zero.
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var currentPeriod = openPeriods.Items
+            .Where(p => p.StartDate <= today)
+            .OrderByDescending(p => p.StartDate)
+            .FirstOrDefault()
+            ?? openPeriods.Items.FirstOrDefault();
+
+        if (currentPeriod != null)
         {
             // Use the period-level staff summary so deductions are netted once, not per line.
-            var detail = await _repository.GetPeriodByIdAsync(openPeriod.Id, cancellationToken);
+            var detail = await _repository.GetPeriodByIdAsync(currentPeriod.Id, cancellationToken);
             if (detail != null)
             {
                 currentTotal = detail.StaffSummary.Sum(s => s.NetCompensation);
