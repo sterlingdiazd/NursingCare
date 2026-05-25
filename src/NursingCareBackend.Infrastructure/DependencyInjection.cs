@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NursingCareBackend.Application.AdminPortal.Auditing;
 using NursingCareBackend.Application.AdminPortal.Clients;
@@ -96,6 +98,9 @@ public static class DependencyInjection
                 ?? "NursingCare";
         });
 
+        services.Configure<EmailArchiveOptions>(
+            configuration.GetSection(EmailArchiveOptions.SectionName));
+
         // Care Request Repository and billing
         services.AddScoped<ICareRequestRepository, CareRequestRepository>();
         services.AddScoped<IPaymentValidationRepository, PaymentValidationRepository>();
@@ -154,7 +159,14 @@ public static class DependencyInjection
                 new HttpClient(),
                 serviceProvider.GetRequiredService<IOptions<GoogleOAuthOptions>>()));
         services.AddScoped<IAuthenticationService, AuthenticationService>();
-        services.AddScoped<IEmailService, AcsEmailService>();
+        // Real transport, then wrap it so every outgoing email is archived to disk (.eml).
+        services.AddScoped<AcsEmailService>();
+        services.AddScoped<IEmailService>(sp => new ArchivingEmailService(
+            sp.GetRequiredService<AcsEmailService>(),
+            sp.GetRequiredService<IOptions<EmailArchiveOptions>>(),
+            sp.GetRequiredService<IOptions<EmailOptions>>(),
+            sp.GetRequiredService<IHostEnvironment>(),
+            sp.GetRequiredService<ILogger<ArchivingEmailService>>()));
         services.AddSingleton<IEmailTemplateRenderer, Email.MarkdownEmailTemplateRenderer>();
         services.AddScoped<IAdminBootstrapPolicy, AdminBootstrapPolicy>();
         services.AddScoped<INurseProfileAdministrationService, NurseProfileAdministrationService>();

@@ -141,3 +141,9 @@
 .env
 .vscode/launch.json
 **/.int/**
+
+# ------------------------
+# Runtime logs & email archive (contain PII — never versioned)
+# ------------------------
+**/logs/**
+**/email-archive/**
