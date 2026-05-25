@@ -52,7 +52,7 @@ public static class FullLifecycleSeeding
         await SeedAuditLogsAsync(db, cancellationToken);
 
         // ── 6. Admin notifications ────────────────────────────────────────────────────
-        await SeedAdminNotificationsAsync(db, cancellationToken);
+        await SeedAdminNotificationsAsync(db, careRequests, marchPeriod, cancellationToken);
 
         // ── 7. Deduction records ──────────────────────────────────────────────────────
         await SeedDeductionRecordsAsync(db, marchPeriod, cancellationToken);
@@ -661,10 +661,30 @@ public static class FullLifecycleSeeding
     // 6. Admin notifications
     // ─────────────────────────────────────────────────────────────────────────────────
 
-    private static async Task SeedAdminNotificationsAsync(NursingCareDbContext db, CancellationToken cancellationToken)
+    private static async Task SeedAdminNotificationsAsync(
+        NursingCareDbContext db, CareRequest[] careRequests, PayrollPeriod marchPeriod, CancellationToken cancellationToken)
     {
         var adminId = CatalogSeeding.SeededAdminId;
         var march10 = new DateTime(2026, 3, 10, 8, 30, 0, DateTimeKind.Utc);
+
+        // Resolve the specific seeded request each notification refers to so "Abrir contexto"
+        // deep-links to that request's detail (the most specific context where the action took
+        // place) instead of the bare list. Production handlers already do this via
+        // DeepLinkPath: /admin/care-requests/{id}; the seed data must match that contract.
+        // Descriptions are unique within BuildCareRequests, so they are a stable lookup key.
+        Guid? RequestId(string description) =>
+            careRequests.FirstOrDefault(cr => cr.Description == description)?.Id;
+
+        // Falls back to the list when the request can't be resolved (defensive — descriptions
+        // above are expected to match), mirroring the bare path used before this change.
+        string CareRequestLink(Guid? id) =>
+            id is null ? "/admin/care-requests" : $"/admin/care-requests/{id}";
+
+        var rejectedCarmenId = RequestId("Cuidado de paciente con alta complejidad");
+        var completedPostPartoId = RequestId("Cuidado post-parto en hogar");
+        var pendingAnaId = RequestId("Cuidado de adulto mayor en hogar");
+        var paidMarchId = RequestId("Servicio diario adulto mayor Marzo");
+        var invoicedIntensivoId = RequestId("Cuidado intensivo dia completo");
 
         var notifications = new List<AdminNotification>
         {
@@ -672,44 +692,44 @@ public static class FullLifecycleSeeding
             Notification(adminId, "CareRequest", "High",
                 "Solicitud rechazada requiere atención",
                 "La solicitud de Carmen Lopez fue rechazada por falta de cobertura en zona lejana. Revise opciones de reasignación.",
-                "CareRequest", null, "/admin/care-requests", requiresAction: true, readAt: null, createdAt: march10),
+                "CareRequest", rejectedCarmenId?.ToString(), CareRequestLink(rejectedCarmenId), requiresAction: true, readAt: null, createdAt: march10),
 
             Notification(adminId, "Nurse", "High",
                 "Perfil de enfermera pendiente de revisión",
                 "El perfil de la enfermera tiene documentos vencidos que requieren actualización antes del próximo servicio.",
-                "Nurse", CatalogSeeding.NurseIds["Figueredo"].ToString(), "/nurse-profiles", requiresAction: true, readAt: null, createdAt: march10.AddMinutes(10)),
+                "Nurse", CatalogSeeding.NurseIds["Figueredo"].ToString(), $"/admin/nurse-profiles/{CatalogSeeding.NurseIds["Figueredo"]}", requiresAction: true, readAt: null, createdAt: march10.AddMinutes(10)),
 
             // Unread — medium severity
             Notification(adminId, "CareRequest", "Medium",
                 "Servicio completado exitosamente",
                 "El servicio de cuidado post-parto fue completado satisfactoriamente.",
-                "CareRequest", null, "/admin/care-requests", requiresAction: false, readAt: null, createdAt: march10.AddMinutes(20)),
+                "CareRequest", completedPostPartoId?.ToString(), CareRequestLink(completedPostPartoId), requiresAction: false, readAt: null, createdAt: march10.AddMinutes(20)),
 
             Notification(adminId, "Payroll", "Medium",
                 "Período de nómina pendiente de cierre",
                 "El período de nómina de marzo 2026 está pendiente de revisión y cierre. Fecha límite: 1 de abril.",
-                "PayrollPeriod", null, "/payroll", requiresAction: true, readAt: null, createdAt: march10.AddMinutes(30)),
+                "PayrollPeriod", marchPeriod.Id.ToString(), $"/admin/payroll/periods?periodId={marchPeriod.Id}", requiresAction: true, readAt: null, createdAt: march10.AddMinutes(30)),
 
             Notification(adminId, "CareRequest", "Medium",
                 "Solicitud próxima a vencer",
                 "La solicitud de Ana Reyes lleva más de 48 horas en estado Pendiente sin asignación de enfermera.",
-                "CareRequest", null, "/admin/care-requests", requiresAction: true, readAt: null, createdAt: march10.AddMinutes(40)),
+                "CareRequest", pendingAnaId?.ToString(), CareRequestLink(pendingAnaId), requiresAction: true, readAt: null, createdAt: march10.AddMinutes(40)),
 
             // Read — medium severity
             Notification(adminId, "CareRequest", "Medium",
                 "Pago registrado correctamente",
                 "El pago con referencia TRF-BHD-00201 fue registrado para la solicitud de servicio diario de marzo.",
-                "CareRequest", null, "/admin/care-requests", requiresAction: false, readAt: march10.AddHours(1), createdAt: march10.AddMinutes(50)),
+                "CareRequest", paidMarchId?.ToString(), CareRequestLink(paidMarchId), requiresAction: false, readAt: march10.AddHours(1), createdAt: march10.AddMinutes(50)),
 
             Notification(adminId, "CareRequest", "Medium",
                 "Factura generada",
                 "La factura SOL-202603-0031 fue generada exitosamente para el servicio de cuidado intensivo.",
-                "CareRequest", null, "/admin/care-requests", requiresAction: false, readAt: march10.AddHours(2), createdAt: march10.AddMinutes(60)),
+                "CareRequest", invoicedIntensivoId?.ToString(), CareRequestLink(invoicedIntensivoId), requiresAction: false, readAt: march10.AddHours(2), createdAt: march10.AddMinutes(60)),
 
             Notification(adminId, "Payroll", "Medium",
                 "Nómina de marzo cerrada",
                 "El período de nómina de marzo 2026 fue cerrado exitosamente con líneas de nómina procesadas.",
-                "PayrollPeriod", null, "/payroll", requiresAction: false, readAt: march10.AddHours(3), createdAt: new DateTime(2026, 4, 1, 10, 30, 0, DateTimeKind.Utc)),
+                "PayrollPeriod", marchPeriod.Id.ToString(), $"/admin/payroll/periods?periodId={marchPeriod.Id}", requiresAction: false, readAt: march10.AddHours(3), createdAt: new DateTime(2026, 4, 1, 10, 30, 0, DateTimeKind.Utc)),
 
             // Low severity
             Notification(adminId, "Settings", "Low",
@@ -720,7 +740,7 @@ public static class FullLifecycleSeeding
             Notification(adminId, "Nurse", "Low",
                 "Enfermera inactiva detectada",
                 "La enfermera Emilina no ha ejecutado servicios en los últimos 30 días. Considere revisar su disponibilidad.",
-                "Nurse", CatalogSeeding.NurseIds["Emilina"].ToString(), "/nurses", requiresAction: false, readAt: null, createdAt: march10.AddHours(5)),
+                "Nurse", CatalogSeeding.NurseIds["Emilina"].ToString(), $"/admin/nurse-profiles/{CatalogSeeding.NurseIds["Emilina"]}", requiresAction: false, readAt: null, createdAt: march10.AddHours(5)),
         };
 
         db.AdminNotifications.AddRange(notifications);
