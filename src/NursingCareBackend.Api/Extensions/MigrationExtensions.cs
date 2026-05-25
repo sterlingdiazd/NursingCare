@@ -301,6 +301,41 @@ namespace NursingCareBackend.Api.Extensions
           Category = "Empresa",
           ValueType = "Text",
           ModifiedAtUtc = DateTime.UtcNow
+        },
+        // Política de fecha de pago de nómina (configurable por el dueño en el Menú → Configuración).
+        // Defaults reproduce el comportamiento actual: 1ra quincena el día 15, 2da el último día del mes.
+        new() {
+          Key = "PAYROLL_PAYMENT_DATE_MODE",
+          Value = "FIXED_DAY",
+          Description = "Cómo se calcula la fecha de pago de nómina: día fijo por quincena, o un número de días antes del fin de mes.",
+          Category = "Nómina",
+          ValueType = "Select",
+          AllowedValuesJson = "[\"FIXED_DAY\", \"DAYS_BEFORE_MONTH_END\"]",
+          ModifiedAtUtc = DateTime.UtcNow
+        },
+        new() {
+          Key = "PAYROLL_FIRST_HALF_PAYMENT_DAY",
+          Value = "15",
+          Description = "Día del mes en que se paga la 1ra quincena (1–28).",
+          Category = "Nómina",
+          ValueType = "Number",
+          ModifiedAtUtc = DateTime.UtcNow
+        },
+        new() {
+          Key = "PAYROLL_SECOND_HALF_PAYMENT_DAY",
+          Value = "0",
+          Description = "Día del mes en que se paga la 2da quincena. 0 = último día del mes.",
+          Category = "Nómina",
+          ValueType = "Number",
+          ModifiedAtUtc = DateTime.UtcNow
+        },
+        new() {
+          Key = "PAYROLL_DAYS_BEFORE_MONTH_END",
+          Value = "0",
+          Description = "Modo 'días antes de fin de mes': la 2da quincena se paga este número de días antes del último día del mes (0 = último día).",
+          Category = "Nómina",
+          ValueType = "Number",
+          ModifiedAtUtc = DateTime.UtcNow
         }
       };
 
