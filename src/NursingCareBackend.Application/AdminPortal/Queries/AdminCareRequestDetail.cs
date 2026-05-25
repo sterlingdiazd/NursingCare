@@ -26,6 +26,7 @@ public sealed record AdminCareRequestDetail(
   string? AssignedNurseEmail,
   string CareRequestDescription,
   string CareRequestType,
+  string? CareRequestTypeDisplayName,
   int Unit,
   string UnitType,
   decimal Price,

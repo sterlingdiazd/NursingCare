@@ -36,7 +36,7 @@ public sealed class AdminCareRequestRepository : IAdminCareRequestRepository
 
     var userLookup = await LoadUserLookupAsync(careRequests, cancellationToken);
     var allFiltered = careRequests
-      .Select(careRequest => ToListItem(careRequest, userLookup, utcNow))
+      .Select(careRequest => ToListItem(careRequest, userLookup, utcNow, typeDisplayNames))
       .Where(item => MatchesFilter(item, filter, utcNow, typeDisplayNames))
       .ToList();
 
@@ -112,6 +112,13 @@ public sealed class AdminCareRequestRepository : IAdminCareRequestRepository
     var assignedNurse = careRequest.AssignedNurse.HasValue && users.TryGetValue(careRequest.AssignedNurse.Value, out var nurse)
       ? nurse
       : null;
+
+    var typeDisplayName = await _dbContext.CareRequestTypeCatalogs
+      .AsNoTracking()
+      .Where(ct => ct.Code == careRequest.CareRequestType)
+      .Select(ct => ct.DisplayName)
+      .FirstOrDefaultAsync(cancellationToken);
+
     var serviceExecution = await _dbContext.ServiceExecutions
       .AsNoTracking()
       .FirstOrDefaultAsync(item => item.CareRequestId == careRequest.Id, cancellationToken);
@@ -154,6 +161,7 @@ public sealed class AdminCareRequestRepository : IAdminCareRequestRepository
       AssignedNurseEmail: assignedNurse?.Email,
       CareRequestDescription: careRequest.Description,
       CareRequestType: careRequest.CareRequestType,
+      CareRequestTypeDisplayName: typeDisplayName,
       Unit: careRequest.Unit,
       UnitType: careRequest.UnitType,
       Price: careRequest.Price,
@@ -329,11 +337,17 @@ public sealed class AdminCareRequestRepository : IAdminCareRequestRepository
   private static AdminCareRequestListItem ToListItem(
     CareRequest careRequest,
     IReadOnlyDictionary<Guid, UserLookup> users,
-    DateTime utcNow)
+    DateTime utcNow,
+    IReadOnlyDictionary<string, string>? typeDisplayNames = null)
   {
     var client = users.TryGetValue(careRequest.UserID, out var c) ? c : null;
     var assignedNurse = careRequest.AssignedNurse.HasValue && users.TryGetValue(careRequest.AssignedNurse.Value, out var nurse)
       ? nurse
+      : null;
+
+    string? typeDisplayName = typeDisplayNames is not null
+      && typeDisplayNames.TryGetValue(careRequest.CareRequestType, out var dn)
+      ? dn
       : null;
 
     return new AdminCareRequestListItem(
@@ -346,6 +360,7 @@ public sealed class AdminCareRequestRepository : IAdminCareRequestRepository
       AssignedNurseEmail: assignedNurse?.Email,
       CareRequestDescription: careRequest.Description,
       CareRequestType: careRequest.CareRequestType,
+      CareRequestTypeDisplayName: typeDisplayName,
       Unit: careRequest.Unit,
       UnitType: careRequest.UnitType,
       Total: careRequest.Total,
@@ -505,7 +520,7 @@ public sealed class AdminCareRequestRepository : IAdminCareRequestRepository
       timeline.Add(new AdminCareRequestTimelineEvent(
         Id: $"approved:{careRequest.Id}",
         Title: "Solicitud aprobada",
-        Description: "Administracion aprobo la solicitud para ejecucion operativa.",
+        Description: "Administración aprobó la solicitud para ejecución operativa.",
         OccurredAtUtc: careRequest.ApprovedAtUtc.Value));
     }
 
@@ -514,7 +529,7 @@ public sealed class AdminCareRequestRepository : IAdminCareRequestRepository
       timeline.Add(new AdminCareRequestTimelineEvent(
         Id: $"rejected:{careRequest.Id}",
         Title: "Solicitud rechazada",
-        Description: "Administracion rechazo la solicitud.",
+        Description: "Administración rechazó la solicitud.",
         OccurredAtUtc: careRequest.RejectedAtUtc.Value));
     }
 

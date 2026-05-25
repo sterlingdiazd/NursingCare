@@ -188,7 +188,7 @@ public static class FullLifecycleSeeding
         list.Add(Make(testClient,      null, "Cuidado post-operatorio a domicilio",      "hogar_diario",       "dia_completo", 5, "local",   "estandar", 12500m, april10));
         list.Add(Make(ClientCarmenId,  null, "Terapia respiratoria nocturna",             "domicilio_noche_12h","medio_dia",   3, "cercana", "moderada",  8250m, april10.AddHours(2)));
         list.Add(Make(ClientAnaId,     null, "Cuidado de adulto mayor en hogar",          "hogar_diario",       "dia_completo", 6, "local",   "estandar", 15000m, april10.AddHours(4)));
-        list.Add(Make(ClientRosaId,    null, "Administracion de medicamentos IV",          "medicamentos",       "sesion",       2, "local",   "estandar",  4000m, april10.AddHours(6)));
+        list.Add(Make(ClientRosaId,    null, "Administración de medicamentos IV",          "medicamentos",       "sesion",       2, "local",   "estandar",  4000m, april10.AddHours(6)));
         list.Add(Make(ClientLuisaId,   null, "Curacion de heridas post-cirugia",           "curas",              "sesion",       3, "cercana", "moderada",  6600m, april10.AddHours(8)));
 
         // ── Approved (5) — nurses n13-n17 ─────────────────────────────────────────────
@@ -204,10 +204,10 @@ public static class FullLifecycleSeeding
             "No hay enfermeras disponibles en la zona indicada para la fecha solicitada."));
         list.Add(MakeRejected(ClientCarmenId,
             "Cuidado de paciente con alta complejidad",         "hogar_diario", "dia_completo", 5, "lejana", "critica",  16900m, march25.AddHours(3),
-            "La distancia supera el radio de cobertura activo. Contacte para reagendar."));
+            "La distancia supera el radio de cobertura activo. Contáctenos para reagendar."));
         list.Add(MakeRejected(ClientBeatrizId,
-            "Colocacion de sonda vesical urgente",              "sonda_vesical","sesion",       1, "local",  "estandar",  2000m, march25.AddHours(6),
-            "Documentacion medica incompleta. Adjunte orden medica firmada."));
+            "Colocación de sonda vesical urgente",              "sonda_vesical","sesion",       1, "local",  "estandar",  2000m, march25.AddHours(6),
+            "Documentación médica incompleta. Adjunte orden médica firmada."));
 
         // ── Completed (5) — nurses n18-n22 ───────────────────────────────────────────
         list.Add(MakeCompleted(testClient,      n18, "Cuidado post-parto en hogar",              "hogar_diario", "dia_completo", 6, "local",  "estandar", 15000m, march15));
@@ -222,17 +222,17 @@ public static class FullLifecycleSeeding
         list.Add(MakeCancelled(ClientLuisaId,   "Control de sonda PEG en domicilio",    "sonda_peg",         "sesion",       1, "cercana","estandar", 4400m, march20.AddHours(6)));
 
         // ── Invoiced (5) — nurses n1-n5 ───────────────────────────────────────────────
-        list.Add(MakeInvoiced(testClient,      n1,  "Cuidado intensivo dia completo",            "domicilio_24h","dia_completo", 7, "local", "alta",      24500m, march10,            "FAC-2026-0031"));
-        list.Add(MakeInvoiced(ClientAnaId,     n2,  "Cuidado basico mensual hogar",              "hogar_basico", "mes",          1, "local", "estandar",  55000m, march10.AddHours(2), "FAC-2026-0032"));
-        list.Add(MakeInvoiced(ClientRosaId,    n3,  "Administracion de medicamentos inyectables","medicamentos", "sesion",       3, "cercana","moderada",  7260m, march10.AddHours(4), "FAC-2026-0033"));
-        list.Add(MakeInvoiced(ClientBeatrizId, n4,  "Cuidado diario estandar hogar",             "hogar_diario", "dia_completo", 5, "local", "estandar",  12500m, march10.AddHours(6), "FAC-2026-0034"));
-        list.Add(MakeInvoiced(ClientLuisaId,   n5,  "Terapia nocturna domiciliaria",             "domicilio_noche_12h","medio_dia",4,"media","estandar", 12000m, march10.AddHours(8), "FAC-2026-0035"));
+        list.Add(MakeInvoiced(testClient,      n1,  "Cuidado intensivo dia completo",            "domicilio_24h","dia_completo", 7, "local", "alta",      24500m, march10,            "SOL-202603-0031"));
+        list.Add(MakeInvoiced(ClientAnaId,     n2,  "Cuidado basico mensual hogar",              "hogar_basico", "mes",          1, "local", "estandar",  55000m, march10.AddHours(2), "SOL-202603-0032"));
+        list.Add(MakeInvoiced(ClientRosaId,    n3,  "Administración de medicamentos inyectables","medicamentos", "sesion",       3, "cercana","moderada",  7260m, march10.AddHours(4), "SOL-202603-0033"));
+        list.Add(MakeInvoiced(ClientBeatrizId, n4,  "Cuidado diario estandar hogar",             "hogar_diario", "dia_completo", 5, "local", "estandar",  12500m, march10.AddHours(6), "SOL-202603-0034"));
+        list.Add(MakeInvoiced(ClientLuisaId,   n5,  "Terapia nocturna domiciliaria",             "domicilio_noche_12h","medio_dia",4,"media","estandar", 12000m, march10.AddHours(8), "SOL-202603-0035"));
 
         // ── Paid (4) — nurses n6-n9 ───────────────────────────────────────────────────
-        list.Add(MakePaid(testClient,      n6,  "Servicio diario adulto mayor Marzo",  "hogar_diario",     "dia_completo", 5, "local",  "estandar", 12500m, march10,            "FAC-2026-0021", "TRF-BHD-00201"));
-        list.Add(MakePaid(ClientCarmenId,  n7,  "Cuidado 24h paciente oncologico",     "domicilio_24h",    "dia_completo", 6, "media",  "alta",     25200m, march10.AddHours(2), "FAC-2026-0022", "TRF-BHD-00202"));
-        list.Add(MakePaid(ClientAnaId,     n8,  "Enfermeria domiciliaria dia Marzo",   "domicilio_dia_12h","medio_dia",    5, "cercana","moderada", 15125m, march10.AddHours(4), "FAC-2026-0023", "TRF-BHD-00203"));
-        list.Add(MakePaid(ClientRosaId,    n9,  "Curaciones post-cirugia Marzo",       "curas",            "sesion",       4, "local",  "estandar",  8000m, march10.AddHours(6), "FAC-2026-0024", "TRF-BHD-00204"));
+        list.Add(MakePaid(testClient,      n6,  "Servicio diario adulto mayor Marzo",  "hogar_diario",     "dia_completo", 5, "local",  "estandar", 12500m, march10,            "SOL-202603-0021", "TRF-BHD-00201"));
+        list.Add(MakePaid(ClientCarmenId,  n7,  "Cuidado 24h paciente oncologico",     "domicilio_24h",    "dia_completo", 6, "media",  "alta",     25200m, march10.AddHours(2), "SOL-202603-0022", "TRF-BHD-00202"));
+        list.Add(MakePaid(ClientAnaId,     n8,  "Enfermeria domiciliaria dia Marzo",   "domicilio_dia_12h","medio_dia",    5, "cercana","moderada", 15125m, march10.AddHours(4), "SOL-202603-0023", "TRF-BHD-00203"));
+        list.Add(MakePaid(ClientRosaId,    n9,  "Curaciones post-cirugia Marzo",       "curas",            "sesion",       4, "local",  "estandar",  8000m, march10.AddHours(6), "SOL-202603-0024", "TRF-BHD-00204"));
 
         // ── Voided (2) — nurses n10-n11 ───────────────────────────────────────────────
         // Void is allowed from Completed or Invoiced status.
@@ -241,7 +241,7 @@ public static class FullLifecycleSeeding
             "Paciente ingresado a hospital de emergencia. Servicio no ejecutado."));
         list.Add(MakeVoidedFromCompleted(ClientBeatrizId,n11, "Suero anulado por cambio de tratamiento",
             "suero","sesion", 2, "local","estandar", 4000m, march10.AddHours(3),
-            "Medico tratante cambio protocolo. Solicitud anulada de comun acuerdo con cliente."));
+            "Médico tratante cambió protocolo. Solicitud anulada de común acuerdo con cliente."));
 
         return list.ToArray();
     }
@@ -621,21 +621,21 @@ public static class FullLifecycleSeeding
             AuditEntry(adminId, "Admin", "ApproveRequest",    "CareRequest",    "lifecycle-approved-1",  "Solicitud aprobada y enfermera asignada.",                     march10),
             AuditEntry(adminId, "Admin", "ApproveRequest",    "CareRequest",    "lifecycle-approved-2",  "Solicitud aprobada.",                                          march10.AddMinutes(5)),
             AuditEntry(adminId, "Admin", "RejectRequest",     "CareRequest",    "lifecycle-rejected-1",  "Solicitud rechazada: zona fuera de cobertura.",                march10.AddMinutes(10)),
-            AuditEntry(adminId, "Admin", "RejectRequest",     "CareRequest",    "lifecycle-rejected-2",  "Solicitud rechazada: documentacion incompleta.",               march10.AddMinutes(15)),
+            AuditEntry(adminId, "Admin", "RejectRequest",     "CareRequest",    "lifecycle-rejected-2",  "Solicitud rechazada: documentación incompleta.",               march10.AddMinutes(15)),
             AuditEntry(adminId, "Admin", "CompleteRequest",   "CareRequest",    "lifecycle-completed-1", "Servicio marcado como completado.",                            march10.AddMinutes(20)),
             AuditEntry(adminId, "Admin", "CompleteRequest",   "CareRequest",    "lifecycle-completed-2", "Servicio completado por enfermera asignada.",                  march10.AddMinutes(25)),
-            AuditEntry(adminId, "Admin", "InvoiceRequest",    "CareRequest",    "lifecycle-invoiced-1",  "Factura FAC-2026-0031 generada.",                              march10.AddMinutes(30)),
-            AuditEntry(adminId, "Admin", "InvoiceRequest",    "CareRequest",    "lifecycle-invoiced-2",  "Factura FAC-2026-0032 generada.",                              march10.AddMinutes(35)),
+            AuditEntry(adminId, "Admin", "InvoiceRequest",    "CareRequest",    "lifecycle-invoiced-1",  "Factura SOL-202603-0031 generada.",                            march10.AddMinutes(30)),
+            AuditEntry(adminId, "Admin", "InvoiceRequest",    "CareRequest",    "lifecycle-invoiced-2",  "Factura SOL-202603-0032 generada.",                            march10.AddMinutes(35)),
             AuditEntry(adminId, "Admin", "RecordPayment",     "CareRequest",    "lifecycle-paid-1",      "Pago registrado: TRF-BHD-00201.",                              march10.AddMinutes(40)),
             AuditEntry(adminId, "Admin", "RecordPayment",     "CareRequest",    "lifecycle-paid-2",      "Pago registrado: TRF-BHD-00202.",                              march10.AddMinutes(45)),
             AuditEntry(adminId, "Admin", "VoidRequest",       "CareRequest",    "lifecycle-voided-1",    "Solicitud anulada: paciente hospitalizado.",                   march10.AddMinutes(50)),
-            AuditEntry(adminId, "Admin", "VoidRequest",       "CareRequest",    "lifecycle-voided-2",    "Solicitud anulada: cambio de tratamiento medico.",             march10.AddMinutes(55)),
-            AuditEntry(adminId, "Admin", "UserLogin",         "User",           adminId.ToString(),      "Inicio de sesion exitoso desde portal de administracion.",     march10.AddHours(1)),
-            AuditEntry(adminId, "Admin", "UserLogin",         "User",           adminId.ToString(),      "Inicio de sesion exitoso.",                                    march10.AddHours(2)),
+            AuditEntry(adminId, "Admin", "VoidRequest",       "CareRequest",    "lifecycle-voided-2",    "Solicitud anulada: cambio de tratamiento médico.",             march10.AddMinutes(55)),
+            AuditEntry(adminId, "Admin", "UserLogin",         "User",           adminId.ToString(),      "Inicio de sesión exitoso desde portal de administración.",     march10.AddHours(1)),
+            AuditEntry(adminId, "Admin", "UserLogin",         "User",           adminId.ToString(),      "Inicio de sesión exitoso.",                                    march10.AddHours(2)),
             AuditEntry(adminId, "Admin", "UpdateSetting",     "SystemSetting",  "CARE_REQUEST_AGING_THRESHOLD_HOURS", "Umbral de envejecimiento actualizado de 48 a 72 horas.", march10.AddHours(3)),
             AuditEntry(adminId, "Admin", "UpdateSetting",     "SystemSetting",  "DASHBOARD_HIGH_SEVERITY_THRESHOLD",  "Umbral de severidad actualizado a 85.",              march10.AddHours(4)),
-            AuditEntry(adminId, "Admin", "ClosePayrollPeriod","PayrollPeriod",  "march-2026",            "Periodo de nomina de marzo 2026 cerrado.",                     april1),
-            AuditEntry(adminId, "Admin", "ApproveOverride",   "PayrollLineOverride","lifecycle-override-1","Override de linea de nomina aprobado.",                      april2),
+            AuditEntry(adminId, "Admin", "ClosePayrollPeriod","PayrollPeriod",  "march-2026",            "Período de nómina de marzo 2026 cerrado.",                     april1),
+            AuditEntry(adminId, "Admin", "ApproveOverride",   "PayrollLineOverride","lifecycle-override-1","Override de línea de nómina aprobado.",                      april2),
             AuditEntry(adminId, "Admin", "NurseProfileReview","Nurse",          CatalogSeeding.NurseIds["Lorea"].ToString(), "Perfil de enfermera revisado y actualizado.", april3),
             AuditEntry(adminId, "Admin", "CancelRequest",     "CareRequest",    "lifecycle-cancelled-1", "Solicitud cancelada a pedido del cliente.",                    march10.AddMinutes(60)),
         };
@@ -670,56 +670,56 @@ public static class FullLifecycleSeeding
         {
             // Unread — high severity
             Notification(adminId, "CareRequest", "High",
-                "Solicitud rechazada requiere atencion",
-                "La solicitud de Carmen Lopez fue rechazada por falta de cobertura en zona lejana. Revise opciones de reasignacion.",
-                "CareRequest", null, "/care-requests", requiresAction: true, readAt: null, createdAt: march10),
+                "Solicitud rechazada requiere atención",
+                "La solicitud de Carmen Lopez fue rechazada por falta de cobertura en zona lejana. Revise opciones de reasignación.",
+                "CareRequest", null, "/admin/care-requests", requiresAction: true, readAt: null, createdAt: march10),
 
             Notification(adminId, "Nurse", "High",
-                "Perfil de enfermera pendiente de revision",
-                "El perfil de la enfermera tiene documentos vencidos que requieren actualizacion antes del proximo servicio.",
-                "Nurse", CatalogSeeding.NurseIds["Figueredo"].ToString(), "/nurses", requiresAction: true, readAt: null, createdAt: march10.AddMinutes(10)),
+                "Perfil de enfermera pendiente de revisión",
+                "El perfil de la enfermera tiene documentos vencidos que requieren actualización antes del próximo servicio.",
+                "Nurse", CatalogSeeding.NurseIds["Figueredo"].ToString(), "/nurse-profiles", requiresAction: true, readAt: null, createdAt: march10.AddMinutes(10)),
 
             // Unread — medium severity
             Notification(adminId, "CareRequest", "Medium",
                 "Servicio completado exitosamente",
                 "El servicio de cuidado post-parto fue completado satisfactoriamente.",
-                "CareRequest", null, "/care-requests", requiresAction: false, readAt: null, createdAt: march10.AddMinutes(20)),
+                "CareRequest", null, "/admin/care-requests", requiresAction: false, readAt: null, createdAt: march10.AddMinutes(20)),
 
             Notification(adminId, "Payroll", "Medium",
-                "Periodo de nomina pendiente de cierre",
-                "El periodo de nomina de marzo 2026 esta pendiente de revision y cierre. Fecha limite: 1 de abril.",
+                "Período de nómina pendiente de cierre",
+                "El período de nómina de marzo 2026 está pendiente de revisión y cierre. Fecha límite: 1 de abril.",
                 "PayrollPeriod", null, "/payroll", requiresAction: true, readAt: null, createdAt: march10.AddMinutes(30)),
 
             Notification(adminId, "CareRequest", "Medium",
-                "Solicitud proxima a vencer",
-                "La solicitud de Ana Reyes lleva mas de 48 horas en estado Pendiente sin asignacion de enfermera.",
-                "CareRequest", null, "/care-requests", requiresAction: true, readAt: null, createdAt: march10.AddMinutes(40)),
+                "Solicitud próxima a vencer",
+                "La solicitud de Ana Reyes lleva más de 48 horas en estado Pendiente sin asignación de enfermera.",
+                "CareRequest", null, "/admin/care-requests", requiresAction: true, readAt: null, createdAt: march10.AddMinutes(40)),
 
             // Read — medium severity
             Notification(adminId, "CareRequest", "Medium",
                 "Pago registrado correctamente",
                 "El pago con referencia TRF-BHD-00201 fue registrado para la solicitud de servicio diario de marzo.",
-                "CareRequest", null, "/care-requests", requiresAction: false, readAt: march10.AddHours(1), createdAt: march10.AddMinutes(50)),
+                "CareRequest", null, "/admin/care-requests", requiresAction: false, readAt: march10.AddHours(1), createdAt: march10.AddMinutes(50)),
 
             Notification(adminId, "CareRequest", "Medium",
                 "Factura generada",
-                "La factura FAC-2026-0031 fue generada exitosamente para el servicio de cuidado intensivo.",
-                "CareRequest", null, "/care-requests", requiresAction: false, readAt: march10.AddHours(2), createdAt: march10.AddMinutes(60)),
+                "La factura SOL-202603-0031 fue generada exitosamente para el servicio de cuidado intensivo.",
+                "CareRequest", null, "/admin/care-requests", requiresAction: false, readAt: march10.AddHours(2), createdAt: march10.AddMinutes(60)),
 
             Notification(adminId, "Payroll", "Medium",
-                "Nomina de marzo cerrada",
-                "El periodo de nomina de marzo 2026 fue cerrado exitosamente con lineas de nomina procesadas.",
+                "Nómina de marzo cerrada",
+                "El período de nómina de marzo 2026 fue cerrado exitosamente con líneas de nómina procesadas.",
                 "PayrollPeriod", null, "/payroll", requiresAction: false, readAt: march10.AddHours(3), createdAt: new DateTime(2026, 4, 1, 10, 30, 0, DateTimeKind.Utc)),
 
             // Low severity
             Notification(adminId, "Settings", "Low",
-                "Configuracion actualizada",
+                "Configuración actualizada",
                 "El umbral de envejecimiento de solicitudes fue actualizado de 48 a 72 horas por el administrador.",
                 null, null, "/settings", requiresAction: false, readAt: march10.AddHours(4), createdAt: march10.AddHours(3)),
 
             Notification(adminId, "Nurse", "Low",
                 "Enfermera inactiva detectada",
-                "La enfermera Emilina no ha ejecutado servicios en los ultimos 30 dias. Considere revisar su disponibilidad.",
+                "La enfermera Emilina no ha ejecutado servicios en los últimos 30 días. Considere revisar su disponibilidad.",
                 "Nurse", CatalogSeeding.NurseIds["Emilina"].ToString(), "/nurses", requiresAction: false, readAt: null, createdAt: march10.AddHours(5)),
         };
 
@@ -960,10 +960,10 @@ public static class FullLifecycleSeeding
         var n6 = CatalogSeeding.NurseIds["Clari"];
 
         // Build and save two Invoiced care requests first (paymentproof needs the saved ID).
-        var pr1 = MakeInvoiced(ClientLuisaId,  n5, "Atencion domiciliaria nocturna reportada",
-            "domicilio_noche_12h", "medio_dia", 3, "cercana", "moderada", 8250m, march8,  "FAC-2026-0036");
+        var pr1 = MakeInvoiced(ClientLuisaId,  n5, "Atención domiciliaria nocturna reportada",
+            "domicilio_noche_12h", "medio_dia", 3, "cercana", "moderada", 8250m, march8,  "SOL-202603-0036");
         var pr2 = MakeInvoiced(ClientBeatrizId, n6, "Cuidado diario con pago reportado",
-            "hogar_diario",        "dia_completo", 4, "local", "estandar", 10000m, march9, "FAC-2026-0037");
+            "hogar_diario",        "dia_completo", 4, "local", "estandar", 10000m, march9, "SOL-202603-0037");
 
         db.CareRequests.AddRange(pr1, pr2);
         await db.SaveChangesAsync(cancellationToken);
@@ -1160,7 +1160,7 @@ public static class FullLifecycleSeeding
                 "hogar_diario",     "dia_completo", 5, "cercana","moderada", 13750m, future2),
             MakeApproved(ClientAnaId,     n14, "Sonda vesical programada",
                 "sonda_vesical",    "sesion",       1, "local",  "estandar",  2000m, future3),
-            MakeApproved(ClientLuisaId,   n15, "Atencion domiciliaria nocturna programada",
+            MakeApproved(ClientLuisaId,   n15, "Atención domiciliaria nocturna programada",
                 "domicilio_noche_12h","medio_dia",  3, "media",  "moderada",  9900m, future4),
 
             // Pending — no nurse assigned yet.

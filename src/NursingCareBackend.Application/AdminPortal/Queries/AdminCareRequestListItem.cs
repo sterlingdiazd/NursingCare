@@ -10,6 +10,7 @@ public sealed record AdminCareRequestListItem(
   string? AssignedNurseEmail,
   string CareRequestDescription,
   string CareRequestType,
+  string? CareRequestTypeDisplayName,
   int Unit,
   string UnitType,
   decimal Total,
