@@ -192,6 +192,32 @@ namespace NursingCareBackend.Api.Extensions
         medicos.DisplayName = "Médicos";
         db.SaveChanges();
       }
+
+      // Correct accented service-type display names. The catalog only seeds when empty, so
+      // existing databases keep an older un-accented copy — fix it idempotently on startup.
+      var typeNameFixes = new Dictionary<string, string>
+      {
+        ["domicilio_dia_12h"] = "Domicilio día 12h",
+        ["hogar_basico"] = "Hogar básico",
+        ["hogar_estandar"] = "Hogar estándar",
+        ["sonda_nasogastrica"] = "Sonda nasogástrica",
+      };
+
+      var typeChanged = false;
+      foreach (var fix in typeNameFixes)
+      {
+        var row = db.CareRequestTypeCatalogs.FirstOrDefault(t => t.Code == fix.Key);
+        if (row is not null && row.DisplayName != fix.Value)
+        {
+          row.DisplayName = fix.Value;
+          typeChanged = true;
+        }
+      }
+
+      if (typeChanged)
+      {
+        db.SaveChanges();
+      }
     }
 
     private static void EnsureSystemSettings(NursingCareDbContext db)
