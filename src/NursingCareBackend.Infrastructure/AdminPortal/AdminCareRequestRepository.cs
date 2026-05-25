@@ -425,6 +425,11 @@ public sealed class AdminCareRequestRepository : IAdminCareRequestRepository
         && item.RejectedAtUtc.Value >= todayUtc
         && item.RejectedAtUtc.Value < todayUtc.AddDays(1),
       "completed" => item.Status == CareRequestStatus.Completed.ToString(),
+      "cancelled" => item.Status == CareRequestStatus.Cancelled.ToString(),
+      "invoiced" => item.Status == CareRequestStatus.Invoiced.ToString(),
+      "payment-reported" => item.Status == CareRequestStatus.PaymentReported.ToString(),
+      "paid" => item.Status == CareRequestStatus.Paid.ToString(),
+      "voided" => item.Status == CareRequestStatus.Voided.ToString(),
       "unassigned" => item.Status == CareRequestStatus.Pending.ToString() && !item.AssignedNurseUserId.HasValue,
       "pending-approval" => item.Status == CareRequestStatus.Pending.ToString() && item.AssignedNurseUserId.HasValue,
       "overdue" => item.IsOverdueOrStale,
@@ -530,7 +535,11 @@ public sealed class AdminCareRequestRepository : IAdminCareRequestRepository
 
   private static bool IsOverdueOrStale(CareRequest careRequest, DateTime utcNow)
   {
-    if (careRequest.Status == CareRequestStatus.Completed)
+    // "Vencida" applies only to requests still awaiting assignment/approval (Pending) whose
+    // scheduled service date has passed, or that have aged without a date. Approved, billing
+    // (Invoiced/PaymentReported/Paid) and closed (Rejected/Cancelled/Voided) requests are NOT
+    // overdue — each appears under its own status filter.
+    if (careRequest.Status != CareRequestStatus.Pending)
     {
       return false;
     }
@@ -543,7 +552,7 @@ public sealed class AdminCareRequestRepository : IAdminCareRequestRepository
       return careRequest.CareRequestDate.Value < currentCareDate;
     }
 
-    return careRequest.Status == CareRequestStatus.Pending && careRequest.UpdatedAtUtc <= staleCutoffUtc;
+    return careRequest.UpdatedAtUtc <= staleCutoffUtc;
   }
 
   private static AdminPayrollCompensationSnapshot BuildPayrollCompensation(Domain.Payroll.ServiceExecution serviceExecution)

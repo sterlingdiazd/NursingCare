@@ -178,11 +178,10 @@ public sealed class AdminActionQueueRepository : IAdminActionQueueRepository
     var overdueOrStaleCount = await _dbContext.CareRequests
       .AsNoTracking()
       .Where(careRequest =>
-        careRequest.Status != CareRequestStatus.Completed
+        careRequest.Status == CareRequestStatus.Pending
         && (
           (careRequest.CareRequestDate.HasValue && careRequest.CareRequestDate.Value < currentCareDate)
           || (!careRequest.CareRequestDate.HasValue
-              && careRequest.Status == CareRequestStatus.Pending
               && careRequest.UpdatedAtUtc <= staleCutoffUtc)
         ))
       .CountAsync(cancellationToken);
@@ -314,7 +313,7 @@ public sealed class AdminActionQueueRepository : IAdminActionQueueRepository
     DateOnly currentCareDate,
     DateTime staleCutoffUtc)
   {
-    if (status == CareRequestStatus.Completed)
+    if (status != CareRequestStatus.Pending)
     {
       return false;
     }
@@ -324,7 +323,7 @@ public sealed class AdminActionQueueRepository : IAdminActionQueueRepository
       return careRequestDate.Value < currentCareDate;
     }
 
-    return status == CareRequestStatus.Pending && updatedAtUtc <= staleCutoffUtc;
+    return updatedAtUtc <= staleCutoffUtc;
   }
 
   private static int GetSeverityRank(string severity)
