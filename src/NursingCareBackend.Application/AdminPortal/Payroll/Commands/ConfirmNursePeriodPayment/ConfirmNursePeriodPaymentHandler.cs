@@ -10,7 +10,7 @@ using NursingCareBackend.Domain.Payroll;
 
 namespace NursingCareBackend.Application.AdminPortal.Payroll.Commands.ConfirmNursePeriodPayment;
 
-public sealed class ConfirmNursePeriodPaymentHandler
+public sealed class ConfirmNursePeriodPaymentHandler : IConfirmNursePeriodPaymentHandler
 {
     private readonly IAdminPayrollRepository _payrollRepository;
     private readonly INursePeriodPaymentRepository _paymentRepository;

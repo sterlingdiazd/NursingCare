@@ -28,6 +28,7 @@ public sealed class AdminPayrollController : ControllerBase
     private readonly NursingCareBackend.Application.AdminPortal.Payroll.ICompanyInfoProvider _companyProvider;
     private readonly NursingCareBackend.Application.AdminPortal.Payroll.Validation.IFinancialOutputValidator _financialOutputValidator;
     private readonly NursingCareBackend.Application.AdminPortal.Payroll.Commands.ConfirmNursePeriodPayment.ConfirmNursePeriodPaymentHandler _confirmPaymentHandler;
+    private readonly NursingCareBackend.Application.AdminPortal.Payroll.Commands.DeliverPeriodVouchers.DeliverPeriodVouchersHandler _deliverVouchersHandler;
 
     public AdminPayrollController(
         IAdminPayrollRepository repository,
@@ -40,7 +41,8 @@ public sealed class AdminPayrollController : ControllerBase
         NursingCareBackend.Application.AdminPortal.Auditing.IAdminAuditService auditService,
         NursingCareBackend.Application.AdminPortal.Payroll.ICompanyInfoProvider companyProvider,
         NursingCareBackend.Application.AdminPortal.Payroll.Validation.IFinancialOutputValidator financialOutputValidator,
-        NursingCareBackend.Application.AdminPortal.Payroll.Commands.ConfirmNursePeriodPayment.ConfirmNursePeriodPaymentHandler confirmPaymentHandler)
+        NursingCareBackend.Application.AdminPortal.Payroll.Commands.ConfirmNursePeriodPayment.ConfirmNursePeriodPaymentHandler confirmPaymentHandler,
+        NursingCareBackend.Application.AdminPortal.Payroll.Commands.DeliverPeriodVouchers.DeliverPeriodVouchersHandler deliverVouchersHandler)
     {
         _repository = repository;
         _recalculationService = recalculationService;
@@ -53,6 +55,7 @@ public sealed class AdminPayrollController : ControllerBase
         _companyProvider = companyProvider;
         _financialOutputValidator = financialOutputValidator;
         _confirmPaymentHandler = confirmPaymentHandler;
+        _deliverVouchersHandler = deliverVouchersHandler;
     }
 
     private Guid GetAdminUserId()
@@ -990,6 +993,45 @@ public sealed class AdminPayrollController : ControllerBase
         }
     }
 
+    // POST /api/admin/payroll/periods/{periodId}/deliver-vouchers
+    // Batch: confirm the period's bank transfer for EVERY nurse with lines and deliver each her
+    // comprobante in one action. A single (optional) bank reference (the bank's batch/dispersion
+    // reference) is applied to all nurses. Each nurse goes through the same per-nurse pipeline, so
+    // the financial-output gate and idempotency hold per nurse; one nurse failing does not abort the
+    // batch. Email is sent automatically; the response returns one wa.me link per nurse for the admin
+    // to tap (wa.me cannot bulk-send).
+    [HttpPost("periods/{periodId:guid}/deliver-vouchers")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeliverPeriodVouchers(
+        Guid periodId,
+        [FromBody] DeliverPeriodVouchersRequest? request,
+        CancellationToken cancellationToken)
+    {
+        var adminId = GetAdminUserId();
+        if (adminId == Guid.Empty)
+            return Unauthorized();
+
+        try
+        {
+            var result = await _deliverVouchersHandler.Handle(
+                new NursingCareBackend.Application.AdminPortal.Payroll.Commands.DeliverPeriodVouchers.DeliverPeriodVouchersCommand(
+                    periodId,
+                    adminId,
+                    request?.BankReference),
+                cancellationToken);
+
+            return Ok(result);
+        }
+        catch (VoucherNotFoundException)
+        {
+            return this.ProblemResponse(
+                StatusCodes.Status404NotFound,
+                Messages.Get("errors.periodo_enfermera_no_encontrado"),
+                Messages.Get("errors.periodo_enfermera_no_encontrado_detalle"));
+        }
+    }
+
     private static string EscapeCsv(object? value)
     {
         if (value is null) return "\"\"";
@@ -1000,6 +1042,12 @@ public sealed class AdminPayrollController : ControllerBase
 
 public sealed class ConfirmNursePeriodPaymentRequest
 {
+    public string? BankReference { get; set; }
+}
+
+public sealed class DeliverPeriodVouchersRequest
+{
+    /// <summary>Optional bank batch/dispersion reference applied to every nurse's confirmation.</summary>
     public string? BankReference { get; set; }
 }
 
