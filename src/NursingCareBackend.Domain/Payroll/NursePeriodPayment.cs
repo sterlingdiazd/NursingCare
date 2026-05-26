@@ -105,7 +105,13 @@ public sealed class NursePeriodPayment
     /// </summary>
     public void MarkPaymentFailed(string reason, Guid byUserId, DateTime atUtc)
     {
-        if (PaymentStatus is not (NursePaymentStatus.Confirmed or NursePaymentStatus.SentToBank or NursePaymentStatus.Failed))
+        // Idempotent: re-marking an already-failed payment is a no-op so a retry/double-submit does
+        // not overwrite the original failure reason/actor/timestamp.
+        if (PaymentStatus == NursePaymentStatus.Failed)
+        {
+            return;
+        }
+        if (PaymentStatus is not (NursePaymentStatus.Confirmed or NursePaymentStatus.SentToBank))
         {
             throw new InvalidOperationException("Solo se puede marcar como fallido un pago confirmado o enviado al banco.");
         }

@@ -11,8 +11,11 @@ namespace NursingCareBackend.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            // Existing NursePeriodPayment rows represent real prior confirmations, so backfill them
-            // to "Confirmed". New rows are set explicitly by the domain (Create -> Confirmed).
+            // Existing NursePeriodPayment rows represent real prior confirmations (pre-migration a row
+            // was ONLY ever created by a confirm-payment), so "Confirmed" is the correct backfill. The
+            // new reopen -> Pending reset is forward-only. A period-aware (Open -> Pending) backfill
+            // would be WRONG here: a payment can be legitimately confirmed while its period is still
+            // Open. New rows are set explicitly by the domain (Create -> Confirmed).
             migrationBuilder.AddColumn<string>(
                 name: "PaymentStatus",
                 table: "NursePeriodPayments",

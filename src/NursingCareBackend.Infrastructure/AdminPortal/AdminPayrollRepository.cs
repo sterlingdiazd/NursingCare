@@ -1023,7 +1023,7 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
             TotalAdjustments = lines.Sum(l => l.AdjustmentsTotal),
             TotalDeductions = deductions.Sum(d => d.Amount),
             NetCompensation = lines.Sum(l => l.BaseCompensation + l.TransportIncentive + l.ComplexityBonus + l.MedicalSuppliesCompensation + l.AdjustmentsTotal) - deductions.Sum(d => d.Amount),
-            PaymentConfirmed = payment is not null,
+            PaymentConfirmed = payment?.PaymentStatus == NursePaymentStatus.Confirmed,
             BankReference = payment?.BankReference,
             PaymentConfirmedAtUtc = payment?.ConfirmedAtUtc,
         };
@@ -1141,7 +1141,7 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
                 TotalAdjustments = lines.Sum(l => l.AdjustmentsTotal),
                 TotalDeductions = nurseDeductions.Sum(d => d.Amount),
                 NetCompensation = lines.Sum(l => l.BaseCompensation + l.TransportIncentive + l.ComplexityBonus + l.MedicalSuppliesCompensation + l.AdjustmentsTotal) - nurseDeductions.Sum(d => d.Amount),
-                PaymentConfirmed = payment is not null,
+                PaymentConfirmed = payment?.PaymentStatus == NursePaymentStatus.Confirmed,
                 BankReference = payment?.BankReference,
                 PaymentConfirmedAtUtc = payment?.ConfirmedAtUtc,
             });

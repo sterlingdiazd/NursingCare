@@ -22,7 +22,7 @@ public sealed class PayrollVoucherServiceTests
     private static ICompanyInfoProvider CompanyProvider =>
         new FakeCompanyInfoProvider(new CompanyInfo(DefaultCompanyInfo.Name, DefaultCompanyInfo.Rnc, null, null));
 
-    private static PayrollVoucherData BuildSampleVoucherData() => new()
+    private static PayrollVoucherData BuildSampleVoucherData(bool paymentConfirmed = false) => new()
     {
         PeriodId = Guid.NewGuid(),
         PeriodStartDate = new DateOnly(2026, 4, 1),
@@ -62,7 +62,16 @@ public sealed class PayrollVoucherServiceTests
         TotalAdjustments = 0m,
         TotalDeductions = 500m,
         NetCompensation = 2900m,
+        PaymentConfirmed = paymentConfirmed,
+        BankReference = paymentConfirmed ? "BR-TEST-1" : null,
+        PaymentConfirmedAtUtc = paymentConfirmed ? new DateTime(2026, 5, 5, 12, 0, 0, DateTimeKind.Utc) : null,
     };
+
+    private static string ExtractPdfText(byte[] pdf)
+    {
+        using var doc = UglyToad.PdfPig.PdfDocument.Open(pdf);
+        return string.Join("\n", doc.GetPages().Select(p => p.Text));
+    }
 
     [Fact]
     public async Task GenerateVoucherAsync_WithValidData_ReturnsNonEmptyPdfBytes()
@@ -90,6 +99,30 @@ public sealed class PayrollVoucherServiceTests
 
         await Assert.ThrowsAsync<VoucherNotFoundException>(
             () => service.GenerateVoucherAsync(Guid.NewGuid(), Guid.NewGuid()));
+    }
+
+    // Regression (P0-1): the comprobante must stamp PAGADO only when the payment is Confirmed.
+    // A reversed/failed/reopened payment (PaymentConfirmed=false) must NOT render a paid voucher.
+    [Fact]
+    public async Task GenerateVoucherAsync_DoesNotStampPagado_WhenPaymentNotConfirmed()
+    {
+        var data = BuildSampleVoucherData(paymentConfirmed: false);
+        var service = new PayrollVoucherService(new FakeVoucherRepository(data), CompanyProvider);
+
+        var pdf = await service.GenerateVoucherAsync(data.PeriodId, data.NurseUserId);
+
+        Assert.DoesNotContain("PAGADO", ExtractPdfText(pdf), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task GenerateVoucherAsync_StampsPagado_WhenPaymentConfirmed()
+    {
+        var data = BuildSampleVoucherData(paymentConfirmed: true);
+        var service = new PayrollVoucherService(new FakeVoucherRepository(data), CompanyProvider);
+
+        var pdf = await service.GenerateVoucherAsync(data.PeriodId, data.NurseUserId);
+
+        Assert.Contains("PAGADO", ExtractPdfText(pdf), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
