@@ -860,12 +860,33 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
                 .Select(e => new { e.Id, e.CareRequestId, e.ServiceDate })
                 .ToDictionaryAsync(e => e.Id, e => (e.CareRequestId, e.ServiceDate), cancellationToken);
 
+        // Reconciliation: resolve the client invoice + collection status that funded each line, so
+        // the admin can see "which client invoices paid this nurse, and were they collected".
+        var careRequestIds = executions.Values
+            .Select(e => e.CareRequestId)
+            .Where(id => id != Guid.Empty)
+            .Distinct()
+            .ToList();
+
+        var careRequestInfo = careRequestIds.Count == 0
+            ? new Dictionary<Guid, (string? InvoiceNumber, string? Status)>()
+            : await _dbContext.CareRequests
+                .AsNoTracking()
+                .Where(c => careRequestIds.Contains(c.Id))
+                .Select(c => new { c.Id, c.InvoiceNumber, c.Status })
+                .ToDictionaryAsync(
+                    c => c.Id,
+                    c => (InvoiceNumber: (string?)c.InvoiceNumber, Status: (string?)c.Status.ToString()),
+                    cancellationToken);
+
         var serviceRows = lines
             .Select(l =>
             {
                 var execData = l.ServiceExecutionId.HasValue && executions.TryGetValue(l.ServiceExecutionId.Value, out var ed)
                     ? ed
                     : (CareRequestId: Guid.Empty, ServiceDate: DateOnly.MinValue);
+
+                careRequestInfo.TryGetValue(execData.CareRequestId, out var invoice);
 
                 return new NurseServiceRow(
                     l.ServiceExecutionId ?? Guid.Empty,
@@ -877,7 +898,9 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
                     l.MedicalSuppliesCompensation,
                     l.AdjustmentsTotal,
                     l.DeductionsTotal,
-                    l.NetCompensation);
+                    l.NetCompensation,
+                    invoice.InvoiceNumber,
+                    invoice.Status);
             })
             .ToList()
             .AsReadOnly();

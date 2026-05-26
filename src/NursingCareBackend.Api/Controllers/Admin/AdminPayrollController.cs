@@ -172,9 +172,9 @@ public sealed class AdminPayrollController : ControllerBase
     {
         // Closing is irreversible-by-default: surface unliquidated services and zero/negative
         // net pay, and require explicit acknowledgement before locking the period.
+        var warnings = await _repository.GetCloseWarningsAsync(id, cancellationToken);
         if (request?.AcknowledgeWarnings != true)
         {
-            var warnings = await _repository.GetCloseWarningsAsync(id, cancellationToken);
             if (warnings.HasWarnings)
             {
                 var parts = new List<string>();
@@ -210,6 +210,19 @@ public sealed class AdminPayrollController : ControllerBase
 
         // Closing settles each scheduled-deduction installment that lived in this period.
         await _scheduledDeductionService.SettlePeriodInstallmentsAsync(id, cancellationToken);
+
+        // Audit the money action: who closed the period, when, and the warnings they accepted.
+        await _auditService.WriteAsync(
+            new NursingCareBackend.Application.AdminPortal.Auditing.AdminAuditRecord(
+                ActorUserId: GetAdminUserId(),
+                ActorRole: "Admin",
+                Action: NursingCareBackend.Application.AdminPortal.Auditing.AdminAuditActions.ClosePeriod,
+                EntityType: "PayrollPeriod",
+                EntityId: id.ToString(),
+                Notes: $"Período cerrado. Advertencias: {warnings.UnliquidatedServices} sin liquidar, {warnings.NegativeNetNurses} con neto <= 0" +
+                       (request?.AcknowledgeWarnings == true ? " (reconocidas)." : "."),
+                MetadataJson: null),
+            cancellationToken);
 
         return NoContent();
     }

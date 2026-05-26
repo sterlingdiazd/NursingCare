@@ -33,5 +33,9 @@ public sealed record NurseServiceRow(
     decimal MedicalSuppliesCompensation,
     decimal AdjustmentsTotal,
     decimal DeductionsTotal,
-    decimal NetCompensation
+    decimal NetCompensation,
+    // Reconciliation: the client invoice that funded this line and whether it was collected.
+    // Optional/additive so older clients keep parsing.
+    string? InvoiceNumber = null,
+    string? ClientPaymentStatus = null
 );
