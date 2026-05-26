@@ -28,9 +28,10 @@ public sealed class DeliverPeriodVouchersHandlerTests
     private static DeliverPeriodVouchersHandler Build(
         IReadOnlyList<PayrollVoucherData> nurses,
         IConfirmNursePeriodPaymentHandler confirmHandler,
-        bool periodExists = true)
+        bool periodExists = true,
+        string periodStatus = "Closed")
     {
-        var repo = new FakeBulkRepository(nurses, periodExists);
+        var repo = new FakeBulkRepository(nurses, periodExists, periodStatus);
         return new DeliverPeriodVouchersHandler(repo, new FakeScopeFactory(confirmHandler), NullLogger<DeliverPeriodVouchersHandler>.Instance);
     }
 
@@ -91,6 +92,15 @@ public sealed class DeliverPeriodVouchersHandlerTests
             .Should().ThrowAsync<VoucherNotFoundException>();
     }
 
+    [Fact]
+    public async Task Handle_Throws_When_Period_Is_Open()
+    {
+        // T1.2: never stamp PAGADO against a mutable (Open) period's net.
+        var handler = Build([Nurse("Ana")], new FakeConfirmHandler(c => Result(c, true)), periodStatus: "Open");
+        await FluentActions.Awaiting(() => handler.Handle(new DeliverPeriodVouchersCommand(PeriodId, AdminId, null), default))
+            .Should().ThrowAsync<InvalidOperationException>();
+    }
+
     private static ConfirmNursePeriodPaymentResult Result(ConfirmNursePeriodPaymentCommand cmd, bool emailSent) =>
         new(cmd.PeriodId, cmd.NurseUserId, DateTime.UtcNow, cmd.BankReference,
             VoucherEmailSent: emailSent,
@@ -135,17 +145,19 @@ file sealed class FakeBulkRepository : IAdminPayrollRepository
 {
     private readonly IReadOnlyList<PayrollVoucherData> _nurses;
     private readonly bool _periodExists;
+    private readonly string _status;
 
-    public FakeBulkRepository(IReadOnlyList<PayrollVoucherData> nurses, bool periodExists)
+    public FakeBulkRepository(IReadOnlyList<PayrollVoucherData> nurses, bool periodExists, string status = "Closed")
     {
         _nurses = nurses;
         _periodExists = periodExists;
+        _status = status;
     }
 
     public Task<AdminPayrollPeriodDetail?> GetPeriodByIdAsync(Guid periodId, CancellationToken cancellationToken)
         => Task.FromResult(_periodExists
             ? new AdminPayrollPeriodDetail(periodId, new DateOnly(2026, 3, 1), new DateOnly(2026, 3, 31),
-                new DateOnly(2026, 3, 29), new DateOnly(2026, 3, 31), "Closed", DateTime.UtcNow, DateTime.UtcNow,
+                new DateOnly(2026, 3, 29), new DateOnly(2026, 3, 31), _status, DateTime.UtcNow, DateTime.UtcNow,
                 [], [], CanModify: false, ReopenedAtUtc: null, ReopenReason: null, ReopenCount: 0)
             : null);
 

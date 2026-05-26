@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using NursingCareBackend.Application.AdminPortal.Payroll.Commands.ConfirmNursePeriodPayment;
 using NursingCareBackend.Application.Exceptions;
+using NursingCareBackend.Domain.Payroll;
 
 namespace NursingCareBackend.Application.AdminPortal.Payroll.Commands.DeliverPeriodVouchers;
 
@@ -41,6 +42,13 @@ public sealed class DeliverPeriodVouchersHandler
         if (period is null)
         {
             throw new VoucherNotFoundException(command.PeriodId);
+        }
+
+        // Batch delivery only on a CLOSED period (T1.2): never stamp PAGADO against a mutable net.
+        // Checked up front so the whole batch fails cleanly (409) instead of every nurse erroring.
+        if (!string.Equals(period.Status, nameof(PayrollPeriodStatus.Closed), StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("El período debe estar cerrado antes de enviar los comprobantes.");
         }
 
         // Every nurse with payroll lines in the period (same source the bulk-ZIP export uses).

@@ -1013,6 +1013,10 @@ public sealed class AdminPayrollController : ControllerBase
                 Messages.Get("errors.periodo_enfermera_no_encontrado"),
                 Messages.Get("errors.periodo_enfermera_no_encontrado_detalle"));
         }
+        catch (InvalidOperationException ex)
+        {
+            return this.ProblemResponse(StatusCodes.Status409Conflict, "Estado del período inválido", ex.Message);
+        }
     }
 
     // POST /api/admin/payroll/periods/{periodId}/deliver-vouchers
@@ -1051,6 +1055,10 @@ public sealed class AdminPayrollController : ControllerBase
                 StatusCodes.Status404NotFound,
                 Messages.Get("errors.periodo_enfermera_no_encontrado"),
                 Messages.Get("errors.periodo_enfermera_no_encontrado_detalle"));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return this.ProblemResponse(StatusCodes.Status409Conflict, "Estado del período inválido", ex.Message);
         }
     }
 

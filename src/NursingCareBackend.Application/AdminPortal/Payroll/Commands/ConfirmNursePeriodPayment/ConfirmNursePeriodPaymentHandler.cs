@@ -67,6 +67,13 @@ public sealed class ConfirmNursePeriodPaymentHandler : IConfirmNursePeriodPaymen
             throw new VoucherNotFoundException(command.PeriodId);
         }
 
+        // 1b. Payment can only be confirmed on a CLOSED period. Confirming while Open would stamp the
+        //     comprobante PAGADO against a net whose lines/deductions can still change (T1.2).
+        if (!string.Equals(period.Status, nameof(PayrollPeriodStatus.Closed), StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("El período debe estar cerrado antes de confirmar el pago de la enfermera.");
+        }
+
         // 2. The nurse must have payroll lines in this period. GetVoucherDataAsync returns
         //    null when there are no lines for the (period, nurse) pair.
         var voucherData = await _payrollRepository.GetVoucherDataAsync(
