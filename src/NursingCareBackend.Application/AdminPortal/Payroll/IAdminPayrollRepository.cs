@@ -26,13 +26,6 @@ public interface IAdminPayrollRepository
         Guid periodId,
         CancellationToken cancellationToken);
 
-    /// <summary>Reopens a closed period (audited). Returns the outcome of the transition.</summary>
-    Task<PeriodReopenResult> ReopenPeriodAsync(
-        Guid periodId,
-        string reason,
-        Guid? reopenedByUserId,
-        CancellationToken cancellationToken);
-
     Task<PeriodMutationResult> UpdatePeriodAsync(
         Guid periodId,
         DateOnly startDate,

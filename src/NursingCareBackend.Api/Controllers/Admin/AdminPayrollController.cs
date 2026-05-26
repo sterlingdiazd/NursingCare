@@ -205,63 +205,6 @@ public sealed class AdminPayrollController : ControllerBase
         return NoContent();
     }
 
-    // POST /api/admin/payroll/periods/{id}/reopen
-    // Reopens a closed period for correction (audited). Reverts to Open and recomputes
-    // installment settlement so cuotas in this period are no longer counted as paid.
-    [HttpPost("periods/{id:guid}/reopen")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> ReopenPeriod(
-        Guid id,
-        [FromBody] ReopenPeriodRequest? request,
-        CancellationToken cancellationToken)
-    {
-        var reason = request?.Reason?.Trim();
-        if (string.IsNullOrWhiteSpace(reason))
-        {
-            return this.ProblemResponse(
-                StatusCodes.Status400BadRequest,
-                Messages.Get("errors.razon_requerida"),
-                Messages.Get("errors.razon_reapertura_detalle"));
-        }
-
-        var result = await _repository.ReopenPeriodAsync(id, reason, GetAdminUserId(), cancellationToken);
-
-        if (result == PeriodReopenResult.NotFound)
-        {
-            return this.ProblemResponse(
-                StatusCodes.Status404NotFound,
-                Messages.Get("errors.periodo_no_encontrado"),
-                $"No se encontró el período de nómina con id '{id}'.");
-        }
-
-        if (result == PeriodReopenResult.NotClosed)
-        {
-            return this.ProblemResponse(
-                StatusCodes.Status409Conflict,
-                Messages.Get("errors.periodo_no_cerrado"),
-                Messages.Get("errors.periodo_no_cerrado_detalle"));
-        }
-
-        // Recompute installment settlement: cuotas living in the now-open period drop out of "paid".
-        await _scheduledDeductionService.SettlePeriodInstallmentsAsync(id, cancellationToken);
-
-        await _auditService.WriteAsync(
-            new NursingCareBackend.Application.AdminPortal.Auditing.AdminAuditRecord(
-                ActorUserId: GetAdminUserId(),
-                ActorRole: "Admin",
-                Action: "ReopenPeriod",
-                EntityType: "PayrollPeriod",
-                EntityId: id.ToString(),
-                Notes: reason,
-                MetadataJson: null),
-            cancellationToken);
-
-        return NoContent();
-    }
-
     // PUT /api/admin/payroll/periods/{id}
     [HttpPut("periods/{id:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -1016,9 +959,4 @@ public sealed class ClosePeriodRequest
     // When true the admin has reviewed and accepted the pre-close warnings (unliquidated
     // services, zero/negative net pay) and the period is closed anyway.
     public bool AcknowledgeWarnings { get; set; }
-}
-
-public sealed class ReopenPeriodRequest
-{
-    public string? Reason { get; set; }
 }

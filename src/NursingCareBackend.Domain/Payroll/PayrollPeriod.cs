@@ -96,28 +96,4 @@ public sealed class PayrollPeriod
         Status = PayrollPeriodStatus.Closed;
         ClosedAtUtc = closedAtUtc;
     }
-
-    // Reopen a closed period for correction. Requires a non-empty reason for the audit
-    // trail. Reverts the period to Open and clears the closure stamp so it can be edited,
-    // recalculated and re-closed. Reopening an already-open period is invalid.
-    public void Reopen(string reason, Guid? reopenedByUserId, DateTime reopenedAtUtc)
-    {
-        if (Status != PayrollPeriodStatus.Closed)
-        {
-            throw new InvalidOperationException(
-                $"Payroll period {Id} is not closed and cannot be reopened.");
-        }
-
-        if (string.IsNullOrWhiteSpace(reason))
-        {
-            throw new ArgumentException("A reason is required to reopen a payroll period.", nameof(reason));
-        }
-
-        Status = PayrollPeriodStatus.Open;
-        ClosedAtUtc = null;
-        ReopenedAtUtc = reopenedAtUtc;
-        ReopenReason = reason.Trim();
-        ReopenedByUserId = reopenedByUserId;
-        ReopenCount += 1;
-    }
 }

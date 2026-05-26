@@ -292,23 +292,6 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
         return new PeriodCloseWarnings(negativeNetNurses, unliquidatedServices);
     }
 
-    public async Task<PeriodReopenResult> ReopenPeriodAsync(
-        Guid periodId,
-        string reason,
-        Guid? reopenedByUserId,
-        CancellationToken cancellationToken)
-    {
-        var period = await _dbContext.PayrollPeriods
-            .FirstOrDefaultAsync(p => p.Id == periodId, cancellationToken);
-
-        if (period is null) return PeriodReopenResult.NotFound;
-        if (!period.IsClosed) return PeriodReopenResult.NotClosed;
-
-        period.Reopen(reason, reopenedByUserId, DateTime.UtcNow);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-        return PeriodReopenResult.Success;
-    }
-
     public async Task<PeriodMutationResult> UpdatePeriodAsync(
         Guid periodId,
         DateOnly startDate,
