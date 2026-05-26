@@ -153,8 +153,11 @@ public static class DependencyInjection
           client.Timeout = TimeSpan.FromSeconds(30);
         });
         services.AddScoped<IPushTokenService, PushTokenService>();
-        services.AddHostedService<PushDispatcherWorker>();
-        services.AddHostedService<OverdueNotificationWorker>();
+        if (!configuration.GetValue<bool>("BackgroundWorkers:Disabled"))
+        {
+            services.AddHostedService<PushDispatcherWorker>();
+            services.AddHostedService<OverdueNotificationWorker>();
+        }
         services.Configure<OverdueNotificationOptions>(
             configuration.GetSection(OverdueNotificationOptions.SectionName));
         services.AddScoped<IAdminReportsRepository, AdminReportsRepository>();
