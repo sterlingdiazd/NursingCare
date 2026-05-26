@@ -118,6 +118,38 @@ public class CareRequestTests
         Assert.Throws<InvalidOperationException>(act);
     }
 
+    [Fact]
+    public void RejectPayment_Returns_PaymentReported_To_Invoiced_And_Clears_Proof()
+    {
+        var nurse = Guid.NewGuid();
+        var cr = CreateForTest(Guid.NewGuid(), "Para rechazo", assignedNurse: nurse);
+        var t = new DateTime(2026, 3, 18, 12, 0, 0, DateTimeKind.Utc);
+        cr.Approve(t);
+        cr.Complete(t.AddMinutes(10), nurse);
+        cr.Invoice("SOL-202603-0001", t.AddMinutes(11));
+        cr.ReportPayment(Guid.NewGuid(), t.AddMinutes(20));
+
+        cr.RejectPayment("Comprobante ilegible", t.AddMinutes(30));
+
+        Assert.Equal(CareRequestStatus.Invoiced, cr.Status);
+        Assert.Null(cr.PaymentProofId);
+        Assert.Null(cr.PaymentReportedAtUtc);
+        Assert.Equal("Comprobante ilegible", cr.PaymentRejectionReason);
+    }
+
+    [Fact]
+    public void RejectPayment_From_Invoiced_Should_Throw()
+    {
+        var nurse = Guid.NewGuid();
+        var cr = CreateForTest(Guid.NewGuid(), "No reportado", assignedNurse: nurse);
+        var t = new DateTime(2026, 3, 18, 12, 0, 0, DateTimeKind.Utc);
+        cr.Approve(t);
+        cr.Complete(t.AddMinutes(1), nurse);
+        cr.Invoice("SOL-202603-0002", t.AddMinutes(2));
+
+        Assert.Throws<InvalidOperationException>(() => cr.RejectPayment("x", t.AddMinutes(3)));
+    }
+
     private static CareRequest CreateForTest(Guid userID, string description, Guid? assignedNurse = null)
     {
         return CareRequest.Create(new CareRequestCreateParams

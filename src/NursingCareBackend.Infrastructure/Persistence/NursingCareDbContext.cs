@@ -120,6 +120,7 @@ public sealed class NursingCareDbContext : DbContext
                      builder.Property(x => x.PaidAtUtc);
                      builder.Property(x => x.VoidedAtUtc);
                      builder.Property(x => x.VoidReason).HasMaxLength(500);
+                     builder.Property(x => x.PaymentRejectionReason).HasMaxLength(500);
                      builder.Ignore(x => x.IsVoided);
 
                      // Removed custom column mappings – now using default property names

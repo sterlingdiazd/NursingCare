@@ -54,6 +54,8 @@ public sealed class CareRequest
     public DateTime? VoidedAtUtc { get; private set; }
     public string? VoidReason { get; private set; }
     public bool IsVoided => VoidedAtUtc.HasValue;
+    /// <summary>Reason the admin gave when rejecting a reported payment proof (back to Invoiced).</summary>
+    public string? PaymentRejectionReason { get; private set; }
 
     private CareRequest() { } // For ORM
 
@@ -308,6 +310,26 @@ public sealed class CareRequest
         Status = CareRequestStatus.Paid;
         PaidAtUtc = paymentDate;
         UpdatedAtUtc = paymentDate;
+    }
+
+    // Admin rejects a reported payment proof (wrong/blurry/non-matching). Moves PaymentReported ->
+    // Invoiced, clears the proof, and records the reason so the client can re-report. No revenue.
+    public void RejectPayment(string reason, DateTime rejectedAtUtc)
+    {
+        if (Status != CareRequestStatus.PaymentReported)
+        {
+            throw new InvalidOperationException(
+                $"A payment can only be rejected from PaymentReported status. Current status is {Status}.");
+        }
+
+        if (string.IsNullOrWhiteSpace(reason))
+            throw new ArgumentException("Rejection reason cannot be empty.", nameof(reason));
+
+        Status = CareRequestStatus.Invoiced;
+        PaymentProofId = null;
+        PaymentReportedAtUtc = null;
+        PaymentRejectionReason = reason.Trim();
+        UpdatedAtUtc = rejectedAtUtc;
     }
 
     public void Void(string voidReason, DateTime voidedAtUtc)
