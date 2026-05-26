@@ -161,27 +161,37 @@ public sealed class AdminPayrollController : ControllerBase
         [FromBody] ClosePeriodRequest? request,
         CancellationToken cancellationToken)
     {
+        var acknowledgeWarnings = request?.AcknowledgeWarnings == true;
+
         // Closing is irreversible-by-default: surface unliquidated services and zero/negative
-        // net pay, and require explicit acknowledgement before locking the period.
-        if (request?.AcknowledgeWarnings != true)
+        // net pay, and require explicit acknowledgement before locking the period. This advisory
+        // pass produces the rich, per-warning Spanish detail the UI shows the admin. The gate is
+        // ALSO re-evaluated authoritatively inside ClosePeriodAsync (see RequiresConfirmation
+        // below) so a stale preflight can never let an unacknowledged close slip through.
+        if (!acknowledgeWarnings)
         {
             var warnings = await _repository.GetCloseWarningsAsync(id, cancellationToken);
             if (warnings.HasWarnings)
             {
-                var parts = new List<string>();
-                if (warnings.UnliquidatedServices > 0)
-                    parts.Add($"{warnings.UnliquidatedServices} servicio(s) completado(s) en el período sin línea de nómina (quedarían sin pagar)");
-                if (warnings.NegativeNetNurses > 0)
-                    parts.Add($"{warnings.NegativeNetNurses} enfermera(s) con pago neto en cero o negativo");
-
                 return this.ProblemResponse(
                     StatusCodes.Status409Conflict,
                     Messages.Get("errors.periodo_requiere_confirmacion"),
-                    $"Antes de cerrar revisa: {string.Join("; ", parts)}. Confirma para cerrar de todas formas (es irreversible).");
+                    BuildCloseWarningsDetail(warnings));
             }
         }
 
-        var result = await _repository.ClosePeriodAsync(id, cancellationToken);
+        var result = await _repository.ClosePeriodAsync(id, acknowledgeWarnings, cancellationToken);
+
+        if (result == PeriodCloseResult.RequiresConfirmation)
+        {
+            // Authoritative at-close-time gate: warnings appeared (or remained unacknowledged)
+            // between the preflight and the close. Re-read them so the detail stays accurate.
+            var warnings = await _repository.GetCloseWarningsAsync(id, cancellationToken);
+            return this.ProblemResponse(
+                StatusCodes.Status409Conflict,
+                Messages.Get("errors.periodo_requiere_confirmacion"),
+                BuildCloseWarningsDetail(warnings));
+        }
 
         if (result == PeriodCloseResult.NotFound)
         {
@@ -203,6 +213,17 @@ public sealed class AdminPayrollController : ControllerBase
         await _scheduledDeductionService.SettlePeriodInstallmentsAsync(id, cancellationToken);
 
         return NoContent();
+    }
+
+    private static string BuildCloseWarningsDetail(PeriodCloseWarnings warnings)
+    {
+        var parts = new List<string>();
+        if (warnings.UnliquidatedServices > 0)
+            parts.Add($"{warnings.UnliquidatedServices} servicio(s) completado(s) en el período sin línea de nómina (quedarían sin pagar)");
+        if (warnings.NegativeNetNurses > 0)
+            parts.Add($"{warnings.NegativeNetNurses} enfermera(s) con pago neto en cero o negativo");
+
+        return $"Antes de cerrar revisa: {string.Join("; ", parts)}. Confirma para cerrar de todas formas (es irreversible).";
     }
 
     // PUT /api/admin/payroll/periods/{id}

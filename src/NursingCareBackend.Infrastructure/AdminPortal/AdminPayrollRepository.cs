@@ -218,7 +218,10 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
             .OrderBy(p => p.StartDate)
             .FirstOrDefaultAsync(cancellationToken);
 
-    public async Task<PeriodCloseResult> ClosePeriodAsync(Guid periodId, CancellationToken cancellationToken)
+    public async Task<PeriodCloseResult> ClosePeriodAsync(
+        Guid periodId,
+        bool acknowledgeWarnings,
+        CancellationToken cancellationToken)
     {
         var period = await _dbContext.PayrollPeriods
             .FirstOrDefaultAsync(p => p.Id == periodId, cancellationToken);
@@ -233,6 +236,21 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
         if (!await PeriodHasActivityAsync(periodId, cancellationToken))
         {
             return PeriodCloseResult.Empty;
+        }
+
+        // Safe-close gate, re-evaluated INSIDE the close path (not from a stale preflight).
+        // The controller's pre-close advisory call can race the actual close: unliquidated
+        // services or zero/negative net pay may appear (or be acknowledged against different
+        // data) between the preflight and now. Re-checking here makes the gate authoritative
+        // at close time and TOCTOU-safe — closing is irreversible-by-default, so an
+        // unacknowledged warning must block the lock regardless of what the preflight saw.
+        if (!acknowledgeWarnings)
+        {
+            var warnings = await GetCloseWarningsAsync(periodId, cancellationToken);
+            if (warnings.HasWarnings)
+            {
+                return PeriodCloseResult.RequiresConfirmation;
+            }
         }
 
         period.Close(DateTime.UtcNow);

@@ -199,7 +199,7 @@ file sealed class FakeVoucherRepository : IAdminPayrollRepository
     public Task<AdminPayrollPeriodListResult> GetPeriodsAsync(AdminPayrollPeriodListFilter filter, CancellationToken cancellationToken) => throw new NotImplementedException();
     public Task<AdminPayrollPeriodDetail?> GetPeriodByIdAsync(Guid periodId, CancellationToken cancellationToken) => throw new NotImplementedException();
     public Task<Guid> CreatePeriodAsync(DateOnly startDate, DateOnly endDate, DateOnly cutoffDate, DateOnly paymentDate, CancellationToken cancellationToken) => throw new NotImplementedException();
-    public Task<PeriodCloseResult> ClosePeriodAsync(Guid periodId, CancellationToken cancellationToken) => throw new NotImplementedException();
+    public Task<PeriodCloseResult> ClosePeriodAsync(Guid periodId, bool acknowledgeWarnings, CancellationToken cancellationToken) => throw new NotImplementedException();
     public Task<PeriodCloseWarnings> GetCloseWarningsAsync(Guid periodId, CancellationToken cancellationToken) => throw new NotImplementedException();
     public Task<PeriodMutationResult> UpdatePeriodAsync(Guid periodId, DateOnly startDate, DateOnly endDate, DateOnly cutoffDate, DateOnly paymentDate, CancellationToken cancellationToken) => throw new NotImplementedException();
     public Task<PeriodMutationResult> DeletePeriodAsync(Guid periodId, CancellationToken cancellationToken) => throw new NotImplementedException();
