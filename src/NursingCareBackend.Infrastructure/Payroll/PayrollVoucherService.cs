@@ -149,9 +149,9 @@ public sealed class PayrollVoucherService : IPayrollVoucherService
         {
             table.ColumnsDefinition(cols =>
             {
-                cols.ConstantColumn(95);
+                cols.ConstantColumn(120);
                 cols.RelativeColumn();
-                cols.ConstantColumn(95);
+                cols.ConstantColumn(120);
                 cols.RelativeColumn();
             });
 
@@ -161,7 +161,7 @@ public sealed class PayrollVoucherService : IPayrollVoucherService
             BodyCell(table, string.IsNullOrWhiteSpace(data.NurseCedula) ? "No registrada" : data.NurseCedula);
             LabelCell(table, "Estado");
             BodyCell(table, FormatStatus(data.PeriodStatus));
-            LabelCell(table, "Fecha de pago programada");
+            LabelCell(table, "Pago programado");
             BodyCell(table, FormatDate(data.PaymentDate));
         });
     }
