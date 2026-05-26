@@ -49,6 +49,9 @@ public sealed class ClientSelfProfileService : IClientSelfProfileService
     user.IdentificationNumber = request.IdentificationNumber.Trim();
     user.Phone = request.Phone.Trim();
     user.DisplayName = $"{user.Name} {user.LastName}".Trim();
+    user.PreferredAddress = NormalizeOptional(request.PreferredAddress);
+    user.EmergencyContactName = NormalizeOptional(request.EmergencyContactName);
+    user.EmergencyContactPhone = NormalizeOptional(request.EmergencyContactPhone);
 
     await _users.UpdateAsync(user, cancellationToken);
 
@@ -77,5 +80,13 @@ public sealed class ClientSelfProfileService : IClientSelfProfileService
     IdentityInputRules.EnsureTextOnlyRequired(request.LastName, nameof(request.LastName), "Last name");
     IdentityInputRules.EnsureIdentificationNumber(request.IdentificationNumber, nameof(request.IdentificationNumber));
     IdentityInputRules.EnsurePhone(request.Phone, nameof(request.Phone));
+    IdentityInputRules.EnsureTextOnlyOptional(request.EmergencyContactName, nameof(request.EmergencyContactName), "Emergency contact name");
+    IdentityInputRules.EnsurePhoneOptional(request.EmergencyContactPhone, nameof(request.EmergencyContactPhone), "Emergency contact phone");
+  }
+
+  private static string? NormalizeOptional(string? value)
+  {
+    var trimmed = value?.Trim();
+    return string.IsNullOrWhiteSpace(trimmed) ? null : trimmed;
   }
 }

@@ -53,6 +53,32 @@ public static class IdentityInputRules
         }
     }
 
+    public static void EnsureTextOnlyOptional(string? value, string parameterName, string displayName)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        if (!TextOnlyRegex.IsMatch(value.Trim()))
+        {
+            throw new ArgumentException($"{displayName} must contain letters and spaces only.", parameterName);
+        }
+    }
+
+    public static void EnsurePhoneOptional(string? value, string parameterName, string displayName)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        if (!PhoneRegex.IsMatch(value.Trim()))
+        {
+            throw new ArgumentException($"{displayName} must contain exactly 10 digits.", parameterName);
+        }
+    }
+
     public static void EnsureNumericOnlyOptional(string? value, string parameterName, string displayName)
     {
         if (string.IsNullOrWhiteSpace(value))

@@ -10,6 +10,9 @@ public sealed record ClientSelfProfileResponse(
   string? DisplayName,
   string? IdentificationNumber,
   string? Phone,
+  string? PreferredAddress,
+  string? EmergencyContactName,
+  string? EmergencyContactPhone,
   bool IsActive,
   DateTime CreatedAtUtc);
 
@@ -17,7 +20,10 @@ public sealed record UpdateClientSelfProfileRequest(
   string Name,
   string LastName,
   string IdentificationNumber,
-  string Phone);
+  string Phone,
+  string? PreferredAddress = null,
+  string? EmergencyContactName = null,
+  string? EmergencyContactPhone = null);
 
 internal static class ClientSelfProfileMapper
 {
@@ -30,6 +36,9 @@ internal static class ClientSelfProfileMapper
       user.DisplayName,
       user.IdentificationNumber,
       user.Phone,
+      user.PreferredAddress,
+      user.EmergencyContactName,
+      user.EmergencyContactPhone,
       user.IsActive,
       user.CreatedAtUtc);
 }
