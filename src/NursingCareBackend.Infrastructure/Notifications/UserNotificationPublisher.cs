@@ -49,7 +49,8 @@ public sealed class UserNotificationPublisher : IUserNotificationPublisher
       .AnyAsync(user =>
         user.Id == request.RecipientUserId
         && user.IsActive
-        && user.UserRoles.Any(userRole => userRole.Role.Name == SystemRoles.Client),
+        && user.UserRoles.Any(userRole =>
+            userRole.Role.Name == SystemRoles.Client || userRole.Role.Name == SystemRoles.Nurse),
         cancellationToken);
 
     if (!recipientExists)

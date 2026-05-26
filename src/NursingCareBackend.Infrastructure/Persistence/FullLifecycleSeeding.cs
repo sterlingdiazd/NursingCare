@@ -420,7 +420,8 @@ public static class FullLifecycleSeeding
         {
             // Mes completo (01→31): per the payment-date policy the payment is the last day of the
             // month (31/03), and the cutoff is end − 2 (29/03). A fresh seed is thus already
-            // policy-correct; the startup backfill also corrects any pre-existing March period.
+            // policy-correct. (The startup backfill only corrects OPEN periods; this seeded March
+            // period is Closed, so it is never auto-rewritten — it must be seeded correct here.)
             march = PayrollPeriod.Create(
                 startDate: marchStart,
                 endDate: marchEnd,

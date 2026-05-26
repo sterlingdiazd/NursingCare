@@ -146,6 +146,14 @@ public sealed class ConfirmNursePeriodPaymentHandler : IConfirmNursePeriodPaymen
                     "La enfermera no tiene un correo registrado para recibir el comprobante.", now);
                 deliveryDetail = payment.DeliveryError;
             }
+            else if (_demoComms.Enabled && string.IsNullOrWhiteSpace(_demoComms.ContactEmail))
+            {
+                // Fail-closed demo with no contact email: the email layer suppresses the send, so do
+                // NOT record the comprobante as delivered (mirrors the wa.me suppression guard above).
+                payment.MarkVoucherFailed(
+                    "Modo demo sin correo de contacto configurado; comprobante no enviado.", now);
+                deliveryDetail = payment.DeliveryError;
+            }
             else
             {
                 var fileName = $"comprobante-{voucherData.PeriodStartDate:yyyyMMdd}-{voucherData.PeriodEndDate:yyyyMMdd}.pdf";
