@@ -178,6 +178,8 @@ public sealed class AdminPayrollController : ControllerBase
             if (warnings.HasWarnings)
             {
                 var parts = new List<string>();
+                if (warnings.UnpaidNurses > 0)
+                    parts.Add($"{warnings.UnpaidNurses} enfermera(s) con pago aún NO confirmado (quedarían sin pagar)");
                 if (warnings.UnliquidatedServices > 0)
                     parts.Add($"{warnings.UnliquidatedServices} servicio(s) completado(s) en el período sin línea de nómina (quedarían sin pagar)");
                 if (warnings.NegativeNetNurses > 0)
@@ -219,7 +221,7 @@ public sealed class AdminPayrollController : ControllerBase
                 Action: NursingCareBackend.Application.AdminPortal.Auditing.AdminAuditActions.ClosePeriod,
                 EntityType: "PayrollPeriod",
                 EntityId: id.ToString(),
-                Notes: $"Período cerrado. Advertencias: {warnings.UnliquidatedServices} sin liquidar, {warnings.NegativeNetNurses} con neto <= 0" +
+                Notes: $"Período cerrado. Advertencias: {warnings.UnpaidNurses} sin pagar, {warnings.UnliquidatedServices} sin liquidar, {warnings.NegativeNetNurses} con neto <= 0" +
                        (request?.AcknowledgeWarnings == true ? " (reconocidas)." : "."),
                 MetadataJson: null),
             cancellationToken);

@@ -289,6 +289,16 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
         var negativeNetNurses = grossByNurse
             .Count(n => n.Gross - deductionsByNurse.GetValueOrDefault(n.NurseUserId, 0m) <= 0m);
 
+        // Nurses with lines in this period whose payment is NOT yet Confirmed — the "did everyone get
+        // paid?" backstop. A nurse with no payment row, or one not in Confirmed, counts as unpaid.
+        var confirmedNurseIds = await _dbContext.NursePeriodPayments
+            .AsNoTracking()
+            .Where(p => p.PayrollPeriodId == periodId && p.PaymentStatus == NursePaymentStatus.Confirmed)
+            .Select(p => p.NurseUserId)
+            .ToListAsync(cancellationToken);
+
+        var unpaidNurses = grossByNurse.Count(n => !confirmedNurseIds.Contains(n.NurseUserId));
+
         // Completed service executions inside the window with no payroll line in this period.
         var executionsInWindow = await _dbContext.ServiceExecutions
             .AsNoTracking()
@@ -308,7 +318,7 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
             unliquidatedServices = executionsInWindow.Except(postedExecutionIds).Count();
         }
 
-        return new PeriodCloseWarnings(negativeNetNurses, unliquidatedServices);
+        return new PeriodCloseWarnings(negativeNetNurses, unliquidatedServices, unpaidNurses);
     }
 
     public async Task<PeriodReopenResult> ReopenPeriodAsync(
