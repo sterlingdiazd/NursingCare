@@ -62,10 +62,13 @@ public sealed class ConfirmNursePeriodPaymentHandler
         var now = DateTime.UtcNow;
         var periodLabel = BuildPeriodLabel(voucherData.PeriodStartDate, voucherData.PeriodEndDate);
 
-        // 3. Upsert the confirmation record (idempotent on (period, nurse)).
+        // 3. Upsert the confirmation record (idempotent on (period, nurse)) and persist it BEFORE
+        //    generating the PDF. The voucher generator re-reads the (period, nurse) confirmation row
+        //    to render the "Confirmación de pago" (PAGADO) section, so the row must already exist
+        //    in the database when the PDF is built — otherwise a first-time confirmation would email
+        //    a comprobante that does not yet show the payment as confirmed.
         var existing = await _paymentRepository.GetAsync(command.PeriodId, command.NurseUserId, cancellationToken);
         NursePeriodPayment payment;
-        bool isNew;
         if (existing is null)
         {
             payment = NursePeriodPayment.Create(
@@ -74,27 +77,29 @@ public sealed class ConfirmNursePeriodPaymentHandler
                 command.AdminUserId,
                 command.BankReference,
                 now);
-            isNew = true;
+            await _paymentRepository.AddAsync(payment, cancellationToken);
         }
         else
         {
             existing.Reconfirm(command.AdminUserId, command.BankReference, now);
             payment = existing;
-            isNew = false;
+            await _paymentRepository.SaveChangesAsync(cancellationToken);
         }
 
-        // 4. Resolve the demo recipient: the logged-in admin's own email + phone.
-        var admin = await _userRepository.GetByIdAsync(command.AdminUserId, cancellationToken);
-        var recipientEmail = admin?.Email;
-        var whatsappUrl = BuildWhatsappUrl(admin?.Phone, periodLabel);
+        // 4. Resolve the recipient: the NURSE (the comprobante is the nurse's proof of payment).
+        //    The nurse is a User, resolved the same way the handler resolves the admin user.
+        var nurse = await _userRepository.GetByIdAsync(command.NurseUserId, cancellationToken);
+        var nurseEmail = nurse?.Email;
+        var whatsappUrl = BuildWhatsappUrl(nurse?.Phone, periodLabel);
 
         // 5. Generate the voucher PDF, GATE it through the financial-output validator, and only
-        //    then email it to the admin. Delivery is best-effort for the demo, but a financial
+        //    then email it to the NURSE. Delivery is best-effort for the demo, but a financial
         //    document that fails validation is BLOCKED from being sent (fail-closed) so a corrupt
         //    or unreconciled comprobante never leaves the system. The confirmation itself still
         //    succeeds; re-confirming re-runs the gate, enabling retry once the data is fixed.
         var emailSent = false;
         string? deliveryDetail = null;
+        string recipientLabel = "El comprobante no se pudo enviar a la enfermera.";
         try
         {
             var pdfBytes = await _voucherService.GenerateVoucherAsync(
@@ -118,17 +123,17 @@ public sealed class ConfirmNursePeriodPaymentHandler
                 payment.MarkVoucherFailed(validation.ReasonSummary, now);
                 deliveryDetail = validation.ReasonSummary;
             }
-            else if (string.IsNullOrWhiteSpace(recipientEmail))
+            else if (string.IsNullOrWhiteSpace(nurseEmail))
             {
                 payment.MarkVoucherFailed(
-                    "El administrador no tiene un correo registrado para recibir el comprobante.", now);
+                    "La enfermera no tiene un correo registrado para recibir el comprobante.", now);
                 deliveryDetail = payment.DeliveryError;
             }
             else
             {
                 var fileName = $"comprobante-{voucherData.PeriodStartDate:yyyyMMdd}-{voucherData.PeriodEndDate:yyyyMMdd}.pdf";
                 await _emailService.SendWithAttachmentsAsync(
-                    recipientEmail,
+                    nurseEmail,
                     $"Comprobante de pago — período {periodLabel}",
                     BuildEmailBody(voucherData.NurseDisplayName, periodLabel),
                     new[] { new EmailAttachmentData(fileName, "application/pdf", pdfBytes) },
@@ -136,7 +141,8 @@ public sealed class ConfirmNursePeriodPaymentHandler
 
                 payment.MarkVoucherDelivered(now);
                 emailSent = true;
-                deliveryDetail = "El comprobante superó la validación financiera y se envió por correo.";
+                deliveryDetail = "Comprobante enviado a la enfermera por correo.";
+                recipientLabel = $"Comprobante enviado a la enfermera ({nurseEmail}).";
             }
         }
         catch (Exception ex)
@@ -144,23 +150,17 @@ public sealed class ConfirmNursePeriodPaymentHandler
             // Delivery is best-effort for the demo: never fail the confirmation on a send error.
             _logger.LogError(
                 ex,
-                "Failed to deliver payroll voucher for period {PeriodId} nurse {NurseId} to admin {AdminId}",
+                "Failed to deliver payroll voucher for period {PeriodId} to nurse {NurseId}",
                 command.PeriodId,
-                command.NurseUserId,
-                command.AdminUserId);
+                command.NurseUserId);
             payment.MarkVoucherFailed(ex.Message, now);
             deliveryDetail = payment.DeliveryError;
         }
 
-        // 6. Persist.
-        if (isNew)
-        {
-            await _paymentRepository.AddAsync(payment, cancellationToken);
-        }
-        else
-        {
-            await _paymentRepository.SaveChangesAsync(cancellationToken);
-        }
+        // 6. Persist the delivery-status outcome (the confirmation row itself was already saved in
+        //    step 3 so the PDF could render the PAGADO section). The payment entity is tracked, so
+        //    this flushes MarkVoucherDelivered/MarkVoucherFailed.
+        await _paymentRepository.SaveChangesAsync(cancellationToken);
 
         return new ConfirmNursePeriodPaymentResult(
             PeriodId: command.PeriodId,
@@ -169,7 +169,7 @@ public sealed class ConfirmNursePeriodPaymentHandler
             BankReference: payment.BankReference,
             VoucherEmailSent: emailSent,
             WhatsappUrl: whatsappUrl,
-            RecipientLabel: "Modo demo: el comprobante se envió al correo y número del administrador.",
+            RecipientLabel: recipientLabel,
             VoucherDeliveryDetail: deliveryDetail);
     }
 
@@ -183,13 +183,13 @@ public sealed class ConfirmNursePeriodPaymentHandler
     {
         var nurse = System.Net.WebUtility.HtmlEncode(nurseDisplayName);
         var label = System.Net.WebUtility.HtmlEncode(periodLabel);
-        return $"<p>Hola,</p>" +
-               $"<p>Adjunto encontrarás el comprobante de pago de <strong>{nurse}</strong> correspondiente al período {label}.</p>" +
-               $"<p><em>Este es un envío en modo demostración: el comprobante se entrega al administrador.</em></p>";
+        return $"<p>Hola {nurse},</p>" +
+               $"<p>Confirmamos el pago correspondiente al período {label}. Adjunto encontrarás tu comprobante de pago.</p>" +
+               $"<p>Saludos,<br/>Sol y Luna</p>";
     }
 
     /// <summary>
-    /// Builds a wa.me link to the admin's own phone with a prefilled Spanish message.
+    /// Builds a wa.me link to the NURSE's phone with a prefilled Spanish message.
     /// DR numbers are stored as 10 digits (e.g. "8099892465"); we prepend "1" for the +1
     /// country code. If the stored phone already has 11 digits starting with "1", it is
     /// used as-is. Returns "" when no usable phone is available.
@@ -218,7 +218,7 @@ public sealed class ConfirmNursePeriodPaymentHandler
             return string.Empty;
         }
 
-        var message = $"Hola, te comparto tu comprobante de pago del período {periodLabel}. (Demo)";
+        var message = $"Hola, te enviamos tu comprobante de pago del período {periodLabel} a tu correo. (Sol y Luna)";
         var encodedMessage = Uri.EscapeDataString(message);
         return $"https://wa.me/{normalized}?text={encodedMessage}";
     }

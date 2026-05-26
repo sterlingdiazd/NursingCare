@@ -22,6 +22,15 @@ public sealed class PayrollVoucherData
     public decimal TotalAdjustments { get; init; }
     public decimal TotalDeductions { get; init; }
     public decimal NetCompensation { get; init; }
+
+    /// <summary>True when the admin has confirmed this nurse's bank transfer for the period.</summary>
+    public bool PaymentConfirmed { get; init; }
+
+    /// <summary>Bank reference recorded with the confirmation, when provided.</summary>
+    public string? BankReference { get; init; }
+
+    /// <summary>When the payment was confirmed (UTC); used as the payment/confirmation date on the comprobante.</summary>
+    public DateTime? PaymentConfirmedAtUtc { get; init; }
 }
 
 public sealed class VoucherLineItem

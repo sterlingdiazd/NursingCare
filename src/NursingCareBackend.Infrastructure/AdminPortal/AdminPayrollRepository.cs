@@ -903,6 +903,12 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
             .OrderBy(d => d.CreatedAtUtc)
             .ToListAsync(cancellationToken);
 
+        // A confirmation row means the admin confirmed this nurse's transfer for the period;
+        // the comprobante then surfaces the payment as confirmed (PAGADO) with its reference/date.
+        var payment = await _dbContext.NursePeriodPayments
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.PayrollPeriodId == periodId && p.NurseUserId == nurseId, cancellationToken);
+
         var displayName = user is null
             ? nurseId.ToString()
             : string.Join(" ", new[] { user.Name, user.LastName }.Where(v => !string.IsNullOrWhiteSpace(v)))
@@ -957,6 +963,9 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
             TotalAdjustments = lines.Sum(l => l.AdjustmentsTotal),
             TotalDeductions = deductions.Sum(d => d.Amount),
             NetCompensation = lines.Sum(l => l.BaseCompensation + l.TransportIncentive + l.ComplexityBonus + l.MedicalSuppliesCompensation + l.AdjustmentsTotal) - deductions.Sum(d => d.Amount),
+            PaymentConfirmed = payment is not null,
+            BankReference = payment?.BankReference,
+            PaymentConfirmedAtUtc = payment?.ConfirmedAtUtc,
         };
     }
 
@@ -1000,6 +1009,13 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
             .GroupBy(d => d.NurseUserId)
             .ToDictionary(g => g.Key, g => g.ToList());
 
+        // Confirmation rows for this period, keyed by nurse, so each voucher can surface its
+        // own payment-confirmation state (PAGADO + reference/date) consistently with the single-nurse path.
+        var paymentsByNurse = await _dbContext.NursePeriodPayments
+            .AsNoTracking()
+            .Where(p => p.PayrollPeriodId == periodId && nurseIds.Contains(p.NurseUserId))
+            .ToDictionaryAsync(p => p.NurseUserId, cancellationToken);
+
         var result = new List<PayrollVoucherData>();
 
         foreach (var nurseGroup in allLines.GroupBy(l => l.NurseUserId))
@@ -1027,6 +1043,8 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
                 })
                 .ToList()
                 .AsReadOnly();
+
+            var payment = paymentsByNurse.GetValueOrDefault(nurseId);
 
             var nurseDeductions = deductionsByNurse.GetValueOrDefault(nurseId, []);
             var deductionItems = nurseDeductions
@@ -1063,6 +1081,9 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
                 TotalAdjustments = lines.Sum(l => l.AdjustmentsTotal),
                 TotalDeductions = nurseDeductions.Sum(d => d.Amount),
                 NetCompensation = lines.Sum(l => l.BaseCompensation + l.TransportIncentive + l.ComplexityBonus + l.MedicalSuppliesCompensation + l.AdjustmentsTotal) - nurseDeductions.Sum(d => d.Amount),
+                PaymentConfirmed = payment is not null,
+                BankReference = payment?.BankReference,
+                PaymentConfirmedAtUtc = payment?.ConfirmedAtUtc,
             });
         }
 

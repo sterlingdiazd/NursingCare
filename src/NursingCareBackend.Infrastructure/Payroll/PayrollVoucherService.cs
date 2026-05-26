@@ -130,6 +130,12 @@ public sealed class PayrollVoucherService : IPayrollVoucherService
                         col.Item().PaddingTop(14).Text("Detalle de deducciones").Bold().FontSize(11).FontColor(Navy);
                         col.Item().PaddingTop(5).Element(c => BuildDeductionsTable(c, data));
                     }
+
+                    if (data.PaymentConfirmed)
+                    {
+                        col.Item().PaddingTop(14).Text("Confirmación de pago").Bold().FontSize(11).FontColor(Green);
+                        col.Item().PaddingTop(5).Element(c => BuildPaymentConfirmationTable(c, data));
+                    }
                 });
             });
         });
@@ -239,6 +245,37 @@ public sealed class PayrollVoucherService : IPayrollVoucherService
                 BodyCell(table, deduction.Label);
                 BodyCell(table, FormatCurrency(deduction.Amount), alignRight: true);
             }
+        });
+    }
+
+    // Renders the payment-confirmation block shown once the admin confirms the transfer.
+    // Two-column label/value table (no Row + ConstantItem().AlignRight) so nothing clips at
+    // the right margin. The "PAGADO" state and bank reference make the comprobante a proof of payment.
+    private static void BuildPaymentConfirmationTable(IContainer container, PayrollVoucherData data)
+    {
+        container.Table(table =>
+        {
+            table.ColumnsDefinition(cols =>
+            {
+                cols.ConstantColumn(150);
+                cols.RelativeColumn();
+            });
+
+            LabelCell(table, "Estado");
+            Cell(table).Background("#ECFDF3").Text("PAGADO").SemiBold().FontColor(Green);
+
+            if (!string.IsNullOrWhiteSpace(data.BankReference))
+            {
+                LabelCell(table, "Referencia bancaria");
+                BodyCell(table, data.BankReference!);
+            }
+
+            // Prefer the confirmation timestamp; fall back to the period's scheduled payment date.
+            var confirmationDate = data.PaymentConfirmedAtUtc is { } confirmedAt
+                ? DateOnly.FromDateTime(confirmedAt)
+                : data.PaymentDate;
+            LabelCell(table, "Fecha de pago");
+            BodyCell(table, FormatDate(confirmationDate));
         });
     }
 

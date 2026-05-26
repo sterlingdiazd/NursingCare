@@ -75,6 +75,18 @@ public sealed class FinancialOutputValidatorTests
         return service.GenerateVoucherAsync(voucher.PeriodId, voucher.NurseUserId).GetAwaiter().GetResult();
     }
 
+    private static string ExtractPdfText(byte[] pdfBytes)
+    {
+        using var document = UglyToad.PdfPig.PdfDocument.Open(pdfBytes);
+        var builder = new StringBuilder();
+        foreach (var page in document.GetPages())
+        {
+            builder.AppendLine(page.Text);
+        }
+
+        return builder.ToString();
+    }
+
     // ----- tests ---------------------------------------------------------------------------
 
     [Fact]
@@ -208,6 +220,62 @@ public sealed class FinancialOutputValidatorTests
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Failures, f => f.Code == FinancialOutputValidator.CodeNegativeNet);
+    }
+
+    [Fact]
+    public void Validate_ConfirmedPaymentVoucher_StillContainsValidatorTokensAndPasses()
+    {
+        // A confirmed-payment comprobante adds the "Confirmación de pago" (PAGADO) section; the gate
+        // must still pass because all validator-required tokens remain present.
+        var voucher = new PayrollVoucherData
+        {
+            PeriodId = Guid.NewGuid(),
+            PeriodStartDate = new DateOnly(2026, 4, 1),
+            PeriodEndDate = new DateOnly(2026, 4, 30),
+            PaymentDate = new DateOnly(2026, 5, 5),
+            PeriodStatus = "Closed",
+            NurseUserId = Guid.NewGuid(),
+            NurseDisplayName = "Ana Garcia",
+            NurseCedula = "001-1234567-8",
+            Lines =
+            [
+                new VoucherLineItem
+                {
+                    Description = "Servicio domicilio 24h",
+                    BaseCompensation = 3000m,
+                    TransportIncentive = 200m,
+                    ComplexityBonus = 150m,
+                    MedicalSuppliesCompensation = 50m,
+                    AdjustmentsTotal = 0m,
+                    DeductionsTotal = 0m,
+                    NetCompensation = 3400m,
+                },
+            ],
+            Deductions = [],
+            TotalGross = 3400m,
+            TotalTransport = 200m,
+            TotalComplexity = 150m,
+            TotalSupplies = 50m,
+            TotalAdjustments = 0m,
+            TotalDeductions = 0m,
+            NetCompensation = 3400m,
+            PaymentConfirmed = true,
+            BankReference = "TRX-998877",
+            PaymentConfirmedAtUtc = new DateTime(2026, 5, 6, 14, 30, 0, DateTimeKind.Utc),
+        };
+
+        var pdf = GenerateRealVoucherPdf(voucher);
+        var data = BuildDocumentData(voucher);
+
+        var result = Validator.Validate(FinancialDocumentKind.PayrollVoucher, pdf, data);
+
+        Assert.True(result.IsValid, $"Expected valid but got: {result.ReasonSummary}");
+        Assert.Empty(result.Failures);
+
+        // Confirm the comprobante actually surfaced the payment-confirmation tokens.
+        var pdfText = ExtractPdfText(pdf);
+        Assert.Contains("PAGADO", pdfText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("TRX-998877", pdfText, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
