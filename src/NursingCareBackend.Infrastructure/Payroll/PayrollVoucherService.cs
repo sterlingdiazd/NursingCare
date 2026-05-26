@@ -161,7 +161,7 @@ public sealed class PayrollVoucherService : IPayrollVoucherService
             BodyCell(table, string.IsNullOrWhiteSpace(data.NurseCedula) ? "No registrada" : data.NurseCedula);
             LabelCell(table, "Estado");
             BodyCell(table, FormatStatus(data.PeriodStatus));
-            LabelCell(table, "Fecha de pago");
+            LabelCell(table, "Fecha de pago programada");
             BodyCell(table, FormatDate(data.PaymentDate));
         });
     }
@@ -274,7 +274,7 @@ public sealed class PayrollVoucherService : IPayrollVoucherService
             var confirmationDate = data.PaymentConfirmedAtUtc is { } confirmedAt
                 ? DateOnly.FromDateTime(confirmedAt)
                 : data.PaymentDate;
-            LabelCell(table, "Fecha de pago");
+            LabelCell(table, "Pagado el");
             BodyCell(table, FormatDate(confirmationDate));
         });
     }
