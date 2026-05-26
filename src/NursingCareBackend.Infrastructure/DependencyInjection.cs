@@ -105,14 +105,14 @@ public static class DependencyInjection
         // DEMO communications redirect: when enabled, every outgoing email AND every wa.me
         // WhatsApp link is redirected to a single configured demo contact (the owner) so demos
         // never message real nurses/clients. Env var with appsettings-section fallback, mirroring
-        // the EmailOptions pattern above. Safe-by-default: Enabled is true unless explicitly
-        // turned off (env "false" or section "false").
+        // the EmailOptions pattern above. PRODUCTION-safe: Enabled is OFF unless explicitly
+        // turned on (env DEMO_COMMS_ENABLED="true" or section "true"). Absent/unparseable => off.
         services.Configure<DemoCommunicationsOptions>(options =>
         {
             var section = configuration.GetSection(DemoCommunicationsOptions.SectionName);
             var enabledRaw = Environment.GetEnvironmentVariable("DEMO_COMMS_ENABLED")
                 ?? section["Enabled"];
-            options.Enabled = !bool.TryParse(enabledRaw, out var enabled) || enabled;
+            options.Enabled = bool.TryParse(enabledRaw, out var enabled) && enabled;
             options.ContactEmail = Environment.GetEnvironmentVariable("DEMO_COMMS_EMAIL")
                 ?? section["ContactEmail"]
                 ?? string.Empty;

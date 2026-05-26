@@ -11,10 +11,10 @@ public sealed class DemoCommunicationsOptions
     public const string SectionName = "DemoCommunications";
 
     /// <summary>
-    /// Master switch for the demo redirect. Defaults to <c>true</c> on this safe-by-default
-    /// branch so a demo never accidentally messages a real recipient.
+    /// Master switch for the demo redirect. Defaults to <c>false</c> (PRODUCTION-safe: real
+    /// recipients). Enable it ONLY in a demo environment via DEMO_COMMS_ENABLED=true.
     /// </summary>
-    public bool Enabled { get; set; } = true;
+    public bool Enabled { get; set; } = false;
 
     /// <summary>
     /// Email address that ALL outgoing email is redirected to while <see cref="Enabled"/>.
