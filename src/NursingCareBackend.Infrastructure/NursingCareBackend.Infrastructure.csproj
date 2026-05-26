@@ -6,7 +6,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="Email\Templates\*.md" />
+    <EmbeddedResource Remove="**/*.resx" />
+    <EmbeddedResource Include="Email/Templates/*.md" />
   </ItemGroup>
 
   <ItemGroup>

@@ -51,6 +51,19 @@ public sealed class PayrollPeriod
         PaymentDate = paymentDate;
     }
 
+    // Data-only correction of the cutoff/payment dates to bring a period in line with the
+    // authoritative payment-date policy. Unlike UpdateSchedule this is ALLOWED even when the
+    // period is Closed: it does not touch the date range (start/end) or any payroll lines, it
+    // only fixes the two derived schedule dates that an out-of-policy seed/legacy value left
+    // behind. Still enforces the start ≤ cutoff ≤ end and cutoff ≤ payment invariant.
+    public void CorrectSchedule(DateOnly cutoffDate, DateOnly paymentDate)
+    {
+        ValidateSchedule(StartDate, EndDate, cutoffDate, paymentDate);
+
+        CutoffDate = cutoffDate;
+        PaymentDate = paymentDate;
+    }
+
     // Standard period date rules: a coherent timeline of start ≤ cutoff ≤ end, and
     // cutoff ≤ payment. The cutoff is the accounting close — it falls inside the period
     // (on or before the end), never after it. Payment is settled on or after the cutoff.

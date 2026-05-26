@@ -1,6 +1,7 @@
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using NursingCareBackend.Application.AdminPortal.Payroll;
 using NursingCareBackend.Domain.Identity;
 using NursingCareBackend.Domain.SystemSettings;
 using NursingCareBackend.Infrastructure.Persistence;
@@ -85,6 +86,7 @@ namespace NursingCareBackend.Api.Extensions
 
         EnsureSystemRoles(db);
         EnsureSystemSettings(db);
+        EnsurePayrollScheduleCompliance(db);
         EnsureCatalogDisplayNames(db);
 
         try
@@ -218,6 +220,81 @@ namespace NursingCareBackend.Api.Extensions
       {
         db.SaveChanges();
       }
+    }
+
+    // Idempotent backfill that enforces the payroll payment-date policy on EVERY existing period
+    // (the policy previously only lived in the mobile create-period prefill). For each stored
+    // PayrollPeriod we recompute (cutoff, payment) from the configured policy and write the
+    // correction only when the stored values differ. Uses PayrollPeriod.CorrectSchedule so even
+    // CLOSED periods (e.g. the seeded March period) are fixed — this is a data correction of the
+    // derived schedule dates, not a business edit of the lines. Runs right after the settings are
+    // seeded so the policy keys are present.
+    private static void EnsurePayrollScheduleCompliance(NursingCareDbContext db)
+    {
+        var config = ReadPayrollScheduleConfig(db);
+
+        var periods = db.PayrollPeriods.ToList();
+        var changed = false;
+
+        foreach (var period in periods)
+        {
+            var (cutoff, payment) = PayrollScheduleCalculator.Compute(period.StartDate, period.EndDate, config);
+            if (period.CutoffDate == cutoff && period.PaymentDate == payment)
+            {
+                continue;
+            }
+
+            period.CorrectSchedule(cutoff, payment);
+            changed = true;
+        }
+
+        if (changed)
+        {
+            db.SaveChanges();
+            Console.WriteLine("Corrected payroll period schedule date(s) to match the payment-date policy.");
+        }
+    }
+
+    // Reads the four payroll payment-date policy settings from the DB, applying defaults for any
+    // missing / blank / non-numeric value. Kept in lockstep with PayrollSchedulePolicy's reader.
+    private static PayrollScheduleConfig ReadPayrollScheduleConfig(NursingCareDbContext db)
+    {
+        var keys = new[]
+        {
+            "PAYROLL_PAYMENT_DATE_MODE",
+            "PAYROLL_FIRST_HALF_PAYMENT_DAY",
+            "PAYROLL_SECOND_HALF_PAYMENT_DAY",
+            "PAYROLL_DAYS_BEFORE_MONTH_END",
+        };
+
+        var rows = db.SystemSettings
+            .AsNoTracking()
+            .Where(s => keys.Contains(s.Key))
+            .Select(s => new { s.Key, s.Value })
+            .ToDictionary(s => s.Key, s => s.Value);
+
+        var defaults = PayrollScheduleConfig.Default;
+
+        var rawMode = rows.GetValueOrDefault("PAYROLL_PAYMENT_DATE_MODE")?.Trim().ToUpperInvariant();
+        var mode = rawMode == "DAYS_BEFORE_MONTH_END"
+            ? PayrollPaymentDateMode.DaysBeforeMonthEnd
+            : PayrollPaymentDateMode.FixedDay;
+
+        return new PayrollScheduleConfig(
+            mode,
+            ParseIntOr(rows.GetValueOrDefault("PAYROLL_FIRST_HALF_PAYMENT_DAY"), defaults.FirstHalfPaymentDay),
+            ParseIntOr(rows.GetValueOrDefault("PAYROLL_SECOND_HALF_PAYMENT_DAY"), defaults.SecondHalfPaymentDay),
+            ParseIntOr(rows.GetValueOrDefault("PAYROLL_DAYS_BEFORE_MONTH_END"), defaults.DaysBeforeMonthEnd));
+    }
+
+    private static int ParseIntOr(string? value, int fallback)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return fallback;
+        }
+
+        return int.TryParse(value.Trim(), out var parsed) ? parsed : fallback;
     }
 
     private static void EnsureSystemSettings(NursingCareDbContext db)

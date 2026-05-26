@@ -17,10 +17,12 @@ file static class StringExtensions
 public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayrollRepository
 {
     private readonly NursingCareDbContext _dbContext;
+    private readonly IPayrollSchedulePolicy _schedulePolicy;
 
-    public AdminPayrollRepository(NursingCareDbContext dbContext)
+    public AdminPayrollRepository(NursingCareDbContext dbContext, IPayrollSchedulePolicy schedulePolicy)
     {
         _dbContext = dbContext;
+        _schedulePolicy = schedulePolicy;
     }
 
     public async Task<AdminPayrollPeriodListResult> GetPeriodsAsync(
@@ -198,6 +200,10 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
                 $"El período {startDate:dd/MM/yyyy}–{endDate:dd/MM/yyyy} se solapa con un período existente ({clash.StartDate:dd/MM/yyyy}–{clash.EndDate:dd/MM/yyyy}).");
         }
 
+        // The payment-date policy is authoritative: compute cutoff/payment from the configured
+        // policy and ignore the client-supplied values, so every period obeys the same rule.
+        (cutoffDate, paymentDate) = await _schedulePolicy.ComputeAsync(startDate, endDate, cancellationToken);
+
         var period = PayrollPeriod.Create(startDate, endDate, cutoffDate, paymentDate, DateTime.UtcNow);
         _dbContext.PayrollPeriods.Add(period);
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -325,6 +331,10 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
         if (await PeriodHasActivityAsync(periodId, cancellationToken)) return PeriodMutationResult.InUse;
         if (await FindOverlappingPeriodAsync(startDate, endDate, periodId, cancellationToken) is not null)
             return PeriodMutationResult.Overlap;
+
+        // Authoritative policy: derive cutoff/payment for the (possibly new) date range and ignore
+        // the client-supplied values.
+        (cutoffDate, paymentDate) = await _schedulePolicy.ComputeAsync(startDate, endDate, cancellationToken);
 
         period.UpdateSchedule(startDate, endDate, cutoffDate, paymentDate);
         await _dbContext.SaveChangesAsync(cancellationToken);

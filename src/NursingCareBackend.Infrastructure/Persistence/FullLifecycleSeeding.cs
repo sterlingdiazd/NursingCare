@@ -418,11 +418,14 @@ public static class FullLifecycleSeeding
 
         if (march is null)
         {
+            // Mes completo (01→31): per the payment-date policy the payment is the last day of the
+            // month (31/03), and the cutoff is end − 2 (29/03). A fresh seed is thus already
+            // policy-correct; the startup backfill also corrects any pre-existing March period.
             march = PayrollPeriod.Create(
                 startDate: marchStart,
                 endDate: marchEnd,
-                cutoffDate: new DateOnly(2026, 3, 28),
-                paymentDate: new DateOnly(2026, 4, 5),
+                cutoffDate: new DateOnly(2026, 3, 29),
+                paymentDate: new DateOnly(2026, 3, 31),
                 createdAtUtc: new DateTime(2026, 3, 1, 0, 0, 0, DateTimeKind.Utc));
             march.Close(new DateTime(2026, 4, 1, 10, 0, 0, DateTimeKind.Utc));
             db.PayrollPeriods.Add(march);
@@ -434,11 +437,13 @@ public static class FullLifecycleSeeding
 
         if (future is null)
         {
+            // 1ra quincena (01→15): per the policy the payment is the fixed first-half day (15/07);
+            // cutoff is end − 2 (13/07).
             future = PayrollPeriod.Create(
                 startDate: futureStart,
                 endDate: futureEnd,
                 cutoffDate: new DateOnly(2026, 7, 13),
-                paymentDate: new DateOnly(2026, 7, 18),
+                paymentDate: new DateOnly(2026, 7, 15),
                 createdAtUtc: DateTime.UtcNow);
             db.PayrollPeriods.Add(future);
             await db.SaveChangesAsync(cancellationToken);
