@@ -125,6 +125,16 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
             .Select(g => new { NurseUserId = g.Key, Total = g.Sum(d => d.Amount) })
             .ToDictionaryAsync(x => x.NurseUserId, x => x.Total, cancellationToken);
 
+        // Per-nurse payment state (for the UI badge): one confirmation row per (period, nurse).
+        var paymentByNurse = await _dbContext.NursePeriodPayments
+            .AsNoTracking()
+            .Where(p => p.PayrollPeriodId == periodId)
+            .Select(p => new { p.NurseUserId, p.PaymentStatus, p.BankReference })
+            .ToDictionaryAsync(
+                x => x.NurseUserId,
+                x => (Status: (string?)x.PaymentStatus.ToString(), Reference: x.BankReference),
+                cancellationToken);
+
         var lineItems = lines
             .Select(l => new AdminPayrollLineItem(
                 l.Id,
@@ -150,6 +160,7 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
             {
                 var gross = g.Sum(l => l.BaseCompensation + l.TransportIncentive + l.ComplexityBonus + l.MedicalSuppliesCompensation + l.AdjustmentsTotal);
                 var deductions = deductionsByNurse.GetValueOrDefault(g.Key, 0m);
+                paymentByNurse.TryGetValue(g.Key, out var payment);
                 return new AdminPayrollStaffSummary(
                     g.Key,
                     nurseLookup.GetValueOrDefault(g.Key, g.Key.ToString()),
@@ -158,7 +169,9 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
                     g.Sum(l => l.TransportIncentive),
                     g.Sum(l => l.AdjustmentsTotal),
                     deductions,
-                    gross - deductions);
+                    gross - deductions,
+                    payment.Status,
+                    payment.Reference);
             })
             .OrderByDescending(s => s.NetCompensation)
             .ToList()
