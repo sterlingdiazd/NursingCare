@@ -218,6 +218,22 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
     db.SaveChanges();
   }
 
+  protected override void Dispose(bool disposing)
+  {
+    if (disposing)
+    {
+      try
+      {
+        var options = new DbContextOptionsBuilder<NursingCareDbContext>().UseSqlServer(_testConnectionString).Options;
+        using var db = new NursingCareDbContext(options);
+        db.Database.EnsureDeleted();
+      }
+      catch { /* best-effort teardown; never fail the run */ }
+    }
+
+    base.Dispose(disposing);
+  }
+
   private sealed class FakeGoogleOAuthClient : IGoogleOAuthClient
   {
     public bool IsConfigured => true;

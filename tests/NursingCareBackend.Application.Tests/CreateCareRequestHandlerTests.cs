@@ -10,11 +10,14 @@ using Xunit;
 
 namespace NursingCareBackend.Application.Tests;
 
-public sealed class CreateCareRequestHandlerTests
+public sealed class CreateCareRequestHandlerTests : IDisposable
 {
-  private static NursingCareDbContext CreateDbContext()
+  private readonly List<string> _createdConnectionStrings = new();
+
+  private NursingCareDbContext CreateDbContext()
   {
     var connectionString = TestSqlConnectionResolver.CreateUniqueDatabaseConnectionString();
+    _createdConnectionStrings.Add(connectionString);
     var options = new DbContextOptionsBuilder<NursingCareDbContext>()
         .UseSqlServer(connectionString)
         .Options;
@@ -63,5 +66,21 @@ public sealed class CreateCareRequestHandlerTests
     Assert.Equal("dia_completo", saved.UnitType);
     Assert.Equal(1, saved.Unit);
     Assert.Null(saved.AssignedNurse);
+  }
+
+  public void Dispose()
+  {
+    foreach (var connectionString in _createdConnectionStrings)
+    {
+      try
+      {
+        var options = new DbContextOptionsBuilder<NursingCareDbContext>()
+            .UseSqlServer(connectionString)
+            .Options;
+        using var db = new NursingCareDbContext(options);
+        db.Database.EnsureDeleted();
+      }
+      catch { /* best-effort teardown; never fail the run */ }
+    }
   }
 }

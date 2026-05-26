@@ -14,13 +14,16 @@ namespace NursingCareBackend.Application.Tests;
 // the close is blocked with PeriodCloseResult.RequiresConfirmation regardless of whether any
 // preflight ran. This makes the money-safe gate authoritative and TOCTOU-safe.
 // See AdminPayrollRepository.ClosePeriodAsync.
-public sealed class AdminPayrollRepositoryCloseGateTests
+public sealed class AdminPayrollRepositoryCloseGateTests : IDisposable
 {
     private static readonly Guid NurseId = Guid.Parse("33333333-3333-3333-3333-333333333333");
 
-    private static NursingCareDbContext CreateDbContext()
+    private readonly List<string> _createdConnectionStrings = new();
+
+    private NursingCareDbContext CreateDbContext()
     {
         var connectionString = TestSqlConnectionResolver.CreateUniqueDatabaseConnectionString();
+        _createdConnectionStrings.Add(connectionString);
         var options = new DbContextOptionsBuilder<NursingCareDbContext>()
             .UseSqlServer(connectionString)
             .Options;
@@ -174,5 +177,21 @@ public sealed class AdminPayrollRepositoryCloseGateTests
 
         var period = await dbContext.PayrollPeriods.AsNoTracking().SingleAsync(p => p.Id == periodId);
         Assert.True(period.IsClosed);
+    }
+
+    public void Dispose()
+    {
+        foreach (var connectionString in _createdConnectionStrings)
+        {
+            try
+            {
+                var options = new DbContextOptionsBuilder<NursingCareDbContext>()
+                    .UseSqlServer(connectionString)
+                    .Options;
+                using var db = new NursingCareDbContext(options);
+                db.Database.EnsureDeleted();
+            }
+            catch { /* best-effort teardown; never fail the run */ }
+        }
     }
 }

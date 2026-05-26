@@ -13,13 +13,16 @@ namespace NursingCareBackend.Application.Tests;
 // existing PayrollPeriod CONTAINS the service date (StartDate <= date <= EndDate),
 // including admin-created NON-STANDARD periods, instead of always materializing a fresh
 // standard quincena. See PayrollCompensationService.GetOrCreatePayrollPeriodAsync.
-public sealed class PayrollCompensationServicePeriodBindingTests
+public sealed class PayrollCompensationServicePeriodBindingTests : IDisposable
 {
   private static readonly Guid NurseId = Guid.Parse("22222222-2222-2222-2222-222222222222");
 
-  private static NursingCareDbContext CreateDbContext()
+  private readonly List<string> _createdConnectionStrings = new();
+
+  private NursingCareDbContext CreateDbContext()
   {
     var connectionString = TestSqlConnectionResolver.CreateUniqueDatabaseConnectionString();
+    _createdConnectionStrings.Add(connectionString);
     var options = new DbContextOptionsBuilder<NursingCareDbContext>()
         .UseSqlServer(connectionString)
         .Options;
@@ -159,5 +162,21 @@ public sealed class PayrollCompensationServicePeriodBindingTests
 
     var line = await dbContext.PayrollLines.SingleAsync();
     Assert.Equal(period.Id, line.PayrollPeriodId);
+  }
+
+  public void Dispose()
+  {
+    foreach (var connectionString in _createdConnectionStrings)
+    {
+      try
+      {
+        var options = new DbContextOptionsBuilder<NursingCareDbContext>()
+            .UseSqlServer(connectionString)
+            .Options;
+        using var db = new NursingCareDbContext(options);
+        db.Database.EnsureDeleted();
+      }
+      catch { /* best-effort teardown; never fail the run */ }
+    }
   }
 }

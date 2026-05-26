@@ -12,11 +12,14 @@ namespace NursingCareBackend.Application.Tests;
 // preferredAddress / emergencyContactName / emergencyContactPhone, which the
 // backend previously dropped silently. This exercises the real SQL persistence
 // path (UserRepository + ClientSelfProfileService) end to end.
-public sealed class ClientSelfProfileContactFieldsTests
+public sealed class ClientSelfProfileContactFieldsTests : IDisposable
 {
-  private static NursingCareDbContext CreateDbContext()
+  private readonly List<string> _createdConnectionStrings = new();
+
+  private NursingCareDbContext CreateDbContext()
   {
     var connectionString = TestSqlConnectionResolver.CreateUniqueDatabaseConnectionString();
+    _createdConnectionStrings.Add(connectionString);
     var options = new DbContextOptionsBuilder<NursingCareDbContext>()
         .UseSqlServer(connectionString)
         .Options;
@@ -137,5 +140,21 @@ public sealed class ClientSelfProfileContactFieldsTests
         .UseSqlServer(template.Database.GetConnectionString())
         .Options;
     return new NursingCareDbContext(options);
+  }
+
+  public void Dispose()
+  {
+    foreach (var connectionString in _createdConnectionStrings)
+    {
+      try
+      {
+        var options = new DbContextOptionsBuilder<NursingCareDbContext>()
+            .UseSqlServer(connectionString)
+            .Options;
+        using var db = new NursingCareDbContext(options);
+        db.Database.EnsureDeleted();
+      }
+      catch { /* best-effort teardown; never fail the run */ }
+    }
   }
 }

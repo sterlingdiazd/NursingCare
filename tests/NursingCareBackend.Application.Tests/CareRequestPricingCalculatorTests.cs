@@ -7,8 +7,10 @@ using Xunit;
 
 namespace NursingCareBackend.Application.Tests;
 
-public sealed class CareRequestPricingCalculatorTests
+public sealed class CareRequestPricingCalculatorTests : IDisposable
 {
+  private readonly List<string> _createdConnectionStrings = new();
+
   [Fact]
   public async Task CalculateAsync_Should_Match_Legacy_Domicilio_24h_Defaults()
   {
@@ -36,9 +38,10 @@ public sealed class CareRequestPricingCalculatorTests
     Assert.Equal(0, result.VolumeDiscountPercentSnapshot);
   }
 
-  private static async Task<NursingCareDbContext> CreateSeededDbAsync()
+  private async Task<NursingCareDbContext> CreateSeededDbAsync()
   {
     var connectionString = TestSqlConnectionResolver.CreateUniqueDatabaseConnectionString();
+    _createdConnectionStrings.Add(connectionString);
     var options = new DbContextOptionsBuilder<NursingCareDbContext>()
         .UseSqlServer(connectionString)
         .Options;
@@ -48,5 +51,21 @@ public sealed class CareRequestPricingCalculatorTests
     await context.Database.EnsureCreatedAsync();
     await CatalogSeeding.EnsureSeededAsync(context);
     return context;
+  }
+
+  public void Dispose()
+  {
+    foreach (var connectionString in _createdConnectionStrings)
+    {
+      try
+      {
+        var options = new DbContextOptionsBuilder<NursingCareDbContext>()
+            .UseSqlServer(connectionString)
+            .Options;
+        using var db = new NursingCareDbContext(options);
+        db.Database.EnsureDeleted();
+      }
+      catch { /* best-effort teardown; never fail the run */ }
+    }
   }
 }
