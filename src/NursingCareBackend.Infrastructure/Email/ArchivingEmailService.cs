@@ -85,14 +85,71 @@ public sealed class ArchivingEmailService : IEmailService
             var fromName = string.IsNullOrWhiteSpace(_emailOptions.SenderDisplayName) ? "NursingCare" : _emailOptions.SenderDisplayName;
             var fromAddress = string.IsNullOrWhiteSpace(_emailOptions.SenderAddress) ? "noreply@localhost" : _emailOptions.SenderAddress;
 
-            var eml = BuildEml(sentAt, fromName, fromAddress, recipientEmail, subject, htmlBody, attachments);
+            var eml = BuildEml(sentAt, fromName, fromAddress, recipientEmail, subject, htmlBody, attachments, _options.MaxAttachmentBytes);
             var path = Path.Combine(folder, BuildFileName(sentAt, recipientEmail, subject));
             File.WriteAllText(path, eml, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+
+            // Best-effort retention: drop day-folders older than the cutoff. Never throws.
+            PruneExpiredArchives(root, sentAt);
         }
         catch (Exception ex)
         {
             // Never let archiving break (or change the outcome of) the actual send.
             _logger.LogWarning(ex, "Email archive write failed (non-fatal) for {Recipient}.", recipientEmail);
+        }
+    }
+
+    // Best-effort retention sweep: delete archived {root}/yyyy/MM/dd day-folders whose date is
+    // older than (now - RetentionDays). Pruning is opportunistic (runs on write) and must never
+    // throw — any failure is logged and swallowed so it can't affect archiving or the send.
+    private void PruneExpiredArchives(string root, DateTimeOffset now)
+    {
+        if (_options.RetentionDays <= 0) return;
+
+        try
+        {
+            if (!Directory.Exists(root)) return;
+
+            var cutoff = now.Date.AddDays(-_options.RetentionDays);
+
+            foreach (var yearDir in Directory.EnumerateDirectories(root))
+            {
+                if (!int.TryParse(Path.GetFileName(yearDir), NumberStyles.None, CultureInfo.InvariantCulture, out var year))
+                    continue;
+
+                foreach (var monthDir in Directory.EnumerateDirectories(yearDir))
+                {
+                    if (!int.TryParse(Path.GetFileName(monthDir), NumberStyles.None, CultureInfo.InvariantCulture, out var month)
+                        || month is < 1 or > 12)
+                        continue;
+
+                    foreach (var dayDir in Directory.EnumerateDirectories(monthDir))
+                    {
+                        if (!int.TryParse(Path.GetFileName(dayDir), NumberStyles.None, CultureInfo.InvariantCulture, out var day)
+                            || day is < 1 or > 31)
+                            continue;
+
+                        DateTime folderDate;
+                        try
+                        {
+                            folderDate = new DateTime(year, month, day);
+                        }
+                        catch (ArgumentOutOfRangeException)
+                        {
+                            continue; // e.g. a 31 under a 30-day month — leave it alone
+                        }
+
+                        if (folderDate < cutoff)
+                        {
+                            Directory.Delete(dayDir, recursive: true);
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Email archive retention prune failed (non-fatal).");
         }
     }
 
@@ -106,6 +163,10 @@ public sealed class ArchivingEmailService : IEmailService
     }
 
     /// <summary>Serializes a single email to a standard MIME (.eml) document.</summary>
+    /// <param name="maxAttachmentBytes">
+    /// Attachments larger than this are replaced by a short text placeholder part instead of
+    /// their base64 bytes. Zero or negative disables the cap (embed everything verbatim).
+    /// </param>
     public static string BuildEml(
         DateTimeOffset sentAt,
         string fromName,
@@ -113,7 +174,8 @@ public sealed class ArchivingEmailService : IEmailService
         string recipientEmail,
         string subject,
         string htmlBody,
-        IReadOnlyCollection<EmailAttachmentData>? attachments)
+        IReadOnlyCollection<EmailAttachmentData>? attachments,
+        long maxAttachmentBytes = 0)
     {
         const string crlf = "\r\n";
         var sb = new StringBuilder();
@@ -151,12 +213,31 @@ public sealed class ArchivingEmailService : IEmailService
         {
             var fileName = HeaderSafe(string.IsNullOrWhiteSpace(attachment.FileName) ? "adjunto" : attachment.FileName);
             var contentType = string.IsNullOrWhiteSpace(attachment.ContentType) ? "application/octet-stream" : attachment.ContentType;
+            var content = attachment.Content ?? [];
+
             sb.Append("--").Append(boundary).Append(crlf);
+
+            // Size guard: oversized attachments are NOT embedded; we write a small text
+            // placeholder part instead so the archive stays bounded but the attachment's
+            // presence (name, type, size) is still recorded.
+            if (maxAttachmentBytes > 0 && content.LongLength > maxAttachmentBytes)
+            {
+                var placeholder =
+                    $"[Adjunto omitido del archivo: \"{fileName}\" ({contentType}, {content.LongLength} bytes) " +
+                    $"excede el límite de {maxAttachmentBytes} bytes. El correo enviado sí incluyó el adjunto completo.]";
+                sb.Append("Content-Type: text/plain; charset=utf-8").Append(crlf);
+                sb.Append("Content-Transfer-Encoding: base64").Append(crlf);
+                sb.Append("Content-Disposition: inline").Append(crlf);
+                sb.Append(crlf);
+                sb.Append(Base64(Encoding.UTF8.GetBytes(placeholder))).Append(crlf);
+                continue;
+            }
+
             sb.Append("Content-Type: ").Append(HeaderSafe(contentType)).Append("; name=\"").Append(fileName).Append('"').Append(crlf);
             sb.Append("Content-Transfer-Encoding: base64").Append(crlf);
             sb.Append("Content-Disposition: attachment; filename=\"").Append(fileName).Append('"').Append(crlf);
             sb.Append(crlf);
-            sb.Append(Base64(attachment.Content ?? [])).Append(crlf);
+            sb.Append(Base64(content)).Append(crlf);
         }
 
         sb.Append("--").Append(boundary).Append("--").Append(crlf);
