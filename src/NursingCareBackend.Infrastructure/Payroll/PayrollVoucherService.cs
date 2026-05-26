@@ -16,6 +16,10 @@ public sealed class PayrollVoucherService : IPayrollVoucherService
     private readonly ICompanyInfoProvider _companyProvider;
     private static readonly CultureInfo DominicanCulture = new("es-DO");
 
+    // Dominican Republic is permanently UTC-4 (Atlantic Standard Time, no DST since 2000),
+    // so payslip dates/times are shown in RD local time, never raw UTC.
+    private static readonly TimeZoneInfo DominicanTimeZone = ResolveDominicanTimeZone();
+
     // Shared palette/format with the payroll report export for a consistent look.
     private const string Ink = "#1F2933";
     private const string Muted = "#667085";
@@ -270,9 +274,10 @@ public sealed class PayrollVoucherService : IPayrollVoucherService
                 BodyCell(table, data.BankReference!);
             }
 
-            // Prefer the confirmation timestamp; fall back to the period's scheduled payment date.
+            // Prefer the confirmation timestamp (shown in RD local time, not UTC); fall back to
+            // the period's scheduled payment date.
             var confirmationDate = data.PaymentConfirmedAtUtc is { } confirmedAt
-                ? DateOnly.FromDateTime(confirmedAt)
+                ? ToDominicanDate(confirmedAt)
                 : data.PaymentDate;
             LabelCell(table, "Pagado el");
             BodyCell(table, FormatDate(confirmationDate));
@@ -284,7 +289,7 @@ public sealed class PayrollVoucherService : IPayrollVoucherService
         page.Footer().BorderTop(0.5f).BorderColor(Line).PaddingTop(6).Text(text =>
         {
             text.AlignCenter();
-            text.Span($"Generado el {DateTime.UtcNow:dd-MM-yyyy HH:mm} UTC   ·   Página ").FontSize(7).FontColor(Muted);
+            text.Span($"Generado el {ToDominicanTime(DateTime.UtcNow):dd-MM-yyyy HH:mm} (RD)   ·   Página ").FontSize(7).FontColor(Muted);
             text.CurrentPageNumber().FontSize(7).FontColor(Muted);
         });
     }
@@ -338,6 +343,27 @@ public sealed class PayrollVoucherService : IPayrollVoucherService
 
     private static string FormatDate(DateOnly date) =>
         date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
+
+    // --- Dominican Republic local time (UTC-4, no DST) ---
+    private static TimeZoneInfo ResolveDominicanTimeZone()
+    {
+        foreach (var id in new[] { "America/Santo_Domingo", "SA Western Standard Time" })
+        {
+            try { return TimeZoneInfo.FindSystemTimeZoneById(id); }
+            catch (TimeZoneNotFoundException) { }
+            catch (InvalidTimeZoneException) { }
+        }
+        // Fixed fallback: DR has observed UTC-4 with no daylight saving since 2000.
+        return TimeZoneInfo.CreateCustomTimeZone(
+            "RD-UTC-4", TimeSpan.FromHours(-4), "Rep. Dominicana (UTC-4)", "AST");
+    }
+
+    private static DateTime ToDominicanTime(DateTime utc) =>
+        TimeZoneInfo.ConvertTimeFromUtc(
+            DateTime.SpecifyKind(utc, DateTimeKind.Utc), DominicanTimeZone);
+
+    private static DateOnly ToDominicanDate(DateTime utc) =>
+        DateOnly.FromDateTime(ToDominicanTime(utc));
 
     private static string FormatCurrency(decimal value) =>
         $"RD$ {value.ToString("N2", DominicanCulture)}";
