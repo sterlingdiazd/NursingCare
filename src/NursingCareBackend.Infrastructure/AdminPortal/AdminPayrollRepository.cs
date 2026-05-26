@@ -310,7 +310,21 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
         if (period is null) return PeriodReopenResult.NotFound;
         if (!period.IsClosed) return PeriodReopenResult.NotClosed;
 
-        period.Reopen(reason, reopenedByUserId, DateTime.UtcNow);
+        var now = DateTime.UtcNow;
+        period.Reopen(reason, reopenedByUserId, now);
+
+        // A reopened period's net may change, so any prior confirmed/sent nurse payment becomes
+        // stale (a "PAGADO" comprobante stamped against a net that will change). Reset those to
+        // Pending (preserving the bank reference) so the admin must re-confirm against the corrected
+        // net. ResetForReopen is a no-op for payments not in Confirmed/SentToBank.
+        var periodPayments = await _dbContext.NursePeriodPayments
+            .Where(p => p.PayrollPeriodId == periodId)
+            .ToListAsync(cancellationToken);
+        foreach (var payment in periodPayments)
+        {
+            payment.ResetForReopen(reopenedByUserId ?? Guid.Empty, now);
+        }
+
         await _dbContext.SaveChangesAsync(cancellationToken);
         return PeriodReopenResult.Success;
     }

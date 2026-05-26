@@ -12,4 +12,13 @@ public static class AdminAuditActions
   public const string NurseProfileUpdated = "NurseProfileUpdated";
   public const string NurseOperationalAccessChanged = "NurseOperationalAccessChanged";
   public const string CatalogEntryUpdated = "CatalogEntryUpdated";
+
+  // Money flow (payroll / nurse payment)
+  public const string ConfirmNursePayment = "ConfirmNursePayment";
+  public const string NursePaymentFailed = "NursePaymentFailed";
+  public const string NursePaymentReversed = "NursePaymentReversed";
+  public const string ClosePeriod = "ClosePeriod";
+
+  // Money flow (client payment)
+  public const string RejectPaymentProof = "RejectPaymentProof";
 }

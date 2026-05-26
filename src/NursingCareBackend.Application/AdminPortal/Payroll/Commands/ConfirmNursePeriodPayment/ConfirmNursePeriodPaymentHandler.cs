@@ -1,11 +1,14 @@
 using System.Globalization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using NursingCareBackend.Application.AdminPortal.Auditing;
+using NursingCareBackend.Application.AdminPortal.Notifications;
 using NursingCareBackend.Application.AdminPortal.Payroll.Validation;
 using NursingCareBackend.Application.Communications;
 using NursingCareBackend.Application.Email;
 using NursingCareBackend.Application.Exceptions;
 using NursingCareBackend.Application.Identity.Repositories;
+using NursingCareBackend.Application.Notifications;
 using NursingCareBackend.Domain.Payroll;
 
 namespace NursingCareBackend.Application.AdminPortal.Payroll.Commands.ConfirmNursePeriodPayment;
@@ -19,6 +22,9 @@ public sealed class ConfirmNursePeriodPaymentHandler : IConfirmNursePeriodPaymen
     private readonly ICompanyInfoProvider _companyProvider;
     private readonly IEmailService _emailService;
     private readonly IUserRepository _userRepository;
+    private readonly IAdminAuditService _auditService;
+    private readonly IUserNotificationPublisher _userNotifications;
+    private readonly IAdminNotificationPublisher _adminNotifications;
     private readonly DemoCommunicationsOptions _demoComms;
     private readonly ILogger<ConfirmNursePeriodPaymentHandler> _logger;
 
@@ -30,6 +36,9 @@ public sealed class ConfirmNursePeriodPaymentHandler : IConfirmNursePeriodPaymen
         ICompanyInfoProvider companyProvider,
         IEmailService emailService,
         IUserRepository userRepository,
+        IAdminAuditService auditService,
+        IUserNotificationPublisher userNotifications,
+        IAdminNotificationPublisher adminNotifications,
         IOptions<DemoCommunicationsOptions> demoComms,
         ILogger<ConfirmNursePeriodPaymentHandler> logger)
     {
@@ -40,6 +49,9 @@ public sealed class ConfirmNursePeriodPaymentHandler : IConfirmNursePeriodPaymen
         _companyProvider = companyProvider;
         _emailService = emailService;
         _userRepository = userRepository;
+        _auditService = auditService;
+        _userNotifications = userNotifications;
+        _adminNotifications = adminNotifications;
         _demoComms = demoComms.Value;
         _logger = logger;
     }
@@ -168,6 +180,60 @@ public sealed class ConfirmNursePeriodPaymentHandler : IConfirmNursePeriodPaymen
         //    this flushes MarkVoucherDelivered/MarkVoucherFailed.
         await _paymentRepository.SaveChangesAsync(cancellationToken);
 
+        // 7. Audit the money action (real money; traceable via the request CorrelationId).
+        await _auditService.WriteAsync(
+            new AdminAuditRecord(
+                ActorUserId: command.AdminUserId,
+                ActorRole: "Admin",
+                Action: AdminAuditActions.ConfirmNursePayment,
+                EntityType: "NursePeriodPayment",
+                EntityId: payment.Id.ToString(),
+                Notes: $"Pago confirmado a enfermera {command.NurseUserId}, período {command.PeriodId}" +
+                       (string.IsNullOrWhiteSpace(payment.BankReference) ? string.Empty : $", ref {payment.BankReference}") +
+                       $". Comprobante: {(emailSent ? "enviado" : "no enviado")}.",
+                MetadataJson: null),
+            cancellationToken);
+
+        // 8. Notify the nurse her payment was confirmed; alert admins if the comprobante could not
+        //    be delivered. Best-effort: a notification failure never fails the money action.
+        try
+        {
+            await _userNotifications.PublishToUserAsync(
+                new UserNotificationPublishRequest(
+                    RecipientUserId: command.NurseUserId,
+                    Category: "nurse_payment_confirmed",
+                    Severity: "Medium",
+                    Title: "Pago confirmado",
+                    Body: $"Confirmamos tu pago del período {periodLabel}. Tu comprobante está disponible.",
+                    EntityType: "NursePeriodPayment",
+                    EntityId: payment.Id.ToString(),
+                    DeepLinkPath: "/nurse/payroll",
+                    Source: "Nómina",
+                    RequiresAction: false),
+                cancellationToken);
+
+            if (!emailSent)
+            {
+                await _adminNotifications.PublishToAdminsAsync(
+                    new AdminNotificationPublishRequest(
+                        Category: "voucher_delivery_failed",
+                        Severity: "High",
+                        Title: "Comprobante no enviado",
+                        Body: $"No se pudo enviar el comprobante de una enfermera del período {periodLabel}. " +
+                              $"Motivo: {deliveryDetail ?? "desconocido"}. Reintenta confirmando de nuevo.",
+                        EntityType: "NursePeriodPayment",
+                        EntityId: payment.Id.ToString(),
+                        DeepLinkPath: $"/admin/payroll/periods/{command.PeriodId}/nurse/{command.NurseUserId}",
+                        Source: "Nómina",
+                        RequiresAction: true),
+                    cancellationToken);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Notification publish failed (non-fatal) for nurse payment {PaymentId}.", payment.Id);
+        }
+
         return new ConfirmNursePeriodPaymentResult(
             PeriodId: command.PeriodId,
             NurseUserId: command.NurseUserId,
@@ -176,7 +242,8 @@ public sealed class ConfirmNursePeriodPaymentHandler : IConfirmNursePeriodPaymen
             VoucherEmailSent: emailSent,
             WhatsappUrl: whatsappUrl,
             RecipientLabel: recipientLabel,
-            VoucherDeliveryDetail: deliveryDetail);
+            VoucherDeliveryDetail: deliveryDetail,
+            PaymentStatus: payment.PaymentStatus.ToString());
     }
 
     /// <summary>The document title printed on the voucher PDF; the validator requires it to be present.</summary>

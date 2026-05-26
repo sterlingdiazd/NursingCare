@@ -49,6 +49,8 @@ public static class DependencyInjection
     services.AddScoped<AdminPortal.Payroll.Commands.ConfirmNursePeriodPayment.IConfirmNursePeriodPaymentHandler>(
         sp => sp.GetRequiredService<AdminPortal.Payroll.Commands.ConfirmNursePeriodPayment.ConfirmNursePeriodPaymentHandler>());
     services.AddScoped<AdminPortal.Payroll.Commands.DeliverPeriodVouchers.DeliverPeriodVouchersHandler>();
+    services.AddScoped<AdminPortal.Payroll.Commands.MarkNursePaymentFailed.MarkNursePaymentFailedHandler>();
+    services.AddScoped<AdminPortal.Payroll.Commands.ReverseNursePayment.ReverseNursePaymentHandler>();
     services.AddScoped<GetReceiptHandler>();
     services.AddScoped<GetClientReceiptHandler>();
     services.AddScoped<IAdminAccountProvisioningService, AdminAccountProvisioningService>();

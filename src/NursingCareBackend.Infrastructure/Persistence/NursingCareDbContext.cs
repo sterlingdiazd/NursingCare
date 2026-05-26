@@ -548,6 +548,12 @@ public sealed class NursingCareDbContext : DbContext
 
                      builder.Property(x => x.BankReference).HasMaxLength(200);
 
+                     builder.Property(x => x.PaymentStatus)
+                            .HasConversion<string>()
+                            .HasMaxLength(32);
+
+                     builder.Property(x => x.PaymentStatusReason).HasMaxLength(500);
+
                      builder.Property(x => x.VoucherDeliveryStatus)
                             .HasConversion<string>()
                             .HasMaxLength(32);

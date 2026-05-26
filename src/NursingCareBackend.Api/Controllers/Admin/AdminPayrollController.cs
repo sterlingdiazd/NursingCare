@@ -29,6 +29,8 @@ public sealed class AdminPayrollController : ControllerBase
     private readonly NursingCareBackend.Application.AdminPortal.Payroll.Validation.IFinancialOutputValidator _financialOutputValidator;
     private readonly NursingCareBackend.Application.AdminPortal.Payroll.Commands.ConfirmNursePeriodPayment.ConfirmNursePeriodPaymentHandler _confirmPaymentHandler;
     private readonly NursingCareBackend.Application.AdminPortal.Payroll.Commands.DeliverPeriodVouchers.DeliverPeriodVouchersHandler _deliverVouchersHandler;
+    private readonly NursingCareBackend.Application.AdminPortal.Payroll.Commands.MarkNursePaymentFailed.MarkNursePaymentFailedHandler _markPaymentFailedHandler;
+    private readonly NursingCareBackend.Application.AdminPortal.Payroll.Commands.ReverseNursePayment.ReverseNursePaymentHandler _reversePaymentHandler;
 
     public AdminPayrollController(
         IAdminPayrollRepository repository,
@@ -42,7 +44,9 @@ public sealed class AdminPayrollController : ControllerBase
         NursingCareBackend.Application.AdminPortal.Payroll.ICompanyInfoProvider companyProvider,
         NursingCareBackend.Application.AdminPortal.Payroll.Validation.IFinancialOutputValidator financialOutputValidator,
         NursingCareBackend.Application.AdminPortal.Payroll.Commands.ConfirmNursePeriodPayment.ConfirmNursePeriodPaymentHandler confirmPaymentHandler,
-        NursingCareBackend.Application.AdminPortal.Payroll.Commands.DeliverPeriodVouchers.DeliverPeriodVouchersHandler deliverVouchersHandler)
+        NursingCareBackend.Application.AdminPortal.Payroll.Commands.DeliverPeriodVouchers.DeliverPeriodVouchersHandler deliverVouchersHandler,
+        NursingCareBackend.Application.AdminPortal.Payroll.Commands.MarkNursePaymentFailed.MarkNursePaymentFailedHandler markPaymentFailedHandler,
+        NursingCareBackend.Application.AdminPortal.Payroll.Commands.ReverseNursePayment.ReverseNursePaymentHandler reversePaymentHandler)
     {
         _repository = repository;
         _recalculationService = recalculationService;
@@ -56,6 +60,8 @@ public sealed class AdminPayrollController : ControllerBase
         _financialOutputValidator = financialOutputValidator;
         _confirmPaymentHandler = confirmPaymentHandler;
         _deliverVouchersHandler = deliverVouchersHandler;
+        _markPaymentFailedHandler = markPaymentFailedHandler;
+        _reversePaymentHandler = reversePaymentHandler;
     }
 
     private Guid GetAdminUserId()
@@ -955,10 +961,11 @@ public sealed class AdminPayrollController : ControllerBase
     }
 
     // POST /api/admin/payroll/periods/{periodId}/nurses/{nurseId}/confirm-payment
-    // Demo: admin confirms the nurse's bank transfer for a period. Generates the nurse's
-    // voucher PDF, emails it to the logged-in admin, and returns a wa.me link to the
-    // admin's own phone with a prefilled Spanish message. All delivery is routed to the
-    // admin (never to the nurse). Idempotent on (period, nurse).
+    // Admin confirms the nurse's bank transfer for a period (sets NursePaymentStatus=Confirmed,
+    // audited). Generates the nurse's voucher PDF, validates it (fail-closed), emails it to the
+    // NURSE, and returns a wa.me link prefilled for the nurse. When the DEMO communications
+    // redirect is on, both the email and the wa.me link are routed to the owner's demo contact
+    // instead (so a demo never messages a real nurse). Idempotent on (period, nurse).
     [HttpPost("periods/{periodId:guid}/nurses/{nurseId:guid}/confirm-payment")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -1032,6 +1039,92 @@ public sealed class AdminPayrollController : ControllerBase
         }
     }
 
+    // POST /api/admin/payroll/periods/{periodId}/nurses/{nurseId}/mark-failed
+    // Marks a confirmed/sent nurse payment as FAILED at the bank (money did not arrive), with a
+    // required reason. Audited. Remediation: confirm again to retry.
+    [HttpPost("periods/{periodId:guid}/nurses/{nurseId:guid}/mark-failed")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> MarkNursePaymentFailed(
+        Guid periodId,
+        Guid nurseId,
+        [FromBody] NursePaymentStateChangeRequest? request,
+        CancellationToken cancellationToken)
+    {
+        var adminId = GetAdminUserId();
+        if (adminId == Guid.Empty)
+            return Unauthorized();
+
+        var reason = request?.Reason?.Trim();
+        if (string.IsNullOrWhiteSpace(reason))
+            return this.ProblemResponse(StatusCodes.Status400BadRequest, Messages.Get("errors.razon_requerida"), "El motivo es requerido.");
+
+        try
+        {
+            var result = await _markPaymentFailedHandler.Handle(
+                new NursingCareBackend.Application.AdminPortal.Payroll.Commands.MarkNursePaymentFailed.MarkNursePaymentFailedCommand(
+                    periodId, nurseId, adminId, reason),
+                cancellationToken);
+            return Ok(result);
+        }
+        catch (VoucherNotFoundException)
+        {
+            return this.ProblemResponse(
+                StatusCodes.Status404NotFound,
+                Messages.Get("errors.periodo_enfermera_no_encontrado"),
+                Messages.Get("errors.periodo_enfermera_no_encontrado_detalle"));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return this.ProblemResponse(StatusCodes.Status409Conflict, "Estado de pago inválido", ex.Message);
+        }
+    }
+
+    // POST /api/admin/payroll/periods/{periodId}/nurses/{nurseId}/reverse
+    // Reverses a previously CONFIRMED nurse payment (with a required reason). Audited; the nurse is
+    // notified. Remediation: confirm again to re-pay against the corrected net.
+    [HttpPost("periods/{periodId:guid}/nurses/{nurseId:guid}/reverse")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> ReverseNursePayment(
+        Guid periodId,
+        Guid nurseId,
+        [FromBody] NursePaymentStateChangeRequest? request,
+        CancellationToken cancellationToken)
+    {
+        var adminId = GetAdminUserId();
+        if (adminId == Guid.Empty)
+            return Unauthorized();
+
+        var reason = request?.Reason?.Trim();
+        if (string.IsNullOrWhiteSpace(reason))
+            return this.ProblemResponse(StatusCodes.Status400BadRequest, Messages.Get("errors.razon_requerida"), "El motivo es requerido.");
+
+        try
+        {
+            var result = await _reversePaymentHandler.Handle(
+                new NursingCareBackend.Application.AdminPortal.Payroll.Commands.ReverseNursePayment.ReverseNursePaymentCommand(
+                    periodId, nurseId, adminId, reason),
+                cancellationToken);
+            return Ok(result);
+        }
+        catch (VoucherNotFoundException)
+        {
+            return this.ProblemResponse(
+                StatusCodes.Status404NotFound,
+                Messages.Get("errors.periodo_enfermera_no_encontrado"),
+                Messages.Get("errors.periodo_enfermera_no_encontrado_detalle"));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return this.ProblemResponse(StatusCodes.Status409Conflict, "Estado de pago inválido", ex.Message);
+        }
+    }
+
     private static string EscapeCsv(object? value)
     {
         if (value is null) return "\"\"";
@@ -1049,6 +1142,12 @@ public sealed class DeliverPeriodVouchersRequest
 {
     /// <summary>Optional bank batch/dispersion reference applied to every nurse's confirmation.</summary>
     public string? BankReference { get; set; }
+}
+
+public sealed class NursePaymentStateChangeRequest
+{
+    /// <summary>Required reason for marking a payment failed or reversing it (audited).</summary>
+    public string? Reason { get; set; }
 }
 
 public sealed class CreatePayrollPeriodRequest

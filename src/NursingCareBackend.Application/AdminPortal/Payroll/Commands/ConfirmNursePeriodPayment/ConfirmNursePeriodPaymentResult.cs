@@ -12,4 +12,7 @@ public sealed record ConfirmNursePeriodPaymentResult(
     bool VoucherEmailSent,
     string WhatsappUrl,
     string RecipientLabel,
-    string? VoucherDeliveryDetail);
+    string? VoucherDeliveryDetail,
+    // Real payment state (Pending/SentToBank/Confirmed/Failed/Reversed). Optional/additive: older
+    // mobile builds ignore it. A confirm sets it to Confirmed.
+    string? PaymentStatus = null);
