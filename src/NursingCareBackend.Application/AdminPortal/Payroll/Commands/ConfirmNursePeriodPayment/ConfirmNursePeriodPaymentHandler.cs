@@ -1,6 +1,8 @@
 using System.Globalization;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using NursingCareBackend.Application.AdminPortal.Payroll.Validation;
+using NursingCareBackend.Application.Communications;
 using NursingCareBackend.Application.Email;
 using NursingCareBackend.Application.Exceptions;
 using NursingCareBackend.Application.Identity.Repositories;
@@ -17,6 +19,7 @@ public sealed class ConfirmNursePeriodPaymentHandler
     private readonly ICompanyInfoProvider _companyProvider;
     private readonly IEmailService _emailService;
     private readonly IUserRepository _userRepository;
+    private readonly DemoCommunicationsOptions _demoComms;
     private readonly ILogger<ConfirmNursePeriodPaymentHandler> _logger;
 
     public ConfirmNursePeriodPaymentHandler(
@@ -27,6 +30,7 @@ public sealed class ConfirmNursePeriodPaymentHandler
         ICompanyInfoProvider companyProvider,
         IEmailService emailService,
         IUserRepository userRepository,
+        IOptions<DemoCommunicationsOptions> demoComms,
         ILogger<ConfirmNursePeriodPaymentHandler> logger)
     {
         _payrollRepository = payrollRepository;
@@ -36,6 +40,7 @@ public sealed class ConfirmNursePeriodPaymentHandler
         _companyProvider = companyProvider;
         _emailService = emailService;
         _userRepository = userRepository;
+        _demoComms = demoComms.Value;
         _logger = logger;
     }
 
@@ -90,7 +95,7 @@ public sealed class ConfirmNursePeriodPaymentHandler
         //    The nurse is a User, resolved the same way the handler resolves the admin user.
         var nurse = await _userRepository.GetByIdAsync(command.NurseUserId, cancellationToken);
         var nurseEmail = nurse?.Email;
-        var whatsappUrl = BuildWhatsappUrl(nurse?.Phone, periodLabel);
+        var whatsappUrl = BuildWhatsappUrl(nurse?.Phone, periodLabel, out var whatsappRedirectedToDemo);
 
         // 5. Generate the voucher PDF, GATE it through the financial-output validator, and only
         //    then email it to the NURSE. Delivery is best-effort for the demo, but a financial
@@ -141,8 +146,9 @@ public sealed class ConfirmNursePeriodPaymentHandler
 
                 payment.MarkVoucherDelivered(now);
                 emailSent = true;
-                deliveryDetail = "Comprobante enviado a la enfermera por correo.";
-                recipientLabel = $"Comprobante enviado a la enfermera ({nurseEmail}).";
+                var demoSuffix = whatsappRedirectedToDemo ? " (demo)" : string.Empty;
+                deliveryDetail = $"Comprobante enviado a la enfermera por correo.{demoSuffix}";
+                recipientLabel = $"Comprobante enviado a la enfermera ({nurseEmail}).{demoSuffix}";
             }
         }
         catch (Exception ex)
@@ -189,37 +195,60 @@ public sealed class ConfirmNursePeriodPaymentHandler
     }
 
     /// <summary>
-    /// Builds a wa.me link to the NURSE's phone with a prefilled Spanish message.
-    /// DR numbers are stored as 10 digits (e.g. "8099892465"); we prepend "1" for the +1
-    /// country code. If the stored phone already has 11 digits starting with "1", it is
-    /// used as-is. Returns "" when no usable phone is available.
+    /// Builds a wa.me link with a prefilled Spanish message. The target phone is normally the
+    /// NURSE's phone, but while the DEMO communications redirect is enabled and a demo contact
+    /// phone is configured, the link is built to that demo contact INSTEAD — so a demo never
+    /// WhatsApps a real nurse. <paramref name="redirectedToDemo"/> reports whether the redirect
+    /// applied. Returns "" when no usable phone is available.
     /// </summary>
-    private static string BuildWhatsappUrl(string? phone, string periodLabel)
+    private string BuildWhatsappUrl(string? nursePhone, string periodLabel, out bool redirectedToDemo)
     {
-        if (string.IsNullOrWhiteSpace(phone))
+        redirectedToDemo = false;
+
+        var targetPhone = nursePhone;
+        if (_demoComms.Enabled && !string.IsNullOrWhiteSpace(_demoComms.ContactPhone))
         {
-            return string.Empty;
+            targetPhone = _demoComms.ContactPhone;
+            redirectedToDemo = true;
         }
 
-        var digits = new string(phone.Where(char.IsDigit).ToArray());
-
-        string normalized;
-        if (digits.Length == 10)
+        var normalized = NormalizeDominicanPhone(targetPhone);
+        if (normalized is null)
         {
-            normalized = "1" + digits;
-        }
-        else if (digits.Length == 11 && digits[0] == '1')
-        {
-            normalized = digits;
-        }
-        else
-        {
-            // Unexpected length: no reliable way to build a valid +1 link for the demo.
+            redirectedToDemo = false;
             return string.Empty;
         }
 
         var message = $"Hola, te enviamos tu comprobante de pago del período {periodLabel} a tu correo. (Sol y Luna)";
         var encodedMessage = Uri.EscapeDataString(message);
         return $"https://wa.me/{normalized}?text={encodedMessage}";
+    }
+
+    /// <summary>
+    /// Normalizes a phone for a +1 wa.me link. DR numbers are stored as 10 digits
+    /// (e.g. "8099892465"); we prepend "1" for the +1 country code. An 11-digit number already
+    /// starting with "1" is used as-is. Returns null when the phone is missing or an unexpected
+    /// length (no reliable way to build a valid +1 link).
+    /// </summary>
+    private static string? NormalizeDominicanPhone(string? phone)
+    {
+        if (string.IsNullOrWhiteSpace(phone))
+        {
+            return null;
+        }
+
+        var digits = new string(phone.Where(char.IsDigit).ToArray());
+
+        if (digits.Length == 10)
+        {
+            return "1" + digits;
+        }
+
+        if (digits.Length == 11 && digits[0] == '1')
+        {
+            return digits;
+        }
+
+        return null;
     }
 }

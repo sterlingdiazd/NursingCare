@@ -24,6 +24,7 @@ using NursingCareBackend.Application.AdminPortal.Settings;
 using NursingCareBackend.Application.AdminPortal.Payroll;
 using NursingCareBackend.Application.Email;
 using NursingCareBackend.Application.Catalogs;
+using NursingCareBackend.Application.Communications;
 using NursingCareBackend.Infrastructure.AdminPortal;
 using NursingCareBackend.Infrastructure.Catalogs;
 using NursingCareBackend.Infrastructure.Authentication;
@@ -101,6 +102,25 @@ public static class DependencyInjection
         services.Configure<EmailArchiveOptions>(
             configuration.GetSection(EmailArchiveOptions.SectionName));
 
+        // DEMO communications redirect: when enabled, every outgoing email AND every wa.me
+        // WhatsApp link is redirected to a single configured demo contact (the owner) so demos
+        // never message real nurses/clients. Env var with appsettings-section fallback, mirroring
+        // the EmailOptions pattern above. Safe-by-default: Enabled is true unless explicitly
+        // turned off (env "false" or section "false").
+        services.Configure<DemoCommunicationsOptions>(options =>
+        {
+            var section = configuration.GetSection(DemoCommunicationsOptions.SectionName);
+            var enabledRaw = Environment.GetEnvironmentVariable("DEMO_COMMS_ENABLED")
+                ?? section["Enabled"];
+            options.Enabled = !bool.TryParse(enabledRaw, out var enabled) || enabled;
+            options.ContactEmail = Environment.GetEnvironmentVariable("DEMO_COMMS_EMAIL")
+                ?? section["ContactEmail"]
+                ?? string.Empty;
+            options.ContactPhone = Environment.GetEnvironmentVariable("DEMO_COMMS_PHONE")
+                ?? section["ContactPhone"]
+                ?? string.Empty;
+        });
+
         // Care Request Repository and billing
         services.AddScoped<ICareRequestRepository, CareRequestRepository>();
         services.AddScoped<IPaymentValidationRepository, PaymentValidationRepository>();
@@ -159,14 +179,23 @@ public static class DependencyInjection
                 new HttpClient(),
                 serviceProvider.GetRequiredService<IOptions<GoogleOAuthOptions>>()));
         services.AddScoped<IAuthenticationService, AuthenticationService>();
-        // Real transport, then wrap it so every outgoing email is archived to disk (.eml).
+        // Email pipeline (decorator chain, resolved outermost-first):
+        //   DemoRedirectEmailService → ArchivingEmailService → AcsEmailService.
+        // 1) AcsEmailService is the real transport.
+        // 2) ArchivingEmailService wraps it so every outgoing email is archived to disk (.eml).
+        // 3) DemoRedirectEmailService is OUTERMOST: while the DEMO redirect is on, it rewrites the
+        //    recipient/subject to the demo contact BEFORE archiving, so the archive reflects what
+        //    was actually sent. Consumers resolve IEmailService and get the full chain.
         services.AddScoped<AcsEmailService>();
-        services.AddScoped<IEmailService>(sp => new ArchivingEmailService(
+        services.AddScoped<ArchivingEmailService>(sp => new ArchivingEmailService(
             sp.GetRequiredService<AcsEmailService>(),
             sp.GetRequiredService<IOptions<EmailArchiveOptions>>(),
             sp.GetRequiredService<IOptions<EmailOptions>>(),
             sp.GetRequiredService<IHostEnvironment>(),
             sp.GetRequiredService<ILogger<ArchivingEmailService>>()));
+        services.AddScoped<IEmailService>(sp => new DemoRedirectEmailService(
+            sp.GetRequiredService<ArchivingEmailService>(),
+            sp.GetRequiredService<IOptions<DemoCommunicationsOptions>>()));
         services.AddSingleton<IEmailTemplateRenderer, Email.MarkdownEmailTemplateRenderer>();
         services.AddScoped<IAdminBootstrapPolicy, AdminBootstrapPolicy>();
         services.AddScoped<INurseProfileAdministrationService, NurseProfileAdministrationService>();
