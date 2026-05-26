@@ -18,5 +18,11 @@ public sealed record AdminPayrollPeriodDetail(
     // can show that a closed period was reopened for correction.
     DateTime? ReopenedAtUtc,
     string? ReopenReason,
-    int ReopenCount
+    int ReopenCount,
+    // Period-level reconciliation (T1.3): the money OUT to nurses vs the money IN from the client
+    // invoices that funded this period. Answers "I'm paying RD$X to nurses; did I collect from the
+    // clients that funded them?" Additive/optional (default 0).
+    decimal TotalNetPayout = 0m,
+    decimal TotalBilled = 0m,
+    decimal TotalCollected = 0m
 );

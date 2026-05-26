@@ -182,6 +182,38 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
         // UI can hide edit/delete instead of letting the action fail server-side.
         var canModify = !period.IsClosed && lines.Count == 0 && deductionsByNurse.Count == 0;
 
+        // Period-level reconciliation (T1.3): money OUT to nurses vs money IN from the client invoices
+        // that funded this period (distinct funding requests via PayrollLine -> ServiceExecution ->
+        // CareRequest). Answers "am I paying out what I actually collected?".
+        var totalNetPayout = staffSummary.Sum(s => s.NetCompensation);
+        decimal totalBilled = 0m;
+        decimal totalCollected = 0m;
+        var execIds = lines.Where(l => l.ServiceExecutionId.HasValue)
+            .Select(l => l.ServiceExecutionId!.Value).Distinct().ToList();
+        if (execIds.Count > 0)
+        {
+            var fundingCareRequestIds = await _dbContext.ServiceExecutions
+                .AsNoTracking()
+                .Where(e => execIds.Contains(e.Id))
+                .Select(e => e.CareRequestId)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+
+            if (fundingCareRequestIds.Count > 0)
+            {
+                var fundingInvoices = await _dbContext.CareRequests
+                    .AsNoTracking()
+                    .Where(c => fundingCareRequestIds.Contains(c.Id))
+                    .Select(c => new { c.Total, c.Status })
+                    .ToListAsync(cancellationToken);
+
+                totalBilled = fundingInvoices.Sum(c => c.Total);
+                totalCollected = fundingInvoices
+                    .Where(c => c.Status == NursingCareBackend.Domain.CareRequests.CareRequestStatus.Paid)
+                    .Sum(c => c.Total);
+            }
+        }
+
         return new AdminPayrollPeriodDetail(
             period.Id,
             period.StartDate,
@@ -196,7 +228,10 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
             canModify,
             period.ReopenedAtUtc,
             period.ReopenReason,
-            period.ReopenCount);
+            period.ReopenCount,
+            totalNetPayout,
+            totalBilled,
+            totalCollected);
     }
 
     public async Task<Guid> CreatePeriodAsync(
