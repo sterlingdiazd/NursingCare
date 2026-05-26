@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using NursingCareBackend.Application.AdminPortal.Payroll;
 using NursingCareBackend.Application.AdminPortal.Payroll.Commands.ConfirmNursePeriodPayment;
@@ -30,7 +31,7 @@ public sealed class DeliverPeriodVouchersHandlerTests
         bool periodExists = true)
     {
         var repo = new FakeBulkRepository(nurses, periodExists);
-        return new DeliverPeriodVouchersHandler(repo, confirmHandler, NullLogger<DeliverPeriodVouchersHandler>.Instance);
+        return new DeliverPeriodVouchersHandler(repo, new FakeScopeFactory(confirmHandler), NullLogger<DeliverPeriodVouchersHandler>.Instance);
     }
 
     [Fact]
@@ -96,6 +97,23 @@ public sealed class DeliverPeriodVouchersHandlerTests
             WhatsappUrl: emailSent ? "https://wa.me/18090000000?text=x" : string.Empty,
             RecipientLabel: emailSent ? "Comprobante enviado a la enfermera." : "El comprobante no se pudo enviar a la enfermera.",
             VoucherDeliveryDetail: emailSent ? "Comprobante enviado a la enfermera por correo." : "La enfermera no tiene un correo registrado.");
+}
+
+file sealed class FakeScopeFactory(IConfirmNursePeriodPaymentHandler handler) : IServiceScopeFactory
+{
+    public IServiceScope CreateScope() => new FakeScope(handler);
+}
+
+file sealed class FakeScope(IConfirmNursePeriodPaymentHandler handler) : IServiceScope
+{
+    public IServiceProvider ServiceProvider { get; } = new FakeServiceProvider(handler);
+    public void Dispose() { }
+}
+
+file sealed class FakeServiceProvider(IConfirmNursePeriodPaymentHandler handler) : IServiceProvider
+{
+    public object? GetService(Type serviceType)
+        => serviceType == typeof(IConfirmNursePeriodPaymentHandler) ? handler : null;
 }
 
 file sealed class FakeConfirmHandler : IConfirmNursePeriodPaymentHandler

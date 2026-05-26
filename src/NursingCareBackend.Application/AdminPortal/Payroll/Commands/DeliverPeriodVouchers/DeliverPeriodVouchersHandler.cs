@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using NursingCareBackend.Application.AdminPortal.Payroll.Commands.ConfirmNursePeriodPayment;
 using NursingCareBackend.Application.Exceptions;
@@ -7,24 +8,27 @@ namespace NursingCareBackend.Application.AdminPortal.Payroll.Commands.DeliverPer
 /// <summary>
 /// Batch version of <see cref="ConfirmNursePeriodPaymentHandler"/>: confirms the payment and
 /// delivers the comprobante for EVERY nurse with lines in a period, in one admin action. It reuses
-/// the per-nurse handler verbatim (same financial-output gate, same idempotency, same demo
-/// redirect), so behavior stays consistent and there is no duplicated delivery logic. A single
-/// nurse failing (bad data, no email, send error) is captured as a failed item and never aborts the
-/// rest of the batch.
+/// the per-nurse handler (same financial-output gate, same idempotency, same demo redirect), so
+/// behavior stays consistent and there is no duplicated delivery logic. A single nurse failing
+/// (bad data, no email, send error) is captured as a failed item and never aborts the rest.
+///
+/// Each nurse is processed in its OWN DI scope (its own DbContext) so a mid-batch failure cannot
+/// leave one nurse's tracked entity to be flushed into the next nurse's SaveChanges — i.e. a nurse
+/// reported "failed" can never be silently persisted as Confirmed by a later iteration.
 /// </summary>
 public sealed class DeliverPeriodVouchersHandler
 {
     private readonly IAdminPayrollRepository _payrollRepository;
-    private readonly IConfirmNursePeriodPaymentHandler _confirmHandler;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<DeliverPeriodVouchersHandler> _logger;
 
     public DeliverPeriodVouchersHandler(
         IAdminPayrollRepository payrollRepository,
-        IConfirmNursePeriodPaymentHandler confirmHandler,
+        IServiceScopeFactory scopeFactory,
         ILogger<DeliverPeriodVouchersHandler> logger)
     {
         _payrollRepository = payrollRepository;
-        _confirmHandler = confirmHandler;
+        _scopeFactory = scopeFactory;
         _logger = logger;
     }
 
@@ -54,7 +58,11 @@ public sealed class DeliverPeriodVouchersHandler
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                var result = await _confirmHandler.Handle(
+                // Fresh scope (fresh DbContext) per nurse: isolates each confirmation so a failure
+                // here can never leak tracked state into the next nurse's save.
+                using var scope = _scopeFactory.CreateScope();
+                var confirmHandler = scope.ServiceProvider.GetRequiredService<IConfirmNursePeriodPaymentHandler>();
+                var result = await confirmHandler.Handle(
                     new ConfirmNursePeriodPaymentCommand(
                         command.PeriodId, data.NurseUserId, command.AdminUserId, command.BankReference),
                     cancellationToken);

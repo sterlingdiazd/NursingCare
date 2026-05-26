@@ -36,6 +36,10 @@ public sealed class DemoRedirectEmailService : IEmailService
         string htmlBody,
         CancellationToken cancellationToken = default)
     {
+        if (IsSuppressed())
+        {
+            return Task.CompletedTask;
+        }
         var (recipient, finalSubject) = Redirect(recipientEmail, subject);
         return _inner.SendAsync(recipient, finalSubject, htmlBody, cancellationToken);
     }
@@ -47,9 +51,20 @@ public sealed class DemoRedirectEmailService : IEmailService
         IReadOnlyCollection<EmailAttachmentData> attachments,
         CancellationToken cancellationToken = default)
     {
+        if (IsSuppressed())
+        {
+            return Task.CompletedTask;
+        }
         var (recipient, finalSubject) = Redirect(recipientEmail, subject);
         return _inner.SendWithAttachmentsAsync(recipient, finalSubject, htmlBody, attachments, cancellationToken);
     }
+
+    /// <summary>
+    /// Fail-closed: when demo mode is ON but no demo contact email is configured, SUPPRESS the email
+    /// entirely rather than falling through to the real recipient. A half-configured demo must never
+    /// message a real nurse/client.
+    /// </summary>
+    private bool IsSuppressed() => _options.Enabled && string.IsNullOrWhiteSpace(_options.ContactEmail);
 
     /// <summary>
     /// When the redirect is active, returns the configured demo contact as the recipient and a

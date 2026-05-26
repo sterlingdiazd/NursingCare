@@ -140,7 +140,13 @@ public static class DependencyInjection
         services.AddScoped<IAdminNotificationPublisher, AdminNotificationPublisher>();
         services.AddScoped<IAdminEmailNotifier, AdminEmailNotifier>();
         services.AddScoped<IUserNotificationService, UserNotificationService>();
-        services.AddScoped<IUserNotificationPublisher, UserNotificationPublisher>();
+        // DEMO redirect also gates USER notifications (push/in-app to nurses/clients): suppressed when
+        // demo mode is on, so a demo never reaches a real user. Outermost decorator over the publisher.
+        services.AddScoped<UserNotificationPublisher>();
+        services.AddScoped<IUserNotificationPublisher>(sp => new Notifications.DemoRedirectUserNotificationPublisher(
+            sp.GetRequiredService<UserNotificationPublisher>(),
+            sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<NursingCareBackend.Application.Communications.DemoCommunicationsOptions>>(),
+            sp.GetRequiredService<ILogger<Notifications.DemoRedirectUserNotificationPublisher>>()));
 
         // Push delivery: HttpClient + worker. The worker is a long-running
         // BackgroundService that drains NotificationOutbox; the HttpClient

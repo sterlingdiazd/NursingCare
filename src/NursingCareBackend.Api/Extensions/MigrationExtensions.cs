@@ -2,6 +2,7 @@ using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using NursingCareBackend.Application.AdminPortal.Payroll;
+using NursingCareBackend.Domain.Admin;
 using NursingCareBackend.Domain.Identity;
 using NursingCareBackend.Domain.SystemSettings;
 using NursingCareBackend.Infrastructure.Persistence;
@@ -222,13 +223,12 @@ namespace NursingCareBackend.Api.Extensions
       }
     }
 
-    // Idempotent backfill that enforces the payroll payment-date policy on EVERY existing period
-    // (the policy previously only lived in the mobile create-period prefill). For each stored
-    // PayrollPeriod we recompute (cutoff, payment) from the configured policy and write the
-    // correction only when the stored values differ. Uses PayrollPeriod.CorrectSchedule so even
-    // CLOSED periods (e.g. the seeded March period) are fixed — this is a data correction of the
-    // derived schedule dates, not a business edit of the lines. Runs right after the settings are
-    // seeded so the policy keys are present.
+    // Idempotent backfill that enforces the payroll payment-date policy on OPEN periods only.
+    // CLOSED periods are settled records: rewriting their derived (cutoff, payment) dates here would
+    // retroactively alter an already-delivered comprobante's printed payment date with no business
+    // trail. Closed periods are corrected ONLY via the audited reopen path. Each correction we DO make
+    // (open periods) writes a durable AuditLog row (system actor) recording the old->new dates.
+    // Runs right after the settings are seeded so the policy keys are present.
     private static void EnsurePayrollScheduleCompliance(NursingCareDbContext db)
     {
         var config = ReadPayrollScheduleConfig(db);
@@ -238,20 +238,41 @@ namespace NursingCareBackend.Api.Extensions
 
         foreach (var period in periods)
         {
+            if (period.IsClosed)
+            {
+                // Settled record — never auto-rewrite a closed period's money dates at boot.
+                continue;
+            }
+
             var (cutoff, payment) = PayrollScheduleCalculator.Compute(period.StartDate, period.EndDate, config);
             if (period.CutoffDate == cutoff && period.PaymentDate == payment)
             {
                 continue;
             }
 
+            var oldCutoff = period.CutoffDate;
+            var oldPayment = period.PaymentDate;
             period.CorrectSchedule(cutoff, payment);
+
+            db.AuditLogs.Add(new AuditLog
+            {
+                Id = Guid.NewGuid(),
+                ActorUserId = null,
+                ActorRole = "System",
+                Action = "PayrollScheduleCorrected",
+                EntityType = "PayrollPeriod",
+                EntityId = period.Id.ToString(),
+                Notes = $"Backfill de política: corte {oldCutoff:yyyy-MM-dd}->{cutoff:yyyy-MM-dd}, pago {oldPayment:yyyy-MM-dd}->{payment:yyyy-MM-dd}",
+                CorrelationId = null,
+                CreatedAtUtc = DateTime.UtcNow,
+            });
             changed = true;
         }
 
         if (changed)
         {
             db.SaveChanges();
-            Console.WriteLine("Corrected payroll period schedule date(s) to match the payment-date policy.");
+            Console.WriteLine("Corrected OPEN payroll period schedule date(s) to match the payment-date policy (audited).");
         }
     }
 

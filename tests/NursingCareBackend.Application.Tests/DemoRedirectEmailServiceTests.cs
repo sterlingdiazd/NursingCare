@@ -56,16 +56,16 @@ public class DemoRedirectEmailServiceTests
     }
 
     [Fact]
-    public async Task SendAsync_When_Enabled_But_ContactEmail_Empty_Passes_Through_Unchanged()
+    public async Task SendAsync_When_Enabled_But_ContactEmail_Empty_Suppresses_The_Email()
     {
         var inner = new FakeEmailService();
         var service = CreateService(inner, enabled: true, contactEmail: "");
 
         await service.SendAsync(RealRecipient, "Comprobante de pago", "<p>cuerpo</p>");
 
-        var sent = Assert.Single(inner.SentEmails);
-        Assert.Equal(RealRecipient, sent.RecipientEmail);
-        Assert.Equal("Comprobante de pago", sent.Subject);
+        // Fail-closed: a half-configured demo (enabled, no contact) must NOT fall through to the
+        // real recipient — the email is suppressed entirely.
+        Assert.Empty(inner.SentEmails);
     }
 
     private static DemoRedirectEmailService CreateService(

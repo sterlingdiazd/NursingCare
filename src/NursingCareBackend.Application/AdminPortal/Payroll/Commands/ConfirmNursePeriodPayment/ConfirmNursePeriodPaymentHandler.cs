@@ -272,6 +272,13 @@ public sealed class ConfirmNursePeriodPaymentHandler : IConfirmNursePeriodPaymen
     {
         redirectedToDemo = false;
 
+        // Fail-closed: demo mode ON but no demo phone configured -> suppress the link rather than
+        // build a wa.me to the REAL nurse. A half-configured demo must never message a real recipient.
+        if (_demoComms.Enabled && string.IsNullOrWhiteSpace(_demoComms.ContactPhone))
+        {
+            return string.Empty;
+        }
+
         var targetPhone = nursePhone;
         if (_demoComms.Enabled && !string.IsNullOrWhiteSpace(_demoComms.ContactPhone))
         {
