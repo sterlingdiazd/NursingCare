@@ -203,6 +203,8 @@ file sealed class FakePaymentValidationRepository : IPaymentValidationRepository
     public Task AddAsync(PaymentValidation pv, CancellationToken ct) => Task.CompletedTask;
     public Task<PaymentValidation?> GetByCareRequestIdAsync(Guid careRequestId, CancellationToken ct)
         => Task.FromResult<PaymentValidation?>(null);
+    public Task<bool> IsBankReferenceUsedAsync(string bankReference, Guid excludeCareRequestId, CancellationToken ct)
+        => Task.FromResult(false);
 }
 
 file sealed class FakeReceiptPdfService(Action<ReceiptPdfData> onGenerate) : IReceiptPdfService

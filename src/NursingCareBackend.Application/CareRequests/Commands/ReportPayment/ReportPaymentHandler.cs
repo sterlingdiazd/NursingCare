@@ -48,7 +48,11 @@ public sealed class ReportPaymentHandler
 
         var now = DateTime.UtcNow;
         var proof = PaymentProof.Create(
-            careRequest.Id, command.ImageContent, command.ContentType, command.Note, command.ActingUserId, now);
+            careRequest.Id, command.ImageContent, command.ContentType, command.Note, command.ActingUserId, now,
+            claimedBankReference: command.ClaimedBankReference,
+            claimedAmount: command.ClaimedAmount,
+            claimedPaymentDate: command.ClaimedPaymentDate,
+            payingBank: command.PayingBank);
         await _proofs.AddAsync(proof, cancellationToken);
 
         careRequest.ReportPayment(proof.Id, now);
@@ -65,6 +69,23 @@ public sealed class ReportPaymentHandler
                 MetadataJson: null),
             cancellationToken);
 
+        // Surface the structured claim so the admin can match it against the bank quickly, and flag
+        // an amount that does not match the invoice. The image is a CLAIM — confirmation against the
+        // bank is still required before Paid.
+        var claimParts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(proof.ClaimedBankReference))
+            claimParts.Add($"Referencia: {proof.ClaimedBankReference}");
+        if (proof.ClaimedAmount.HasValue)
+        {
+            var mismatch = !proof.AmountMatches(careRequest.Total) ? " (NO coincide con la factura)" : string.Empty;
+            claimParts.Add($"Monto reportado: RD$ {proof.ClaimedAmount.Value:N2}{mismatch}");
+        }
+        if (proof.ClaimedPaymentDate.HasValue)
+            claimParts.Add($"Fecha: {proof.ClaimedPaymentDate.Value:dd/MM/yyyy}");
+        if (!string.IsNullOrWhiteSpace(proof.PayingBank))
+            claimParts.Add($"Banco: {proof.PayingBank}");
+        var claimSummary = claimParts.Count > 0 ? " " + string.Join(". ", claimParts) + "." : string.Empty;
+
         // Notify admins: in-app + push (via outbox) and email. Verification is required before Paid.
         await _notifications.PublishToAdminsAsync(
             new AdminNotificationPublishRequest(
@@ -72,7 +93,7 @@ public sealed class ReportPaymentHandler
                 Severity: "High",
                 Title: "Pago reportado",
                 Body: $"El cliente reportó el pago de la solicitud \"{careRequest.Description}\" " +
-                      $"(factura {careRequest.InvoiceNumber}). Verifica el comprobante y confirma la recepción.",
+                      $"(factura {careRequest.InvoiceNumber}).{claimSummary} Verifica el comprobante contra el banco y confirma la recepción.",
                 EntityType: "CareRequest",
                 EntityId: careRequest.Id.ToString(),
                 DeepLinkPath: $"/admin/care-requests/{careRequest.Id}",
@@ -80,11 +101,15 @@ public sealed class ReportPaymentHandler
                 RequiresAction: true),
             cancellationToken);
 
+        var claimHtml = claimParts.Count > 0
+            ? $"<p>Datos reportados:<br/>{string.Join("<br/>", claimParts)}</p>"
+            : string.Empty;
         var html =
             $"<h2>Pago reportado</h2>" +
             $"<p>El cliente reportó el pago de la solicitud <strong>{careRequest.Description}</strong>.</p>" +
-            $"<p>Factura: {careRequest.InvoiceNumber}<br/>Monto: RD$ {careRequest.Total:N2}</p>" +
-            $"<p>Revisa el comprobante en la app y confirma la recepción del dinero para marcarla como Pagada.</p>";
+            $"<p>Factura: {careRequest.InvoiceNumber}<br/>Monto facturado: RD$ {careRequest.Total:N2}</p>" +
+            claimHtml +
+            $"<p>Revisa el comprobante y verifica el ingreso en tu cuenta antes de marcarla como Pagada.</p>";
         await _emailNotifier.SendToAdminsAsync("Pago reportado — Sol y Luna", html, cancellationToken);
 
         return careRequest;

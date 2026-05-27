@@ -62,6 +62,8 @@ public sealed class NursingCareDbContext : DbContext
                      builder.ToTable("PaymentValidations");
                      builder.HasKey(x => x.Id);
                      builder.HasIndex(x => x.CareRequestId).IsUnique();
+                     // Reused-reference detection (anti-fraud): look up a bank reference across requests.
+                     builder.HasIndex(x => x.BankReference);
                      builder.Property(x => x.BankReference).IsRequired().HasMaxLength(100);
                      builder.Property(x => x.InvoiceReference).IsRequired().HasMaxLength(50);
                      builder.Property(x => x.SystemTotal).HasColumnType("decimal(10,2)");
@@ -101,6 +103,11 @@ public sealed class NursingCareDbContext : DbContext
                      builder.Property(x => x.ContentType).IsRequired().HasMaxLength(100);
                      builder.Property(x => x.Note).HasMaxLength(500);
                      builder.Property(x => x.UploadedAtUtc).IsRequired();
+                     // Structured claim (anti-fraud) — all nullable for back-compat.
+                     builder.Property(x => x.ClaimedBankReference).HasMaxLength(100);
+                     builder.Property(x => x.ClaimedAmount).HasColumnType("decimal(10,2)");
+                     builder.Property(x => x.PayingBank).HasMaxLength(120);
+                     builder.HasIndex(x => x.ClaimedBankReference);
               });
 
               modelBuilder.Entity<CareRequest>(builder =>

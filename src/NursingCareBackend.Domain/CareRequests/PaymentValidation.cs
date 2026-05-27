@@ -40,7 +40,7 @@ public sealed class PaymentValidation
         {
             Id = Guid.NewGuid(),
             CareRequestId = careRequestId,
-            BankReference = bankReference,
+            BankReference = bankReference.Trim(), // normalized so reuse detection isn't fooled by whitespace
             InvoiceReference = invoiceReference,
             SystemTotal = decimal.Round(systemTotal, 2, MidpointRounding.AwayFromZero),
             ValidatedByUserId = validatedByUserId,

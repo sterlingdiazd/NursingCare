@@ -278,6 +278,12 @@ public sealed class CareRequestsController : ControllerBase
                 "El comprobante debe ser una imagen JPG o PNG.");
         }
 
+        if (form.ClaimedAmount is <= 0m)
+        {
+            return this.ProblemResponse(StatusCodes.Status400BadRequest, "Monto inválido",
+                "El monto reportado debe ser mayor que cero.");
+        }
+
         using var ms = new MemoryStream();
         await proof.CopyToAsync(ms, cancellationToken);
         var bytes = ms.ToArray();
@@ -292,7 +298,11 @@ public sealed class CareRequestsController : ControllerBase
         try
         {
             var updated = await _reportPaymentHandler.Handle(
-                new ReportPaymentCommand(id, userId.Value, bytes, contentType, note),
+                new ReportPaymentCommand(id, userId.Value, bytes, contentType, note,
+                    ClaimedBankReference: form.ClaimedBankReference,
+                    ClaimedAmount: form.ClaimedAmount,
+                    ClaimedPaymentDate: form.ClaimedPaymentDate,
+                    PayingBank: form.PayingBank),
                 cancellationToken);
             return Ok(CareRequestResponse.FromDomain(updated));
         }
@@ -409,4 +419,10 @@ public sealed class ReportPaymentForm
 {
     public IFormFile Proof { get; set; } = default!;
     public string? Note { get; set; }
+    // Structured claim (anti-fraud): what the client says they paid, for the admin to match against
+    // the bank. Optional, but enables reused-reference + amount-mismatch detection.
+    public string? ClaimedBankReference { get; set; }
+    public decimal? ClaimedAmount { get; set; }
+    public DateOnly? ClaimedPaymentDate { get; set; }
+    public string? PayingBank { get; set; }
 }

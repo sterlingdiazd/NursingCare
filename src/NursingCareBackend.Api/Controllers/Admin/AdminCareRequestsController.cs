@@ -18,6 +18,7 @@ using NursingCareBackend.Application.CareRequests.Commands.PayCareRequest;
 using NursingCareBackend.Application.CareRequests.Commands.RejectPaymentProof;
 using NursingCareBackend.Application.CareRequests.Commands.TransitionCareRequest;
 using NursingCareBackend.Application.CareRequests.Commands.VoidCareRequest;
+using NursingCareBackend.Application.CareRequests.Queries.GetPaymentClaim;
 using NursingCareBackend.Application.CareRequests.Queries.GetReceipt;
 using NursingCareBackend.Application.Identity.Repositories;
 using NursingCareBackend.Domain.CareRequests;
@@ -44,6 +45,7 @@ public sealed class AdminCareRequestsController : ControllerBase
   private readonly IssueCreditNoteHandler _issueCreditNoteHandler;
   private readonly GenerateReceiptHandler _generateReceiptHandler;
   private readonly GetReceiptHandler _getReceiptHandler;
+  private readonly GetPaymentClaimHandler _getPaymentClaimHandler;
   private readonly IPaymentProofRepository _paymentProofRepository;
   private readonly CompleteByAdminHandler _completeByAdminHandler;
   private readonly TransitionCareRequestHandler _transitionHandler;
@@ -64,6 +66,7 @@ public sealed class AdminCareRequestsController : ControllerBase
     IssueCreditNoteHandler issueCreditNoteHandler,
     GenerateReceiptHandler generateReceiptHandler,
     GetReceiptHandler getReceiptHandler,
+    GetPaymentClaimHandler getPaymentClaimHandler,
     IPaymentProofRepository paymentProofRepository,
     CompleteByAdminHandler completeByAdminHandler,
     TransitionCareRequestHandler transitionHandler,
@@ -83,6 +86,7 @@ public sealed class AdminCareRequestsController : ControllerBase
     _issueCreditNoteHandler = issueCreditNoteHandler;
     _generateReceiptHandler = generateReceiptHandler;
     _getReceiptHandler = getReceiptHandler;
+    _getPaymentClaimHandler = getPaymentClaimHandler;
     _paymentProofRepository = paymentProofRepository;
     _completeByAdminHandler = completeByAdminHandler;
     _transitionHandler = transitionHandler;
@@ -103,6 +107,20 @@ public sealed class AdminCareRequestsController : ControllerBase
     }
 
     return File(proof.Content, proof.ContentType);
+  }
+
+  // Structured payment claim + anti-fraud flags (reused bank reference, amount mismatch) for the
+  // admin to review before confirming. The image is fetched separately via /payment-proof.
+  [HttpGet("{id:guid}/payment-claim")]
+  [ProducesResponseType(StatusCodes.Status200OK)]
+  [ProducesResponseType(StatusCodes.Status404NotFound)]
+  public async Task<IActionResult> GetPaymentClaim(Guid id, CancellationToken cancellationToken)
+  {
+    var result = await _getPaymentClaimHandler.Handle(id, cancellationToken);
+    if (result is null)
+      return this.ProblemResponse(StatusCodes.Status404NotFound, "Solicitud no encontrada", null);
+
+    return Ok(result);
   }
 
   private Guid GetAdminUserId()
@@ -467,7 +485,8 @@ public sealed class AdminCareRequestsController : ControllerBase
     try
     {
       var result = await _payHandler.Handle(
-        new PayCareRequestCommand(id, request.BankReference, request.PaymentDate ?? DateTime.UtcNow, adminId),
+        new PayCareRequestCommand(id, request.BankReference, request.PaymentDate ?? DateTime.UtcNow, adminId,
+          request.AcknowledgeDuplicateReference),
         cancellationToken);
       return Ok(result);
     }
@@ -686,6 +705,8 @@ public sealed class PayCareRequestRequest
   [MaxLength(100)]
   public string BankReference { get; set; } = default!;
   public DateTime? PaymentDate { get; set; }
+  // Anti-fraud: set true to override the "bank reference already used" guard (rare legit reuse).
+  public bool AcknowledgeDuplicateReference { get; set; }
 }
 
 public sealed class VoidCareRequestRequest

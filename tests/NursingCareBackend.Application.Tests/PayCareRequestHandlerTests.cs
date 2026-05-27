@@ -125,6 +125,48 @@ public sealed class PayCareRequestHandlerTests
                 CancellationToken.None));
     }
 
+    [Fact]
+    public async Task Pay_WhenBankReferenceAlreadyUsed_Throws_AndDoesNotPay()
+    {
+        var request = BuildInvoicedRequest();
+        var handler = BuildHandler(
+            new FakePayCrRepo(request),
+            new RecordingReceiptHandler(),
+            new RecordingPayNotifier(),
+            pv: new RecordingPaymentValidationRepo(referenceUsed: true));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => handler.Handle(
+                new PayCareRequestCommand(request.Id, "TRF-DUP", DateTime.UtcNow, Guid.NewGuid()),
+                CancellationToken.None));
+
+        Assert.NotEqual(CareRequestStatus.Paid, request.Status); // guard fires before Pay
+    }
+
+    [Fact]
+    public async Task Pay_WhenDuplicateReferenceAcknowledged_Succeeds_AndAuditsTheOverride()
+    {
+        var request = BuildInvoicedRequest();
+        var audit = new RecordingPayAudit();
+        var handler = BuildHandler(
+            new FakePayCrRepo(request),
+            new RecordingReceiptHandler(),
+            new RecordingPayNotifier(),
+            audit: audit,
+            pv: new RecordingPaymentValidationRepo(referenceUsed: true));
+
+        var result = await handler.Handle(
+            new PayCareRequestCommand(request.Id, "TRF-DUP", DateTime.UtcNow, Guid.NewGuid(),
+                AcknowledgeDuplicateReference: true),
+            CancellationToken.None);
+
+        Assert.Equal(CareRequestStatus.Paid, request.Status);
+        Assert.NotNull(result);
+        // The knowing override of a duplicate reference must be traceable.
+        Assert.NotNull(audit.Record);
+        Assert.Contains("DUPLICADA", audit.Record!.Notes);
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private static PayCareRequestHandler BuildHandler(
@@ -192,12 +234,14 @@ file sealed class FakePayCrRepo(CareRequest? careRequest) : ICareRequestReposito
         => Task.FromResult(0);
 }
 
-file sealed class RecordingPaymentValidationRepo : IPaymentValidationRepository
+file sealed class RecordingPaymentValidationRepo(bool referenceUsed = false) : IPaymentValidationRepository
 {
     public PaymentValidation? Added { get; private set; }
     public Task AddAsync(PaymentValidation pv, CancellationToken ct) { Added = pv; return Task.CompletedTask; }
     public Task<PaymentValidation?> GetByCareRequestIdAsync(Guid careRequestId, CancellationToken ct)
         => Task.FromResult<PaymentValidation?>(null);
+    public Task<bool> IsBankReferenceUsedAsync(string bankReference, Guid excludeCareRequestId, CancellationToken ct)
+        => Task.FromResult(referenceUsed);
 }
 
 file sealed class RecordingPayAudit : IAdminAuditService

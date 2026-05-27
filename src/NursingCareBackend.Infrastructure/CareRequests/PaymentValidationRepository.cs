@@ -26,4 +26,22 @@ public sealed class PaymentValidationRepository : IPaymentValidationRepository
             .AsNoTracking()
             .FirstOrDefaultAsync(pv => pv.CareRequestId == careRequestId, cancellationToken);
     }
+
+    public Task<bool> IsBankReferenceUsedAsync(
+        string bankReference, Guid excludeCareRequestId, CancellationToken cancellationToken)
+    {
+        var normalized = bankReference?.Trim().ToUpper();
+        if (string.IsNullOrEmpty(normalized))
+        {
+            return Task.FromResult(false);
+        }
+
+        // Compare case-insensitively WITHOUT relying on the DB collation: UPPER() both sides. The
+        // table is tiny (one admin, low volume) so the non-sargable comparison is irrelevant.
+        return _dbContext.PaymentValidations
+            .AsNoTracking()
+            .AnyAsync(
+                pv => pv.CareRequestId != excludeCareRequestId && pv.BankReference.ToUpper() == normalized,
+                cancellationToken);
+    }
 }

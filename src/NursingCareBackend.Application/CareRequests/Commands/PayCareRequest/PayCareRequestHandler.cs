@@ -53,6 +53,19 @@ public sealed class PayCareRequestHandler
             throw new KeyNotFoundException($"Care request '{command.CareRequestId}' was not found.");
         }
 
+        // Anti-fraud: refuse to confirm a payment whose bank reference already confirmed a DIFFERENT
+        // request — that would count one real transfer twice. The admin can override deliberately
+        // (AcknowledgeDuplicateReference) for the rare case of one transfer covering several invoices.
+        // We always detect it (even when acknowledging) so a forced override can be audited.
+        var referenceInUse = await _paymentValidationRepository.IsBankReferenceUsedAsync(
+            command.BankReference, careRequest.Id, cancellationToken);
+        if (referenceInUse && !command.AcknowledgeDuplicateReference)
+        {
+            throw new InvalidOperationException(
+                $"La referencia bancaria \"{command.BankReference}\" ya fue usada para confirmar otro pago. " +
+                "Verifica que no estés registrando la misma transferencia dos veces.");
+        }
+
         careRequest.Pay(command.BankReference, command.PaymentDate);
 
         await _repository.UpdateAsync(careRequest, cancellationToken);
@@ -74,7 +87,9 @@ public sealed class PayCareRequestHandler
                 Action: "Pay",
                 EntityType: "CareRequest",
                 EntityId: careRequest.Id.ToString(),
-                Notes: $"Bank reference: {command.BankReference}",
+                Notes: referenceInUse
+                    ? $"Bank reference: {command.BankReference} — REFERENCIA DUPLICADA reconocida y forzada por el administrador."
+                    : $"Bank reference: {command.BankReference}",
             MetadataJson: null),
             cancellationToken);
 

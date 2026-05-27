@@ -579,6 +579,147 @@ public sealed class AppSecBillingRbacTests : IClassFixture<CustomWebApplicationF
     }
 
     // =========================================================================
+    // Anti-fraud — duplicate bank reference guard + payment-claim review
+    // =========================================================================
+
+    [Fact]
+    public async Task Pay_With_Duplicate_BankReference_Returns_BadRequest()
+    {
+        var admin = CreateAdminClient();
+        const string sharedRef = "TRF-DUPREF-1";
+
+        var idA = await CreateCompletedCareRequestAsync("appsec-dupref-1a");
+        await admin.PostAsJsonAsync($"/api/admin/care-requests/{idA}/invoice", new { invoiceNumber = "FAC-DUPREF-1A" });
+        var payA = await admin.PostAsJsonAsync($"/api/admin/care-requests/{idA}/pay", new { bankReference = sharedRef });
+        payA.EnsureSuccessStatusCode();
+
+        var idB = await CreateCompletedCareRequestAsync("appsec-dupref-1b");
+        await admin.PostAsJsonAsync($"/api/admin/care-requests/{idB}/invoice", new { invoiceNumber = "FAC-DUPREF-1B" });
+        // Same bank reference as A → counting one transfer twice → blocked.
+        var payB = await admin.PostAsJsonAsync($"/api/admin/care-requests/{idB}/pay", new { bankReference = sharedRef });
+
+        Assert.Equal(HttpStatusCode.BadRequest, payB.StatusCode);
+    }
+
+    [Fact]
+    public async Task Pay_With_Duplicate_BankReference_Acknowledged_Succeeds()
+    {
+        var admin = CreateAdminClient();
+        const string sharedRef = "TRF-DUPREF-2";
+
+        var idA = await CreateCompletedCareRequestAsync("appsec-dupref-2a");
+        await admin.PostAsJsonAsync($"/api/admin/care-requests/{idA}/invoice", new { invoiceNumber = "FAC-DUPREF-2A" });
+        (await admin.PostAsJsonAsync($"/api/admin/care-requests/{idA}/pay", new { bankReference = sharedRef })).EnsureSuccessStatusCode();
+
+        var idB = await CreateCompletedCareRequestAsync("appsec-dupref-2b");
+        await admin.PostAsJsonAsync($"/api/admin/care-requests/{idB}/invoice", new { invoiceNumber = "FAC-DUPREF-2B" });
+        var payB = await admin.PostAsJsonAsync(
+            $"/api/admin/care-requests/{idB}/pay",
+            new { bankReference = sharedRef, acknowledgeDuplicateReference = true });
+
+        payB.EnsureSuccessStatusCode();
+    }
+
+    [Fact]
+    public async Task PaymentClaim_Without_Token_Returns_401()
+    {
+        var client = _factory.CreateClient();
+        var response = await client.GetAsync($"/api/admin/care-requests/{Guid.NewGuid()}/payment-claim");
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PaymentClaim_With_Nurse_Token_Returns_403()
+    {
+        var client = CreateNurseClient();
+        var response = await client.GetAsync($"/api/admin/care-requests/{Guid.NewGuid()}/payment-claim");
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PaymentClaim_With_Admin_NoProof_Returns_HasProofFalse()
+    {
+        var id = await CreateCompletedCareRequestAsync("appsec-claim-noproof");
+        var admin = CreateAdminClient();
+
+        var response = await admin.GetAsync($"/api/admin/care-requests/{id}/payment-claim");
+
+        response.EnsureSuccessStatusCode();
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(payload.TryGetProperty("hasProof", out var hasProof), "Missing 'hasProof' field");
+        Assert.False(hasProof.GetBoolean());
+        Assert.True(payload.TryGetProperty("invoiceTotal", out _), "Missing 'invoiceTotal' field");
+    }
+
+    [Fact]
+    public async Task ReportPayment_With_Claim_Is_Captured_And_Surfaced_In_PaymentClaim()
+    {
+        // End-to-end proof that the structured claim is captured by the CLIENT endpoint and surfaced
+        // to the admin (the producer the unit tests can't exercise).
+        var (clientToken, _) = await CareRequestApiAuthHelper.CreateClientTokenAsync(_factory, "appsec-claim-cap-c");
+        var (nurseToken, nurseUserId) = await CareRequestApiAuthHelper.CreateCompletedNurseTokenAsync(_factory, "appsec-claim-cap-n");
+        var admin = CreateAdminClient();
+
+        var clientHttp = _factory.CreateClient();
+        clientHttp.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", clientToken);
+
+        var create = await clientHttp.PostAsJsonAsync("/api/care-requests", new
+        {
+            careRequestDescription = "AppSec claim capture",
+            careRequestType = "domicilio_24h",
+            unit = 1
+        });
+        create.EnsureSuccessStatusCode();
+        var id = (await create.Content.ReadFromJsonAsync<IdResponse>())!.Id;
+
+        await admin.PutAsJsonAsync($"/api/care-requests/{id}/assignment", new { assignedNurse = nurseUserId });
+        (await admin.PostAsync($"/api/care-requests/{id}/approve", null)).EnsureSuccessStatusCode();
+
+        var nurseHttp = _factory.CreateClient();
+        nurseHttp.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", nurseToken);
+        (await nurseHttp.PostAsync($"/api/care-requests/{id}/complete", null)).EnsureSuccessStatusCode();
+        // completing auto-invoices → Invoiced, so the client can report payment.
+
+        using var form = new MultipartFormDataContent();
+        var png = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0 };
+        var img = new ByteArrayContent(png);
+        img.Headers.ContentType = new MediaTypeHeaderValue("image/png");
+        form.Add(img, "Proof", "proof.png");
+        form.Add(new StringContent("TRF-CLAIM-CAP-1"), "ClaimedBankReference");
+        form.Add(new StringContent("1"), "ClaimedAmount"); // 1 != invoice total → mismatch flag
+        form.Add(new StringContent("2026-05-26"), "ClaimedPaymentDate");
+        form.Add(new StringContent("Banreservas"), "PayingBank");
+        (await clientHttp.PostAsync($"/api/care-requests/{id}/report-payment", form)).EnsureSuccessStatusCode();
+
+        var claimResp = await admin.GetAsync($"/api/admin/care-requests/{id}/payment-claim");
+        claimResp.EnsureSuccessStatusCode();
+        var claim = await claimResp.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(claim.GetProperty("hasProof").GetBoolean());
+        Assert.Equal("TRF-CLAIM-CAP-1", claim.GetProperty("claimedBankReference").GetString());
+        Assert.True(claim.GetProperty("amountReported").GetBoolean());
+        Assert.False(claim.GetProperty("amountMatches").GetBoolean()); // 1 != invoice total
+        Assert.Equal("Banreservas", claim.GetProperty("payingBank").GetString());
+    }
+
+    [Fact]
+    public async Task Pay_Duplicate_BankReference_Detected_CaseInsensitively()
+    {
+        // Reuse detection must not be defeated by case (collation-independent).
+        var admin = CreateAdminClient();
+
+        var idA = await CreateCompletedCareRequestAsync("appsec-dupref-case-a");
+        await admin.PostAsJsonAsync($"/api/admin/care-requests/{idA}/invoice", new { invoiceNumber = "FAC-DUPREF-CASE-A" });
+        (await admin.PostAsJsonAsync($"/api/admin/care-requests/{idA}/pay", new { bankReference = "trf-case-9" })).EnsureSuccessStatusCode();
+
+        var idB = await CreateCompletedCareRequestAsync("appsec-dupref-case-b");
+        await admin.PostAsJsonAsync($"/api/admin/care-requests/{idB}/invoice", new { invoiceNumber = "FAC-DUPREF-CASE-B" });
+        // Same reference, different case → still a duplicate.
+        var payB = await admin.PostAsJsonAsync($"/api/admin/care-requests/{idB}/pay", new { bankReference = "TRF-CASE-9" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, payB.StatusCode);
+    }
+
+    // =========================================================================
     // RBAC + boundary — POST /api/admin/care-requests/{id}/credit-note (T1.4)
     // =========================================================================
 
