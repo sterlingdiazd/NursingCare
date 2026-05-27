@@ -204,13 +204,30 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
                 var fundingInvoices = await _dbContext.CareRequests
                     .AsNoTracking()
                     .Where(c => fundingCareRequestIds.Contains(c.Id))
-                    .Select(c => new { c.Total, c.Status })
+                    .Select(c => new { c.Id, c.Total, c.Status })
                     .ToListAsync(cancellationToken);
 
                 totalBilled = fundingInvoices.Sum(c => c.Total);
-                totalCollected = fundingInvoices
+
+                // Collected = paid invoices NET of any credit notes / refunds issued against them
+                // (T1.4). A credit note keeps the request Paid by design, so a gross sum would
+                // overstate cash actually retained; subtract the credited amount so reconciliation
+                // answers "did I net-collect what I'm paying out?" truthfully.
+                var paidFundingIds = fundingInvoices
                     .Where(c => c.Status == NursingCareBackend.Domain.CareRequests.CareRequestStatus.Paid)
+                    .Select(c => c.Id)
+                    .ToList();
+                var grossCollected = fundingInvoices
+                    .Where(c => paidFundingIds.Contains(c.Id))
                     .Sum(c => c.Total);
+                var creditedAgainstPaid = paidFundingIds.Count == 0
+                    ? 0m
+                    : await _dbContext.CreditNotes
+                        .AsNoTracking()
+                        .Where(cn => paidFundingIds.Contains(cn.CareRequestId))
+                        .Select(cn => (decimal?)cn.Amount)
+                        .SumAsync(cancellationToken) ?? 0m;
+                totalCollected = grossCollected - creditedAgainstPaid;
             }
         }
 

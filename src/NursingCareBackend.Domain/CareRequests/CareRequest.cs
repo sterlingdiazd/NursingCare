@@ -349,6 +349,46 @@ public sealed class CareRequest
         UpdatedAtUtc = voidedAtUtc;
     }
 
+    /// <summary>
+    /// Records a credit note / refund against this request's collected revenue. Because
+    /// <see cref="Void"/> is intentionally blocked after <see cref="CareRequestStatus.Paid"/>, this is
+    /// the only auditable way to reverse money on a paid request — and it is a ledger entry, not a
+    /// status change (the request stays Paid). Invariants enforced here:
+    ///   * only a Paid request can be credited (you cannot refund money you never collected);
+    ///   * the running total of credit notes can never exceed the amount paid (<see cref="Total"/>).
+    /// </summary>
+    /// <param name="alreadyCreditedTotal">Sum of amounts of credit notes already issued for this
+    /// request (they are persisted separately, so the caller supplies the running total).</param>
+    public CreditNote IssueCreditNote(
+        decimal amount,
+        string reason,
+        string? reference,
+        Guid issuedByUserId,
+        DateTime issuedAtUtc,
+        decimal alreadyCreditedTotal)
+    {
+        if (Status != CareRequestStatus.Paid)
+        {
+            throw new InvalidOperationException(
+                $"A credit note can only be issued against a Paid request. Current status is {Status}.");
+        }
+
+        if (amount <= 0m)
+            throw new ArgumentException("Credit note amount must be positive.", nameof(amount));
+
+        if (alreadyCreditedTotal < 0m)
+            throw new ArgumentException("Already-credited total cannot be negative.", nameof(alreadyCreditedTotal));
+
+        if (alreadyCreditedTotal + amount > Total)
+        {
+            throw new InvalidOperationException(
+                $"Credit notes for this request would exceed the amount paid (RD${Total:N2}). " +
+                $"Already credited: RD${alreadyCreditedTotal:N2}; requested: RD${amount:N2}.");
+        }
+
+        return CreditNote.Create(Id, amount, reason, reference, issuedByUserId, issuedAtUtc);
+    }
+
     public void AssignNurse(Guid nurseUserId, DateTime assignedAtUtc)
     {
         if (nurseUserId == Guid.Empty)

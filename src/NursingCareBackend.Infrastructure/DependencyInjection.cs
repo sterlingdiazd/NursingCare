@@ -125,6 +125,7 @@ public static class DependencyInjection
         services.AddScoped<ICareRequestRepository, CareRequestRepository>();
         services.AddScoped<IPaymentValidationRepository, PaymentValidationRepository>();
         services.AddScoped<IReceiptRepository, ReceiptRepository>();
+        services.AddScoped<ICreditNoteRepository, CreditNoteRepository>();
         services.AddScoped<IPaymentProofRepository, PaymentProofRepository>();
         services.AddScoped<IReceiptPdfService, ReceiptPdfService>();
         services.AddScoped<IAdminDashboardRepository, AdminDashboardRepository>();

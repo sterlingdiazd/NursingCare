@@ -13,6 +13,7 @@ using NursingCareBackend.Application.CareRequests.Commands.CompleteByAdmin;
 using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
 using NursingCareBackend.Application.CareRequests.Commands.GenerateReceipt;
 using NursingCareBackend.Application.CareRequests.Commands.InvoiceCareRequest;
+using NursingCareBackend.Application.CareRequests.Commands.IssueCreditNote;
 using NursingCareBackend.Application.CareRequests.Commands.PayCareRequest;
 using NursingCareBackend.Application.CareRequests.Commands.RejectPaymentProof;
 using NursingCareBackend.Application.CareRequests.Commands.TransitionCareRequest;
@@ -40,6 +41,7 @@ public sealed class AdminCareRequestsController : ControllerBase
   private readonly PayCareRequestHandler _payHandler;
   private readonly VoidCareRequestHandler _voidHandler;
   private readonly RejectPaymentProofHandler _rejectPaymentHandler;
+  private readonly IssueCreditNoteHandler _issueCreditNoteHandler;
   private readonly GenerateReceiptHandler _generateReceiptHandler;
   private readonly GetReceiptHandler _getReceiptHandler;
   private readonly IPaymentProofRepository _paymentProofRepository;
@@ -59,6 +61,7 @@ public sealed class AdminCareRequestsController : ControllerBase
     PayCareRequestHandler payHandler,
     VoidCareRequestHandler voidHandler,
     RejectPaymentProofHandler rejectPaymentHandler,
+    IssueCreditNoteHandler issueCreditNoteHandler,
     GenerateReceiptHandler generateReceiptHandler,
     GetReceiptHandler getReceiptHandler,
     IPaymentProofRepository paymentProofRepository,
@@ -77,6 +80,7 @@ public sealed class AdminCareRequestsController : ControllerBase
     _payHandler = payHandler;
     _voidHandler = voidHandler;
     _rejectPaymentHandler = rejectPaymentHandler;
+    _issueCreditNoteHandler = issueCreditNoteHandler;
     _generateReceiptHandler = generateReceiptHandler;
     _getReceiptHandler = getReceiptHandler;
     _paymentProofRepository = paymentProofRepository;
@@ -544,6 +548,52 @@ public sealed class AdminCareRequestsController : ControllerBase
     }
   }
 
+  // POST /api/admin/care-requests/{id}/credit-note
+  // Admin records a credit note / refund against an already-Paid request. The request stays Paid
+  // (Void is blocked after Paid by design); this writes an auditable in-books ledger entry so a
+  // reversed/refunded payment is no longer invisible. The domain caps total credits at the amount
+  // paid. Audited; the client is notified.
+  [HttpPost("{id:guid}/credit-note")]
+  [ProducesResponseType(StatusCodes.Status200OK)]
+  [ProducesResponseType(StatusCodes.Status400BadRequest)]
+  [ProducesResponseType(StatusCodes.Status404NotFound)]
+  public async Task<IActionResult> IssueCreditNote(
+    Guid id,
+    [FromBody] IssueCreditNoteRequest request,
+    CancellationToken cancellationToken)
+  {
+    var adminId = GetAdminUserId();
+    if (adminId == Guid.Empty)
+      return Unauthorized();
+
+    var reason = request?.Reason?.Trim();
+    if (string.IsNullOrWhiteSpace(reason))
+      return this.ProblemResponse(StatusCodes.Status400BadRequest, Messages.Get("errors.razon_requerida"), "El motivo es requerido.");
+
+    if (request!.Amount <= 0m)
+      return this.ProblemResponse(StatusCodes.Status400BadRequest, "Monto inválido", "El monto debe ser mayor que cero.");
+
+    try
+    {
+      var result = await _issueCreditNoteHandler.Handle(
+        new IssueCreditNoteCommand(id, request.Amount, reason, request.Reference?.Trim(), adminId),
+        cancellationToken);
+      return Ok(result);
+    }
+    catch (KeyNotFoundException)
+    {
+      return this.ProblemResponse(StatusCodes.Status404NotFound, "Solicitud no encontrada", null);
+    }
+    catch (InvalidOperationException ex)
+    {
+      return this.ProblemResponse(StatusCodes.Status400BadRequest, Messages.Get("errors.transicion_invalida"), ex.Message);
+    }
+    catch (ArgumentException ex)
+    {
+      return this.ProblemResponse(StatusCodes.Status400BadRequest, "Monto inválido", ex.Message);
+    }
+  }
+
   [HttpPost("{id:guid}/receipt")]
   [ProducesResponseType(StatusCodes.Status200OK)]
   [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -650,6 +700,19 @@ public sealed class RejectPaymentRequest
   [Required]
   [MaxLength(500)]
   public string Reason { get; set; } = default!;
+}
+
+public sealed class IssueCreditNoteRequest
+{
+  [Range(0.01, double.MaxValue)]
+  public decimal Amount { get; set; }
+
+  [Required]
+  [MaxLength(500)]
+  public string Reason { get; set; } = default!;
+
+  [MaxLength(100)]
+  public string? Reference { get; set; }
 }
 
 public sealed class RegisterAdminCareRequestShiftRequest

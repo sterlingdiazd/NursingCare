@@ -559,6 +559,125 @@ public sealed class AppSecBillingRbacTests : IClassFixture<CustomWebApplicationF
     }
 
     // =========================================================================
+    // RBAC + boundary — POST /api/admin/care-requests/{id}/credit-note (T1.4)
+    // =========================================================================
+
+    [Fact]
+    public async Task CreditNote_Without_Token_Returns_401()
+    {
+        var client = _factory.CreateClient();
+        var response = await client.PostAsJsonAsync(
+            $"/api/admin/care-requests/{Guid.NewGuid()}/credit-note",
+            new { amount = 100m, reason = "Reembolso" });
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreditNote_With_Nurse_Token_Returns_403()
+    {
+        var client = CreateNurseClient();
+        var response = await client.PostAsJsonAsync(
+            $"/api/admin/care-requests/{Guid.NewGuid()}/credit-note",
+            new { amount = 100m, reason = "Reembolso" });
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreditNote_With_Client_Token_Returns_403()
+    {
+        var client = _factory.CreateClient();
+        var clientToken = JwtTestTokens.CreateToken(_factory.Services, "CLIENT");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", clientToken);
+        var response = await client.PostAsJsonAsync(
+            $"/api/admin/care-requests/{Guid.NewGuid()}/credit-note",
+            new { amount = 100m, reason = "Reembolso" });
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreditNote_With_Admin_Token_And_Unknown_Id_Returns_404()
+    {
+        var client = CreateAdminClient();
+        var response = await client.PostAsJsonAsync(
+            $"/api/admin/care-requests/{Guid.NewGuid()}/credit-note",
+            new { amount = 100m, reason = "Reembolso" });
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreditNote_On_Paid_Request_Within_Cap_Succeeds()
+    {
+        var paidId = await CreatePaidCareRequestAsync("appsec-credit-ok");
+        var adminClient = CreateAdminClient();
+
+        // A tiny amount is always within Total, so we don't need to know the exact price.
+        var response = await adminClient.PostAsJsonAsync(
+            $"/api/admin/care-requests/{paidId}/credit-note",
+            new { amount = 1m, reason = "Reembolso parcial", reference = "TRF-CN-001" });
+
+        response.EnsureSuccessStatusCode();
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(payload.TryGetProperty("id", out _), "Missing 'id' field");
+        Assert.True(payload.TryGetProperty("amount", out var amt), "Missing 'amount' field");
+        Assert.Equal(1m, amt.GetDecimal());
+        Assert.True(payload.TryGetProperty("totalCredited", out _), "Missing 'totalCredited' field");
+    }
+
+    [Fact]
+    public async Task CreditNote_Exceeding_Amount_Paid_Returns_BadRequest()
+    {
+        var paidId = await CreatePaidCareRequestAsync("appsec-credit-over");
+        var adminClient = CreateAdminClient();
+
+        // Absurdly large amount necessarily exceeds Total → domain cap → 400 (never 500).
+        var response = await adminClient.PostAsJsonAsync(
+            $"/api/admin/care-requests/{paidId}/credit-note",
+            new { amount = 99_999_999m, reason = "Excede lo pagado" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreditNote_On_NonPaid_Request_Returns_BadRequest()
+    {
+        // A Completed (not Paid) request cannot be credited — domain guard → 400.
+        var completedId = await CreateCompletedCareRequestAsync("appsec-credit-nonpaid");
+        var adminClient = CreateAdminClient();
+
+        var response = await adminClient.PostAsJsonAsync(
+            $"/api/admin/care-requests/{completedId}/credit-note",
+            new { amount = 1m, reason = "Reembolso" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreditNote_With_Zero_Amount_Returns_BadRequest()
+    {
+        var paidId = await CreatePaidCareRequestAsync("appsec-credit-zero");
+        var adminClient = CreateAdminClient();
+
+        var response = await adminClient.PostAsJsonAsync(
+            $"/api/admin/care-requests/{paidId}/credit-note",
+            new { amount = 0m, reason = "Reembolso" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreditNote_With_Empty_Reason_Returns_BadRequest()
+    {
+        var paidId = await CreatePaidCareRequestAsync("appsec-credit-noreason");
+        var adminClient = CreateAdminClient();
+
+        var response = await adminClient.PostAsJsonAsync(
+            $"/api/admin/care-requests/{paidId}/credit-note",
+            new { amount = 1m, reason = "" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    // =========================================================================
     // Secret detection — error responses must not expose internal data
     // =========================================================================
 

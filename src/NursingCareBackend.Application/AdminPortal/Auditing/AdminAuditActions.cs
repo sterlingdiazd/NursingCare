@@ -21,4 +21,5 @@ public static class AdminAuditActions
 
   // Money flow (client payment)
   public const string RejectPaymentProof = "RejectPaymentProof";
+  public const string IssueCreditNote = "IssueCreditNote";
 }

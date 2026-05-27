@@ -236,6 +236,12 @@ public sealed class AdminFinanceRepository : IAdminFinanceRepository
             .Select(c => new { c.UserID, c.Total, c.InvoicedAtUtc, c.PaidAtUtc })
             .ToListAsync(cancellationToken);
 
+        // KNOWN LIMITATION (T1.4): these date-windowed "Cobrado" figures are GROSS of credit
+        // notes / refunds. Netting them correctly is a cash-basis timing decision (does a refund
+        // reduce collected in its issue-period or the original payment-period?) that is out of
+        // T1.4's minimal scope; the point-in-time period reconciliation in AdminPayrollRepository
+        // IS net of credit notes. Tracked as a follow-up before this dashboard is treated as the
+        // accounting source of truth. See specs/MONEY_FLOW_STANDARD.md.
         decimal CollectedIn(DateOnly f, DateOnly t) => requests
             .Where(c => c.PaidAtUtc >= Start(f) && c.PaidAtUtc < EndEx(t)).Sum(c => c.Total);
         var collected = CollectedIn(from, to);
