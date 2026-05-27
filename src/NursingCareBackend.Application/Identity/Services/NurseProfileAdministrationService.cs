@@ -172,6 +172,8 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
                 LicenseId = TrimOptional(request.LicenseId),
                 BankName = request.BankName.Trim(),
                 AccountNumber = TrimOptional(request.AccountNumber),
+                AccountType = TrimOptional(request.AccountType),
+                AccountHolderName = TrimOptional(request.AccountHolderName),
                 Category = normalizedCategory,
                 VisitDailyRate = request.VisitDailyRate,
                 HomeCareMonthlyRate = request.HomeCareMonthlyRate,
@@ -284,6 +286,8 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
             request.VisitDailyRate,
             request.HomeCareMonthlyRate,
             request.HomeCareMonthlyExpectedDays,
+            request.AccountType,
+            request.AccountHolderName,
             cancellationToken);
 
         await _userRepository.UpdateAsync(user, cancellationToken);
@@ -347,6 +351,8 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
             request.VisitDailyRate,
             request.HomeCareMonthlyRate,
             request.HomeCareMonthlyExpectedDays,
+            request.AccountType,
+            request.AccountHolderName,
             cancellationToken);
 
         user.IsActive = true;
@@ -519,6 +525,8 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
             nurse.LicenseId,
             nurse.BankName,
             nurse.AccountNumber,
+            nurse.AccountType,
+            nurse.AccountHolderName,
             category,
             nurse.VisitDailyRate,
             nurse.HomeCareMonthlyRate,
@@ -624,6 +632,8 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
         decimal visitDailyRate,
         decimal homeCareMonthlyRate,
         decimal homeCareMonthlyExpectedDays,
+        string? accountType,
+        string? accountHolderName,
         CancellationToken cancellationToken)
     {
         var nurse = user.NurseProfile!;
@@ -640,6 +650,8 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
         nurse.LicenseId = TrimOptional(licenseId);
         nurse.BankName = bankName.Trim();
         nurse.AccountNumber = TrimOptional(accountNumber);
+        nurse.AccountType = TrimOptional(accountType);
+        nurse.AccountHolderName = TrimOptional(accountHolderName);
         nurse.Category = await _nurseCatalog.NormalizeRequiredCategoryAsync(category, nameof(category), cancellationToken);
         nurse.VisitDailyRate = visitDailyRate;
         nurse.HomeCareMonthlyRate = homeCareMonthlyRate;
@@ -692,6 +704,8 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
             licenseId = nurse?.LicenseId,
             bankName = nurse?.BankName,
             accountNumber = nurse?.AccountNumber,
+            accountType = nurse?.AccountType,
+            accountHolderName = nurse?.AccountHolderName,
             category = nurse?.Category,
             visitDailyRate = nurse?.VisitDailyRate,
             homeCareMonthlyRate = nurse?.HomeCareMonthlyRate,

@@ -37,4 +37,7 @@ public sealed record AdminUpdateNurseProfileRequest(
     string Category,
     [Range(0, 99999999)] decimal VisitDailyRate = 0m,
     [Range(0, 99999999)] decimal HomeCareMonthlyRate = 0m,
-    [Range(1.0, 31.0)] decimal HomeCareMonthlyExpectedDays = 23.83m);
+    [Range(1.0, 31.0)] decimal HomeCareMonthlyExpectedDays = 23.83m,
+    // DR bank-transfer details (T2.3) — optional.
+    [StringLength(20)] string? AccountType = null,
+    [StringLength(150)] string? AccountHolderName = null);

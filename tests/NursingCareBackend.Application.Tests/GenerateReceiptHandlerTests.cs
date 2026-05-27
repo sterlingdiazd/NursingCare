@@ -103,6 +103,29 @@ public sealed class GenerateReceiptHandlerTests
     }
 
     [Fact]
+    public async Task Handle_PopulatesClientIdentificationNumber_FromUser()
+    {
+        // T2.3: the client's cédula/RNC (User.IdentificationNumber) must reach the receipt PDF data,
+        // instead of the previous hardcoded null.
+        var careRequest = BuildPaidCareRequest();
+        ReceiptPdfData? captured = null;
+        var pdfService = new FakeReceiptPdfService(d => captured = d);
+        var handler = new GenerateReceiptHandler(
+            repository: new FakeCareRequestRepository(careRequest),
+            receiptRepository: new FakeReceiptRepository(),
+            paymentValidationRepository: new FakePaymentValidationRepository(),
+            receiptPdfService: pdfService,
+            userRepository: new FakeUserRepositoryWithId("00112345678"),
+            auditService: new FakeAuditService(),
+            companyInfoProvider: new FakeCompanyInfoProvider(new CompanyInfo(TestCompanyName, null, null, null)));
+
+        await handler.Handle(new GenerateReceiptCommand(careRequest.Id, Guid.NewGuid()), CancellationToken.None);
+
+        Assert.NotNull(captured);
+        Assert.Equal("00112345678", captured!.ClientIdentificationNumber);
+    }
+
+    [Fact]
     public async Task Handle_ReturnsExistingReceipt_WhenAlreadyGenerated()
     {
         // Arrange
@@ -235,6 +258,30 @@ file sealed class FakeUserRepository : IUserRepository
 file sealed class FakeAuditService : IAdminAuditService
 {
     public Task WriteAsync(AdminAuditRecord record, CancellationToken cancellationToken = default) => Task.CompletedTask;
+}
+
+file sealed class FakeUserRepositoryWithId(string identificationNumber) : IUserRepository
+{
+    public Task<User?> GetByIdAsync(Guid userId, CancellationToken ct = default)
+        => Task.FromResult<User?>(new User
+        {
+            Id = userId,
+            Email = "cliente@example.com",
+            Name = "Cliente",
+            LastName = "Prueba",
+            IdentificationNumber = identificationNumber,
+        });
+    public Task<User?> GetByEmailAsync(string email, CancellationToken ct = default) => Task.FromResult<User?>(null);
+    public Task<User?> GetByGoogleSubjectIdAsync(string googleSubjectId, CancellationToken ct = default) => Task.FromResult<User?>(null);
+    public Task<bool> AnyAdminExistsAsync(CancellationToken ct = default) => Task.FromResult(false);
+    public Task<IReadOnlyList<User>> GetNurseProfilesAsync(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<User>>(Array.Empty<User>());
+    public Task<IReadOnlyList<User>> GetPendingNurseProfilesAsync(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<User>>(Array.Empty<User>());
+    public Task<IReadOnlyList<User>> GetActiveNurseProfilesAsync(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<User>>(Array.Empty<User>());
+    public Task<IReadOnlyDictionary<Guid, NurseWorkloadSummary>> GetNurseWorkloadsAsync(IReadOnlyCollection<Guid> nurseUserIds, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyDictionary<Guid, NurseWorkloadSummary>>(new Dictionary<Guid, NurseWorkloadSummary>());
+    public Task<bool> HasAssignedCareRequestsAsync(Guid nurseUserId, CancellationToken ct = default) => Task.FromResult(false);
+    public Task<User> CreateAsync(User user, CancellationToken ct = default) => Task.FromResult(user);
+    public Task UpdateAsync(User user, CancellationToken ct = default) => Task.CompletedTask;
 }
 
 file sealed class FakeCompanyInfoProvider(CompanyInfo info) : ICompanyInfoProvider

@@ -11,6 +11,10 @@ public sealed class Nurse
   public string? LicenseId { get; set; }
   public string? BankName { get; set; }
   public string? AccountNumber { get; set; }
+  // Required for DR bank transfers: account type (ahorro/corriente) and the account holder name
+  // (when the account is not in the nurse's own name) — T2.3.
+  public string? AccountType { get; set; }
+  public string? AccountHolderName { get; set; }
   public string? Category { get; set; }
 
   // Pago a la enfermera (independiente del precio al cliente).

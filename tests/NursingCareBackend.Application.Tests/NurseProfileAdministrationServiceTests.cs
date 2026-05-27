@@ -96,6 +96,41 @@ public sealed class NurseProfileAdministrationServiceTests
   }
 
   [Fact]
+  public async Task CreateNurseProfileAsync_Persists_And_Returns_AccountTypeAndHolder()
+  {
+    var repository = new FakeUserRepository();
+    var service = CreateService(repository);
+
+    var response = await service.CreateNurseProfileAsync(
+      new AdminCreateNurseProfileRequest(
+        Name: "Laura",
+        LastName: "Gomez",
+        IdentificationNumber: "00111111111",
+        Phone: "8095550199",
+        Email: "laura.acct@example.com",
+        Password: "Pass123!",
+        ConfirmPassword: "Pass123!",
+        HireDate: new DateOnly(2026, 3, 21),
+        Specialty: "Cuidados intensivos",
+        LicenseId: "55",
+        BankName: "Banco Central",
+        AccountNumber: "123456",
+        Category: "Semi Senior",
+        IsOperationallyActive: false,
+        AccountType: "ahorro",
+        AccountHolderName: "Laura Gomez"),
+      actorUserId: Guid.NewGuid(),
+      CancellationToken.None);
+
+    Assert.Equal("ahorro", response.AccountType);
+    Assert.Equal("Laura Gomez", response.AccountHolderName);
+
+    var stored = await repository.GetByEmailAsync("laura.acct@example.com");
+    Assert.Equal("ahorro", stored!.NurseProfile!.AccountType);
+    Assert.Equal("Laura Gomez", stored.NurseProfile.AccountHolderName);
+  }
+
+  [Fact]
   public async Task CompleteNurseProfileCreationAsync_Should_Update_User_And_Nurse_And_Activate_Both()
   {
     var nurse = CreateNurseUser("pending@example.com", isProfileComplete: false, userIsActive: true, nurseProfileIsActive: false);
@@ -137,6 +172,71 @@ public sealed class NurseProfileAdministrationServiceTests
     var notification = Assert.Single(notificationPublisher.PublishedRequests);
     Assert.Equal("nurse_profile_completed", notification.Category);
     Assert.Equal("Low", notification.Severity);
+  }
+
+  [Fact]
+  public async Task CompleteNurseProfileCreationAsync_Persists_AccountTypeAndHolder()
+  {
+    var nurse = CreateNurseUser("complete.acct@example.com", isProfileComplete: false, userIsActive: true, nurseProfileIsActive: false);
+    nurse.IsActive = true;
+    var repository = new FakeUserRepository(nurse);
+    var service = CreateService(repository);
+
+    var response = await service.CompleteNurseProfileCreationAsync(
+      nurse.Id,
+      new AdminCompleteNurseProfileRequest(
+        Name: "Laura",
+        LastName: "Gomez",
+        IdentificationNumber: "00111111111",
+        Phone: "8095550199",
+        Email: "complete.acct@example.com",
+        HireDate: new DateOnly(2026, 3, 21),
+        Specialty: "Cuidados intensivos",
+        LicenseId: "55",
+        BankName: "Banco Central",
+        AccountNumber: "123456",
+        Category: "Senior",
+        AccountType: "corriente",
+        AccountHolderName: "Laura Gomez"),
+      actorUserId: Guid.NewGuid(),
+      CancellationToken.None);
+
+    Assert.Equal("corriente", response.AccountType);
+    Assert.Equal("Laura Gomez", response.AccountHolderName);
+    Assert.Equal("corriente", nurse.NurseProfile!.AccountType);
+    Assert.Equal("Laura Gomez", nurse.NurseProfile.AccountHolderName);
+  }
+
+  [Fact]
+  public async Task UpdateNurseProfileAsync_Persists_AccountTypeAndHolder()
+  {
+    var nurse = CreateNurseUser("update.acct@example.com", isProfileComplete: true, userIsActive: true, nurseProfileIsActive: true);
+    var repository = new FakeUserRepository(nurse);
+    var service = CreateService(repository);
+
+    var response = await service.UpdateNurseProfileAsync(
+      nurse.Id,
+      new AdminUpdateNurseProfileRequest(
+        Name: "Laura",
+        LastName: "Gomez",
+        IdentificationNumber: "00111111111",
+        Phone: "8095550199",
+        Email: "update.acct@example.com",
+        HireDate: new DateOnly(2026, 3, 21),
+        Specialty: "Cuidados intensivos",
+        LicenseId: "55",
+        BankName: "Banco Central",
+        AccountNumber: "123456",
+        Category: "Senior",
+        AccountType: "ahorro",
+        AccountHolderName: "Laura Gomez"),
+      actorUserId: Guid.NewGuid(),
+      CancellationToken.None);
+
+    Assert.Equal("ahorro", response.AccountType);
+    Assert.Equal("Laura Gomez", response.AccountHolderName);
+    Assert.Equal("ahorro", nurse.NurseProfile!.AccountType);
+    Assert.Equal("Laura Gomez", nurse.NurseProfile.AccountHolderName);
   }
 
   [Fact]

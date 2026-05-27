@@ -318,6 +318,12 @@ public sealed class NursingCareDbContext : DbContext
                      builder.Property(x => x.AccountNumber)
                       .HasMaxLength(50);
 
+                     builder.Property(x => x.AccountType)
+                      .HasMaxLength(20);
+
+                     builder.Property(x => x.AccountHolderName)
+                      .HasMaxLength(150);
+
                      builder.Property(x => x.Category)
                       .HasMaxLength(100);
               });

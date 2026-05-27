@@ -23,6 +23,8 @@ public sealed record NurseProfileAdminResponse(
     string? LicenseId,
     string? BankName,
     string? AccountNumber,
+    string? AccountType,
+    string? AccountHolderName,
     string? Category,
     decimal VisitDailyRate,
     decimal HomeCareMonthlyRate,

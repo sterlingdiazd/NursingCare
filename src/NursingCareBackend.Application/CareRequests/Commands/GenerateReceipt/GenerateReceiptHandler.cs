@@ -92,7 +92,9 @@ public sealed class GenerateReceiptHandler : IGenerateReceiptHandler
             CareRequestId: careRequest.Id,
             ReceiptNumber: receiptNumber,
             ClientDisplayName: clientDisplayName,
-            ClientIdentificationNumber: null,
+            // The client's cédula/RNC is captured at registration (User.IdentificationNumber); surface
+            // it on the receipt instead of the previous hardcoded null (T2.3).
+            ClientIdentificationNumber: clientUser?.IdentificationNumber,
             CareRequestType: careRequest.CareRequestType,
             Unit: careRequest.Unit,
             UnitType: careRequest.UnitType,
