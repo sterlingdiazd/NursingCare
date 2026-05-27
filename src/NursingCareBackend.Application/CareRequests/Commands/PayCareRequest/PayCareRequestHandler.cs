@@ -1,6 +1,8 @@
+using Microsoft.Extensions.Logging;
 using NursingCareBackend.Application.AdminPortal.Auditing;
 using NursingCareBackend.Application.CareRequests;
 using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
+using NursingCareBackend.Application.CareRequests.Commands.GenerateReceipt;
 using NursingCareBackend.Application.Notifications;
 using NursingCareBackend.Domain.CareRequests;
 
@@ -18,17 +20,23 @@ public sealed class PayCareRequestHandler
     private readonly IPaymentValidationRepository _paymentValidationRepository;
     private readonly IAdminAuditService _auditService;
     private readonly IUserNotificationPublisher _userNotifications;
+    private readonly IGenerateReceiptHandler _generateReceipt;
+    private readonly ILogger<PayCareRequestHandler> _logger;
 
     public PayCareRequestHandler(
         ICareRequestRepository repository,
         IPaymentValidationRepository paymentValidationRepository,
         IAdminAuditService auditService,
-        IUserNotificationPublisher userNotifications)
+        IUserNotificationPublisher userNotifications,
+        IGenerateReceiptHandler generateReceipt,
+        ILogger<PayCareRequestHandler> logger)
     {
         _repository = repository;
         _paymentValidationRepository = paymentValidationRepository;
         _auditService = auditService;
         _userNotifications = userNotifications;
+        _generateReceipt = generateReceipt;
+        _logger = logger;
     }
 
     public async Task<PaidCareRequestResponse> Handle(
@@ -70,19 +78,66 @@ public sealed class PayCareRequestHandler
             MetadataJson: null),
             cancellationToken);
 
-        await _userNotifications.PublishToUserAsync(
-            new UserNotificationPublishRequest(
-                RecipientUserId: careRequest.UserID,
-                Category: "payment_confirmed",
-                Severity: "Medium",
-                Title: "Pago confirmado",
-                Body: $"Confirmamos el pago de tu solicitud \"{careRequest.Description}\". Gracias por usar NursingCare.",
-                EntityType: "CareRequest",
-                EntityId: careRequest.Id.ToString(),
-                DeepLinkPath: $"/care-requests/{careRequest.Id}",
-                Source: "Cobros",
-                RequiresAction: false),
-            cancellationToken);
+        // T2.1: auto-generate the client receipt on payment confirmation. It is idempotent (returns
+        // the existing receipt if one exists) and only valid for a Paid request, which we just are.
+        // Failure-isolated: a receipt/PDF error must NEVER fail the payment — the payment is the
+        // source of truth and the manual "Generar recibo" action remains as a fallback. We only tell
+        // the client the receipt is ready when it actually generated.
+        var receiptReady = false;
+        try
+        {
+            var receiptResult = await _generateReceipt.Handle(
+                new GenerateReceiptCommand(careRequest.Id, command.ActingAdminUserId),
+                cancellationToken);
+            // Only claim the receipt is available if it actually produced content.
+            receiptReady = !string.IsNullOrEmpty(receiptResult.ReceiptContentBase64);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Auto-receipt generation failed for care request {CareRequestId} after payment; payment stands, receipt can be generated manually.",
+                careRequest.Id);
+        }
+
+        var notificationBody = receiptReady
+            ? $"Confirmamos el pago de tu solicitud \"{careRequest.Description}\". Tu recibo ya está disponible."
+            : $"Confirmamos el pago de tu solicitud \"{careRequest.Description}\".";
+
+        // The client notification is a soft side-effect: like the receipt, a failure here must NOT
+        // fail the already-committed payment (which would 500 the admin and tempt a retry that the
+        // domain state guard then blocks). Isolate it.
+        try
+        {
+            await _userNotifications.PublishToUserAsync(
+                new UserNotificationPublishRequest(
+                    RecipientUserId: careRequest.UserID,
+                    Category: "payment_confirmed",
+                    Severity: "Medium",
+                    Title: "Pago confirmado",
+                    Body: notificationBody,
+                    EntityType: "CareRequest",
+                    EntityId: careRequest.Id.ToString(),
+                    DeepLinkPath: $"/care-requests/{careRequest.Id}",
+                    Source: "Cobros",
+                    RequiresAction: false),
+                cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Payment-confirmed notification failed for care request {CareRequestId}; payment stands.",
+                careRequest.Id);
+        }
 
         return new PaidCareRequestResponse(
             careRequest.Id,

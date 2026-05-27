@@ -47,6 +47,8 @@ public static class DependencyInjection
     services.AddScoped<CareRequests.Commands.IssueCreditNote.IssueCreditNoteHandler>();
     services.AddScoped<VoidCareRequestHandler>();
     services.AddScoped<GenerateReceiptHandler>();
+    services.AddScoped<CareRequests.Commands.GenerateReceipt.IGenerateReceiptHandler>(
+        sp => sp.GetRequiredService<GenerateReceiptHandler>());
     services.AddScoped<AdminPortal.Payroll.Commands.ConfirmNursePeriodPayment.ConfirmNursePeriodPaymentHandler>();
     services.AddScoped<AdminPortal.Payroll.Commands.ConfirmNursePeriodPayment.IConfirmNursePeriodPaymentHandler>(
         sp => sp.GetRequiredService<AdminPortal.Payroll.Commands.ConfirmNursePeriodPayment.ConfirmNursePeriodPaymentHandler>());

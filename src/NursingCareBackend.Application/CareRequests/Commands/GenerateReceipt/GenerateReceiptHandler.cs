@@ -13,7 +13,7 @@ public sealed record GenerateReceiptResponse(
     string ReceiptContentBase64
 );
 
-public sealed class GenerateReceiptHandler
+public sealed class GenerateReceiptHandler : IGenerateReceiptHandler
 {
     private readonly ICareRequestRepository _repository;
     private readonly IReceiptRepository _receiptRepository;

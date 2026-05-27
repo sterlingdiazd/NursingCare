@@ -559,6 +559,26 @@ public sealed class AppSecBillingRbacTests : IClassFixture<CustomWebApplicationF
     }
 
     // =========================================================================
+    // T2.1 — Pay auto-generates the receipt (retrievable without manual generate)
+    // =========================================================================
+
+    [Fact]
+    public async Task Pay_AutoGenerates_Receipt_Retrievable_Without_Manual_Generate()
+    {
+        // CreatePaidCareRequestAsync drives the request through /invoice then /pay. After T2.1, /pay
+        // auto-generates the receipt, so GET must return it WITHOUT a prior POST /receipt call.
+        var paidId = await CreatePaidCareRequestAsync("appsec-autoreceipt");
+        var adminClient = CreateAdminClient();
+
+        var getResponse = await adminClient.GetAsync($"/api/admin/care-requests/{paidId}/receipt");
+
+        getResponse.EnsureSuccessStatusCode();
+        var payload = await getResponse.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(payload.TryGetProperty("receiptNumber", out var num), "Missing 'receiptNumber' field");
+        Assert.False(string.IsNullOrEmpty(num.GetString()), "Auto-generated receipt must have a number");
+    }
+
+    // =========================================================================
     // RBAC + boundary — POST /api/admin/care-requests/{id}/credit-note (T1.4)
     // =========================================================================
 
