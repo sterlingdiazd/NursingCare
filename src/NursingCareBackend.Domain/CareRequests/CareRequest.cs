@@ -57,6 +57,19 @@ public sealed class CareRequest
     /// <summary>Reason the admin gave when rejecting a reported payment proof (back to Invoiced).</summary>
     public string? PaymentRejectionReason { get; private set; }
 
+    // Payment-reminder idempotency (T2.2). Payment is due as soon as the service is Completed; these
+    // stamps ensure the "2h after completion" nudge and the "next-day overdue" reminder each fire once.
+    public DateTime? PaymentDueReminderSentAtUtc { get; private set; }
+    public DateTime? PaymentOverdueReminderSentAtUtc { get; private set; }
+
+    /// <summary>True while the client still owes payment: the service is Completed or Invoiced but not
+    /// yet Paid. PaymentReported (client reported, awaiting admin verification), Paid, Voided and
+    /// Cancelled are all excluded by being different statuses. NOTE: the reminder worker mirrors this
+    /// predicate directly in its EF query (a computed property can't be translated to SQL) — keep the
+    /// two in sync if the owed-status set ever changes.</summary>
+    public bool IsPaymentOwed =>
+        Status == CareRequestStatus.Completed || Status == CareRequestStatus.Invoiced;
+
     private CareRequest() { } // For ORM
 
     private CareRequest(
@@ -331,6 +344,13 @@ public sealed class CareRequest
         PaymentRejectionReason = reason.Trim();
         UpdatedAtUtc = rejectedAtUtc;
     }
+
+    /// <summary>Records that the "payment due" reminder (2h after completion) was sent, so it is not
+    /// re-sent on every worker tick. Does not change status.</summary>
+    public void MarkPaymentDueReminderSent(DateTime at) => PaymentDueReminderSentAtUtc = at;
+
+    /// <summary>Records that the "payment overdue" reminder (next day) was sent. Does not change status.</summary>
+    public void MarkPaymentOverdueReminderSent(DateTime at) => PaymentOverdueReminderSentAtUtc = at;
 
     public void Void(string voidReason, DateTime voidedAtUtc)
     {

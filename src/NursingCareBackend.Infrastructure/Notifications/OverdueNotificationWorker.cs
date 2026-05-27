@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NursingCareBackend.Application.AdminPortal.Notifications;
 using NursingCareBackend.Application.Email;
+using NursingCareBackend.Application.Notifications;
 using NursingCareBackend.Domain.CareRequests;
 using NursingCareBackend.Infrastructure.Persistence;
 
@@ -48,6 +49,11 @@ public sealed class OverdueNotificationWorker : BackgroundService
             try
             {
                 var nowUtc = DateTime.UtcNow;
+
+                // Payment reminders are time-sensitive per request (2h after completion, then next
+                // day), so they run on EVERY tick — not gated to the once-a-day summary hour.
+                await ProcessPaymentRemindersAsync(nowUtc, stoppingToken);
+
                 if (nowUtc.Hour == _options.RunHourUtc)
                 {
                     if (await ShouldRunTodayAsync(nowUtc, stoppingToken))
@@ -108,6 +114,16 @@ public sealed class OverdueNotificationWorker : BackgroundService
         var currentDate = DateOnly.FromDateTime(runAtUtc);
         var staleCutoffUtc = runAtUtc.AddHours(-48);
 
+        // Overdue PAYMENTS (T2.2): services done but unpaid past the overdue window, folded into the
+        // daily summary so the admin sees collection risk alongside operational backlog.
+        var overduePaymentCutoff = runAtUtc.AddHours(-_options.OverduePaymentAfterHours);
+        var pagosVencidosCount = await db.CareRequests
+            .AsNoTracking()
+            .CountAsync(r =>
+                (r.Status == CareRequestStatus.Completed || r.Status == CareRequestStatus.Invoiced) &&
+                r.CompletedAtUtc != null && r.CompletedAtUtc <= overduePaymentCutoff,
+                cancellationToken);
+
         // Gather pending/overdue requests.
         var candidates = await db.CareRequests
             .AsNoTracking()
@@ -154,26 +170,28 @@ public sealed class OverdueNotificationWorker : BackgroundService
             "OverdueNotificationWorker: pendientes={P} vencidas={V} sinAsignar={U} monto={M:N2}",
             pendientesCount, vencidasCount, sinAsignarCount, montoEnJuego);
 
-        if (pendientesCount == 0 && vencidasCount == 0)
+        if (pendientesCount == 0 && vencidasCount == 0 && pagosVencidosCount == 0)
         {
             _logger.LogInformation("OverdueNotificationWorker: no pending/overdue items — skipping notifications");
             await PersistLastRunAsync(db, runAtUtc, cancellationToken);
             return;
         }
 
+        var requiresAction = pendientesCount > 0 || vencidasCount > 0 || pagosVencidosCount > 0;
+
         // In-app + push notification.
-        var notificationBody = BuildShortSummary(pendientesCount, vencidasCount, sinAsignarCount, montoEnJuego);
+        var notificationBody = BuildShortSummary(pendientesCount, vencidasCount, sinAsignarCount, montoEnJuego, pagosVencidosCount);
         await publisher.PublishToAdminsAsync(
             new AdminNotificationPublishRequest(
                 Category: "daily_admin_summary",
-                Severity: pendientesCount > 0 || vencidasCount > 0 ? "High" : "Medium",
+                Severity: requiresAction ? "High" : "Medium",
                 Title: $"Resumen diario — {pendientesCount} solicitudes pendientes",
                 Body: notificationBody,
                 EntityType: "SystemSummary",
                 EntityId: runAtUtc.ToString("yyyy-MM-dd"),
                 DeepLinkPath: DeepLinkPath,
                 Source: "Sistema",
-                RequiresAction: pendientesCount > 0 || vencidasCount > 0),
+                RequiresAction: requiresAction),
             cancellationToken);
 
         // Email.
@@ -189,17 +207,144 @@ public sealed class OverdueNotificationWorker : BackgroundService
             { "{{CtaDeepLink}}", DeepLinkPath },
         });
 
-        var subject = $"[NursingCare] Resumen diario {runAtUtc:dd/MM/yyyy} — {pendientesCount} pendientes, {vencidasCount} vencidas";
+        var pagosVencidosSubject = pagosVencidosCount > 0 ? $", {pagosVencidosCount} pagos vencidos" : string.Empty;
+        var subject = $"[NursingCare] Resumen diario {runAtUtc:dd/MM/yyyy} — {pendientesCount} pendientes, {vencidasCount} vencidas{pagosVencidosSubject}";
         await emailNotifier.SendToAdminsAsync(subject, htmlBody, cancellationToken);
 
         await PersistLastRunAsync(db, runAtUtc, cancellationToken);
         _logger.LogInformation("OverdueNotificationWorker: daily summary sent successfully");
     }
 
-    private static string BuildShortSummary(int pendientes, int vencidas, int sinAsignar, decimal monto)
+    /// <summary>
+    /// Per-tick payment reminders (T2.2). Payment is due as soon as a service is Completed. This sends,
+    /// once each: a "payment due" nudge to the client + admin <c>DuePaymentReminderAfterHours</c> after
+    /// completion, and a "payment overdue" reminder the next day (<c>OverduePaymentAfterHours</c>).
+    /// Idempotent via the per-request reminder timestamps. Public so tests can call it directly.
+    ///
+    /// Note: the stamps deliberately PERSIST across a payment rejection (PaymentReported -> Invoiced).
+    /// A rejection already notifies the client directly ("comprobante rechazado, reporta de nuevo"), and
+    /// the daily summary keeps counting the request as an overdue payment, so the admin still sees it —
+    /// re-arming a per-tick reminder would just double up on the rejection notice.
+    /// </summary>
+    public async Task ProcessPaymentRemindersAsync(DateTime nowUtc, CancellationToken cancellationToken)
     {
+        using var scope = _scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<NursingCareDbContext>();
+        var adminPublisher = scope.ServiceProvider.GetRequiredService<IAdminNotificationPublisher>();
+        var userPublisher = scope.ServiceProvider.GetRequiredService<IUserNotificationPublisher>();
+
+        var dueCutoff = nowUtc.AddHours(-_options.DuePaymentReminderAfterHours);
+        var overdueCutoff = nowUtc.AddHours(-_options.OverduePaymentAfterHours);
+
+        // Owed (service done, not yet paid/reported), completion known, at least one reminder pending.
+        var owed = await db.CareRequests
+            .Where(r =>
+                (r.Status == CareRequestStatus.Completed || r.Status == CareRequestStatus.Invoiced) &&
+                r.CompletedAtUtc != null &&
+                (r.PaymentDueReminderSentAtUtc == null || r.PaymentOverdueReminderSentAtUtc == null))
+            .ToListAsync(cancellationToken);
+
+        if (owed.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var r in owed)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var completedAt = r.CompletedAtUtc!.Value;
+
+            try
+            {
+                // Overdue takes precedence: if a request is already overdue, send the overdue reminder
+                // (and mark the "due" one sent too) instead of a now-stale "due" nudge.
+                //
+                // Stamp + persist BEFORE sending (at-most-once): the publishers commit on a separate
+                // path, so if we stamped AFTER and a mid-send failure occurred, the next tick would
+                // re-enter and DOUBLE-nag. For a reminder, a dropped nudge is far better than a
+                // duplicate, so we record "reminded" first; a send failure just means this nudge is
+                // skipped (the daily summary still surfaces it as an overdue payment).
+                if (r.PaymentOverdueReminderSentAtUtc == null && completedAt <= overdueCutoff)
+                {
+                    r.MarkPaymentOverdueReminderSent(nowUtc);
+                    if (r.PaymentDueReminderSentAtUtc == null)
+                    {
+                        r.MarkPaymentDueReminderSent(nowUtc);
+                    }
+                    await db.SaveChangesAsync(cancellationToken);
+                    await NotifyPaymentAsync(userPublisher, adminPublisher, r, overdue: true, cancellationToken);
+                }
+                else if (r.PaymentDueReminderSentAtUtc == null && completedAt <= dueCutoff)
+                {
+                    r.MarkPaymentDueReminderSent(nowUtc);
+                    await db.SaveChangesAsync(cancellationToken);
+                    await NotifyPaymentAsync(userPublisher, adminPublisher, r, overdue: false, cancellationToken);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                // One request failing must not abort the rest; it is retried next tick (flag unset).
+                _logger.LogError(ex, "Payment reminder failed for care request {CareRequestId}", r.Id);
+            }
+        }
+    }
+
+    private static async Task NotifyPaymentAsync(
+        IUserNotificationPublisher userPublisher,
+        IAdminNotificationPublisher adminPublisher,
+        CareRequest r,
+        bool overdue,
+        CancellationToken cancellationToken)
+    {
+        var category = overdue ? "payment_overdue" : "payment_due";
+        var severity = overdue ? "High" : "Medium";
+        var clientTitle = overdue ? "Pago vencido" : "Pago pendiente";
+        var clientBody = overdue
+            ? $"El pago de tu solicitud \"{r.Description}\" está VENCIDO. Por favor realiza el pago lo antes posible."
+            : $"El pago de tu solicitud \"{r.Description}\" está pendiente. Por favor realiza el pago.";
+
+        await userPublisher.PublishToUserAsync(
+            new UserNotificationPublishRequest(
+                RecipientUserId: r.UserID,
+                Category: category,
+                Severity: severity,
+                Title: clientTitle,
+                Body: clientBody,
+                EntityType: "CareRequest",
+                EntityId: r.Id.ToString(),
+                DeepLinkPath: $"/care-requests/{r.Id}",
+                Source: "Cobros",
+                RequiresAction: true),
+            cancellationToken);
+
+        var factura = string.IsNullOrWhiteSpace(r.InvoiceNumber) ? "pendiente" : r.InvoiceNumber;
+        var adminBody = overdue
+            ? $"Pago VENCIDO de la solicitud \"{r.Description}\" (factura {factura})."
+            : $"Pago pendiente de la solicitud \"{r.Description}\" (factura {factura}).";
+
+        await adminPublisher.PublishToAdminsAsync(
+            new AdminNotificationPublishRequest(
+                Category: category,
+                Severity: severity,
+                Title: overdue ? "Pago vencido" : "Pago pendiente",
+                Body: adminBody,
+                EntityType: "CareRequest",
+                EntityId: r.Id.ToString(),
+                DeepLinkPath: $"/admin/care-requests/{r.Id}",
+                Source: "Cobros",
+                RequiresAction: true),
+            cancellationToken);
+    }
+
+    private static string BuildShortSummary(int pendientes, int vencidas, int sinAsignar, decimal monto, int pagosVencidos)
+    {
+        var pagos = pagosVencidos > 0 ? $" {pagosVencidos} pago(s) vencido(s)." : string.Empty;
         return $"{pendientes} solicitudes pendientes, {vencidas} vencidas, {sinAsignar} sin asignar. " +
-               $"Monto en juego: RD$ {monto:N2}.";
+               $"Monto en juego: RD$ {monto:N2}.{pagos}";
     }
 
     private static string BuildRowsMarkdown(
