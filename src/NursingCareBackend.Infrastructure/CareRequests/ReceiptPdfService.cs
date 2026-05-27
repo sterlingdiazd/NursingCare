@@ -1,7 +1,5 @@
 using System.Globalization;
-using Microsoft.Extensions.Options;
 using NursingCareBackend.Application.CareRequests;
-using NursingCareBackend.Infrastructure.Fiscal;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
@@ -12,15 +10,27 @@ public sealed class ReceiptPdfService : IReceiptPdfService
 {
     private static readonly CultureInfo DominicanCulture = new("es-DO");
 
-    private readonly FiscalOptions _fiscal;
+    private readonly IFiscalSettingsProvider _fiscalProvider;
 
-    public ReceiptPdfService(IOptions<FiscalOptions> fiscal)
+    public ReceiptPdfService(IFiscalSettingsProvider fiscalProvider)
     {
-        _fiscal = fiscal.Value;
+        _fiscalProvider = fiscalProvider;
     }
 
-    public byte[] Generate(ReceiptPdfData data)
+    public async Task<byte[]> GenerateAsync(ReceiptPdfData data, CancellationToken cancellationToken = default)
     {
+        // Read the issuer fiscal config fresh from the owner-editable SystemSettings (FISCAL_*),
+        // falling back to appsettings inside the provider. Resolving per call keeps RNC / ITBIS /
+        // legal footer / currency edits live without a redeploy.
+        var fiscal = await _fiscalProvider.GetAsync(cancellationToken);
+
+        // Amounts are formatted with the configured currency code (e.g. DOP -> RD$). The es-DO
+        // culture drives grouping/decimals; we override the currency symbol from the setting so a
+        // currency change is reflected on the document.
+        var currencyFormat = (NumberFormatInfo)DominicanCulture.NumberFormat.Clone();
+        currencyFormat.CurrencySymbol = ResolveCurrencySymbol(fiscal.CurrencyCode);
+        string Money(decimal amount) => amount.ToString("C2", currencyFormat);
+
         // A document is a formal fiscal comprobante (e-NCF) only when the request carries an issued
         // NCF; otherwise it is a non-fiscal proforma / cuenta de cobro keyed by the SOL- number.
         var isFiscal = !string.IsNullOrWhiteSpace(data.Ncf);
@@ -42,8 +52,8 @@ public sealed class ReceiptPdfService : IReceiptPdfService
                             ? "COMPROBANTE FISCAL ELECTRÓNICO (e-NCF)"
                             : "PROFORMA / CUENTA DE COBRO DE SERVICIOS DE ENFERMERÍA")
                         .SemiBold().FontSize(13).AlignCenter();
-                    if (isFiscal && !string.IsNullOrWhiteSpace(_fiscal.Rnc))
-                        col.Item().Text($"RNC: {_fiscal.Rnc}").FontSize(10).AlignCenter();
+                    if (isFiscal && !string.IsNullOrWhiteSpace(fiscal.Rnc))
+                        col.Item().Text($"RNC: {fiscal.Rnc}").FontSize(10).AlignCenter();
                     col.Item().Text(isFiscal
                             ? $"e-NCF: {data.Ncf}"
                             : $"Documento No: {data.ReceiptNumber}")
@@ -92,10 +102,10 @@ public sealed class ReceiptPdfService : IReceiptPdfService
                             table.Cell().Text("e-NCF:").SemiBold();
                             table.Cell().Text(data.Ncf!);
 
-                            if (!string.IsNullOrWhiteSpace(_fiscal.Rnc))
+                            if (!string.IsNullOrWhiteSpace(fiscal.Rnc))
                             {
                                 table.Cell().Text("RNC emisor:").SemiBold();
-                                table.Cell().Text(_fiscal.Rnc!);
+                                table.Cell().Text(fiscal.Rnc!);
                             }
 
                             table.Cell().Text("Fecha de emisión:").SemiBold();
@@ -127,31 +137,31 @@ public sealed class ReceiptPdfService : IReceiptPdfService
                             columns.RelativeColumn(3);
                         });
 
-                        if (isFiscal && _fiscal.ItbisRatePercent > 0m)
+                        if (isFiscal && fiscal.ItbisRatePercent > 0m)
                         {
                             // ITBIS shown for transparency on the fiscal comprobante. Health services
                             // are typically exempt (rate 0), so this row only appears when configured.
-                            var rate = _fiscal.ItbisRatePercent / 100m;
+                            var rate = fiscal.ItbisRatePercent / 100m;
                             var taxableBase = decimal.Round(data.Total / (1m + rate), 2, MidpointRounding.AwayFromZero);
                             var itbis = decimal.Round(data.Total - taxableBase, 2, MidpointRounding.AwayFromZero);
 
                             table.Cell().Text("Base imponible:").SemiBold();
-                            table.Cell().Text(taxableBase.ToString("C2", DominicanCulture)).AlignRight();
+                            table.Cell().Text(Money(taxableBase)).AlignRight();
 
-                            table.Cell().Text($"ITBIS ({_fiscal.ItbisRatePercent:0.##}%):").SemiBold();
-                            table.Cell().Text(itbis.ToString("C2", DominicanCulture)).AlignRight();
+                            table.Cell().Text($"ITBIS ({fiscal.ItbisRatePercent:0.##}%):").SemiBold();
+                            table.Cell().Text(Money(itbis)).AlignRight();
                         }
 
                         table.Cell().Text("TOTAL PAGADO:").SemiBold().FontSize(13);
-                        table.Cell().Text(data.Total.ToString("C2", DominicanCulture)).SemiBold().FontSize(13).AlignRight();
+                        table.Cell().Text(Money(data.Total)).SemiBold().FontSize(13).AlignRight();
                     });
                     col.Item().PaddingTop(4).LineHorizontal(1);
                 });
 
                 page.Footer().AlignCenter().Column(footer =>
                 {
-                    if (isFiscal && !string.IsNullOrWhiteSpace(_fiscal.LegalFooter))
-                        footer.Item().Text(_fiscal.LegalFooter!).FontSize(8);
+                    if (isFiscal && !string.IsNullOrWhiteSpace(fiscal.LegalFooter))
+                        footer.Item().Text(fiscal.LegalFooter!).FontSize(8);
 
                     if (!isFiscal)
                         footer.Item().Text("Este documento es una proforma / cuenta de cobro y no constituye un comprobante fiscal.")
@@ -166,4 +176,15 @@ public sealed class ReceiptPdfService : IReceiptPdfService
             });
         }).GeneratePdf();
     }
+
+    // Map the configured ISO currency code to the symbol shown on the document. DOP keeps the
+    // Dominican "RD$"; unknown codes fall back to the code itself so totals stay unambiguous.
+    private static string ResolveCurrencySymbol(string currencyCode) => currencyCode?.Trim().ToUpperInvariant() switch
+    {
+        "DOP" => "RD$",
+        "USD" => "US$",
+        "EUR" => "€",
+        null or "" => "RD$",
+        var code => $"{code} ",
+    };
 }

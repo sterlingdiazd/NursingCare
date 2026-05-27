@@ -56,7 +56,7 @@ public sealed class PayCareRequestHandler
         // persist it on the request. This is the single point where a fiscal sequence number is
         // burned — completions and pre-payment voids never reach here, so the sequence has no gaps.
         // When fiscal mode is off (today's default) nothing extra happens: Ncf stays null.
-        if (_invoiceNumbers.IsFiscalModeEnabled && careRequest.Ncf is null)
+        if (await _invoiceNumbers.IsFiscalModeEnabledAsync(cancellationToken) && careRequest.Ncf is null)
         {
             var ncf = await _invoiceNumbers.NextFiscalNcfAsync(command.PaymentDate, cancellationToken);
             careRequest.IssueFiscalReceipt(ncf, command.PaymentDate);

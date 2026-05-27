@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using NursingCareBackend.Application.AdminPortal.Payroll;
 using NursingCareBackend.Application.AdminPortal.Reports;
 using NursingCareBackend.Domain.CareRequests;
 using NursingCareBackend.Domain.Identity;
@@ -14,10 +15,12 @@ namespace NursingCareBackend.Infrastructure.AdminPortal;
 public sealed class AdminReportsRepository : IAdminReportsRepository
 {
     private readonly NursingCareDbContext _dbContext;
+    private readonly IPayrollSchedulePolicy _schedulePolicy;
 
-    public AdminReportsRepository(NursingCareDbContext dbContext)
+    public AdminReportsRepository(NursingCareDbContext dbContext, IPayrollSchedulePolicy schedulePolicy)
     {
         _dbContext = dbContext;
+        _schedulePolicy = schedulePolicy;
     }
 
     private static IQueryable<CareRequest> FilterCareRequestsByDate(IQueryable<CareRequest> query, DateOnly? from, DateOnly? to)
@@ -408,7 +411,8 @@ public sealed class AdminReportsRepository : IAdminReportsRepository
             .OrderByDescending(row => row.NetCompensation)
             .ToList();
 
-        var resolvedCutoffDate = payrollPeriod?.CutoffDate ?? periodEnd.AddDays(-2);
+        var resolvedCutoffDate = payrollPeriod?.CutoffDate
+            ?? await _schedulePolicy.ResolveCutoffDateAsync(periodEnd, cancellationToken);
         var resolvedPaymentDate = payrollPeriod?.PaymentDate ?? periodEnd;
         var periodLabel = $"{periodStart:yyyy-MM-dd} al {periodEnd:yyyy-MM-dd}";
 

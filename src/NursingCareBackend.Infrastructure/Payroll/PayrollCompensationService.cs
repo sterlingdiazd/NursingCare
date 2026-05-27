@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using NursingCareBackend.Application.AdminPortal.Payroll;
 using NursingCareBackend.Application.Payroll;
 using NursingCareBackend.Domain.CareRequests;
 using NursingCareBackend.Domain.Identity;
@@ -10,10 +11,12 @@ namespace NursingCareBackend.Infrastructure.Payroll;
 public sealed class PayrollCompensationService : IPayrollCompensationService
 {
     private readonly NursingCareDbContext _dbContext;
+    private readonly IPayrollSchedulePolicy _schedulePolicy;
 
-    public PayrollCompensationService(NursingCareDbContext dbContext)
+    public PayrollCompensationService(NursingCareDbContext dbContext, IPayrollSchedulePolicy schedulePolicy)
     {
         _dbContext = dbContext;
+        _schedulePolicy = schedulePolicy;
     }
 
     public async Task RecordExecutionForCompletedCareRequestAsync(CareRequest careRequest, CancellationToken cancellationToken)
@@ -253,7 +256,8 @@ public sealed class PayrollCompensationService : IPayrollCompensationService
         var endDate = serviceDate.Day <= 15
             ? new DateOnly(serviceDate.Year, serviceDate.Month, 15)
             : new DateOnly(serviceDate.Year, serviceDate.Month, DateTime.DaysInMonth(serviceDate.Year, serviceDate.Month));
-        var cutoffDate = endDate.AddDays(-2);
+        // Cutoff offset is owner-configurable (PAYROLL_CUTOFF_DAYS_BEFORE_END; default 2).
+        var cutoffDate = await _schedulePolicy.ResolveCutoffDateAsync(endDate, cancellationToken);
         var paymentDate = endDate;
 
         var created = PayrollPeriod.Create(startDate, endDate, cutoffDate, paymentDate, createdAtUtc);

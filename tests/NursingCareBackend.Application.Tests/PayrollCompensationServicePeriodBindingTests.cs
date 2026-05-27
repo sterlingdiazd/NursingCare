@@ -122,7 +122,7 @@ public sealed class PayrollCompensationServicePeriodBindingTests : IDisposable
     var completedAtUtc = new DateTime(2026, 3, 20, 12, 0, 0, DateTimeKind.Utc);
     var careRequest = CreateCompletedDomicilioRequest(completedAtUtc);
 
-    var service = new PayrollCompensationService(dbContext);
+    var service = new PayrollCompensationService(dbContext, new PayrollSchedulePolicy(dbContext));
 
     // Act
     await service.RecordExecutionForCompletedCareRequestAsync(careRequest, CancellationToken.None);
@@ -150,7 +150,7 @@ public sealed class PayrollCompensationServicePeriodBindingTests : IDisposable
     var completedAtUtc = new DateTime(2026, 4, 20, 12, 0, 0, DateTimeKind.Utc);
     var careRequest = CreateCompletedDomicilioRequest(completedAtUtc);
 
-    var service = new PayrollCompensationService(dbContext);
+    var service = new PayrollCompensationService(dbContext, new PayrollSchedulePolicy(dbContext));
 
     // Act
     await service.RecordExecutionForCompletedCareRequestAsync(careRequest, CancellationToken.None);

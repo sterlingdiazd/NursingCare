@@ -1,7 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 using NursingCareBackend.Application.CareRequests;
-using NursingCareBackend.Infrastructure.Fiscal;
 using NursingCareBackend.Infrastructure.Persistence;
 
 namespace NursingCareBackend.Infrastructure.CareRequests;
@@ -21,15 +19,16 @@ namespace NursingCareBackend.Infrastructure.CareRequests;
 public sealed class InvoiceNumberGenerator : IInvoiceNumberGenerator
 {
     private readonly NursingCareDbContext _dbContext;
-    private readonly IOptions<FiscalOptions> _fiscal;
+    private readonly IFiscalSettingsProvider _fiscal;
 
-    public InvoiceNumberGenerator(NursingCareDbContext dbContext, IOptions<FiscalOptions> fiscal)
+    public InvoiceNumberGenerator(NursingCareDbContext dbContext, IFiscalSettingsProvider fiscal)
     {
         _dbContext = dbContext;
         _fiscal = fiscal;
     }
 
-    public bool IsFiscalModeEnabled => _fiscal.Value.NcfEnabled;
+    public async Task<bool> IsFiscalModeEnabledAsync(CancellationToken cancellationToken = default)
+        => (await _fiscal.GetAsync(cancellationToken)).NcfEnabled;
 
     public async Task<string> NextProformaAsync(DateTime invoiceDateUtc, CancellationToken cancellationToken)
     {
@@ -40,7 +39,7 @@ public sealed class InvoiceNumberGenerator : IInvoiceNumberGenerator
             .AsNoTracking()
             .CountAsync(c => c.InvoicedAtUtc >= monthStart && c.InvoicedAtUtc < monthEnd, cancellationToken) + 1;
 
-        var f = _fiscal.Value;
+        var f = await _fiscal.GetAsync(cancellationToken);
         return $"{f.InvoiceNumberPrefix}-{invoiceDateUtc:yyyyMM}-{seq:D4}";
     }
 
@@ -52,7 +51,7 @@ public sealed class InvoiceNumberGenerator : IInvoiceNumberGenerator
             .AsNoTracking()
             .CountAsync(c => c.NcfIssuedAtUtc != null, cancellationToken) + 1;
 
-        var f = _fiscal.Value;
+        var f = await _fiscal.GetAsync(cancellationToken);
         return $"{f.NcfType}{seq:D10}";
     }
 }

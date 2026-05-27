@@ -178,6 +178,8 @@ public static class DependencyInjection
         services.AddScoped<ICatalogOptionsService, CatalogOptionsService>();
         services.AddScoped<IAdminCatalogManagementService, AdminCatalogManagementService>();
         services.AddScoped<IAdminSettingsManagementService, AdminSettingsManagementService>();
+        services.AddScoped<NursingCareBackend.Application.AdminPortal.Payroll.IPayrollSchedulePolicy,
+            NursingCareBackend.Infrastructure.Payroll.PayrollSchedulePolicy>();
         services.AddScoped<IPayrollCompensationService, PayrollCompensationService>();
         services.AddScoped<IPayrollRecalculationService, PayrollRecalculationService>();
         services.AddScoped<IAdminPayrollOverrideRepository, AdminPayrollOverrideRepository>();
@@ -198,6 +200,11 @@ public static class DependencyInjection
 
         services.Configure<NursingCareBackend.Infrastructure.Fiscal.FiscalOptions>(
             configuration.GetSection(NursingCareBackend.Infrastructure.Fiscal.FiscalOptions.SectionName));
+        // Fiscal/invoicing config is read live from the owner-editable SystemSettings (FISCAL_*),
+        // falling back to appsettings FiscalOptions. Mirrors CompanyInfoProvider so edits apply
+        // without a redeploy. Consumed by InvoiceNumberGenerator and ReceiptPdfService.
+        services.AddScoped<NursingCareBackend.Application.CareRequests.IFiscalSettingsProvider,
+            NursingCareBackend.Infrastructure.Fiscal.FiscalSettingsProvider>();
         services.AddScoped<NursingCareBackend.Application.CareRequests.IInvoiceNumberGenerator,
             NursingCareBackend.Infrastructure.CareRequests.InvoiceNumberGenerator>();
 

@@ -207,10 +207,10 @@ file sealed class FakePaymentValidationRepository : IPaymentValidationRepository
 
 file sealed class FakeReceiptPdfService(Action<ReceiptPdfData> onGenerate) : IReceiptPdfService
 {
-    public byte[] Generate(ReceiptPdfData data)
+    public Task<byte[]> GenerateAsync(ReceiptPdfData data, CancellationToken cancellationToken = default)
     {
         onGenerate(data);
-        return new byte[] { 0x25, 0x50, 0x44, 0x46 }; // %PDF
+        return Task.FromResult(new byte[] { 0x25, 0x50, 0x44, 0x46 }); // %PDF
     }
 }
 

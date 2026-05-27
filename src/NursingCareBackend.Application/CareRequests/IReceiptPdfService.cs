@@ -24,5 +24,8 @@ public sealed record ReceiptPdfData(
 
 public interface IReceiptPdfService
 {
-    byte[] Generate(ReceiptPdfData data);
+    /// <summary>Renders the receipt/comprobante PDF. Async because the issuer fiscal config
+    /// (RNC, ITBIS rate, legal footer, currency) is resolved live from the owner-editable
+    /// SystemSettings (FISCAL_*) via <c>IFiscalSettingsProvider</c>, so edits apply without a redeploy.</summary>
+    Task<byte[]> GenerateAsync(ReceiptPdfData data, CancellationToken cancellationToken = default);
 }

@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 using NursingCareBackend.Application.AdminPortal.Auditing;
 using NursingCareBackend.Application.AdminPortal.Notifications;
 using NursingCareBackend.Application.CareRequests;
@@ -10,7 +9,6 @@ using NursingCareBackend.Application.Notifications;
 using NursingCareBackend.Application.Payroll;
 using NursingCareBackend.Domain.CareRequests;
 using NursingCareBackend.Infrastructure.CareRequests;
-using NursingCareBackend.Infrastructure.Fiscal;
 using NursingCareBackend.Infrastructure.Persistence;
 using NursingCareBackend.Tests.Infrastructure;
 using Xunit;
@@ -43,7 +41,7 @@ public sealed class EncfDecouplingTests : IDisposable
     }
 
     private static InvoiceNumberGenerator Generator(NursingCareDbContext db, bool ncfEnabled) =>
-        new(db, Options.Create(new FiscalOptions { NcfEnabled = ncfEnabled, NcfType = "E32", InvoiceNumberPrefix = "SOL" }));
+        new(db, new FakeFiscalSettingsProvider(ncfEnabled, ncfType: "E32", invoicePrefix: "SOL"));
 
     private static CareRequest NewApprovedRequest()
     {
@@ -306,5 +304,24 @@ public sealed class EncfDecouplingTests : IDisposable
     {
         public Task PublishToUserAsync(UserNotificationPublishRequest request, CancellationToken cancellationToken = default)
             => Task.CompletedTask;
+    }
+
+    // Stand-in for the live SystemSettings-backed provider: this suite locks the NCF sequencing math,
+    // not the settings plumbing, so a fixed FiscalSettings is sufficient.
+    private sealed class FakeFiscalSettingsProvider : IFiscalSettingsProvider
+    {
+        private readonly FiscalSettings _settings;
+        public FakeFiscalSettingsProvider(bool ncfEnabled, string ncfType, string invoicePrefix)
+            => _settings = new FiscalSettings(
+                Rnc: null,
+                ItbisRatePercent: 0m,
+                NcfEnabled: ncfEnabled,
+                NcfType: ncfType,
+                InvoiceNumberPrefix: invoicePrefix,
+                CurrencyCode: "DOP",
+                LegalFooter: null);
+
+        public Task<FiscalSettings> GetAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(_settings);
     }
 }

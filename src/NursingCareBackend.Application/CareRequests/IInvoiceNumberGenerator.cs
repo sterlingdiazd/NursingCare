@@ -15,10 +15,12 @@ namespace NursingCareBackend.Application.CareRequests;
 /// </summary>
 public interface IInvoiceNumberGenerator
 {
-    /// <summary>True when the business runs in DGII fiscal mode (<c>FiscalOptions.NcfEnabled</c>),
-    /// meaning a formal e-NCF must be issued at payment confirmation. The Application layer reads
-    /// this through the generator so it never has to depend on Infrastructure's FiscalOptions.</summary>
-    bool IsFiscalModeEnabled { get; }
+    /// <summary>True when the business runs in DGII fiscal mode (FISCAL_NCF_ENABLED), meaning a
+    /// formal e-NCF must be issued at payment confirmation. Resolved live from the owner-editable
+    /// SystemSettings via <c>IFiscalSettingsProvider</c> (async because it reads the DB), so toggling
+    /// the setting takes effect without a redeploy. The Application layer reads this through the
+    /// generator so it never has to depend on Infrastructure's FiscalOptions.</summary>
+    Task<bool> IsFiscalModeEnabledAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Next NON-fiscal proforma number ({Prefix}-yyyyMM-####), counted by month over
     /// <c>InvoicedAtUtc</c>. Always this scheme — never an e-NCF.</summary>

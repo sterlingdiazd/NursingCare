@@ -107,10 +107,12 @@ public sealed class GetClientReceiptHandler
       Ncf: careRequest.Ncf,
       NcfIssuedAtUtc: careRequest.NcfIssuedAtUtc);
 
+    var pdfBytes = await _receiptPdfService.GenerateAsync(pdfData, cancellationToken);
+
     var receipt = Receipt.Create(
       careRequestId: careRequest.Id,
       receiptNumber: receiptNumber,
-      receiptContent: _receiptPdfService.Generate(pdfData),
+      receiptContent: pdfBytes,
       generatedByUserId: clientUserId,
       generatedAtUtc: generatedAtUtc);
 

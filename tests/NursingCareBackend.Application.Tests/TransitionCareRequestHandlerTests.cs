@@ -235,7 +235,8 @@ public sealed class TransitionCareRequestHandlerTests
 
   private sealed class FakeInvoiceNumberGenerator : IInvoiceNumberGenerator
   {
-    public bool IsFiscalModeEnabled => false;
+    public Task<bool> IsFiscalModeEnabledAsync(CancellationToken cancellationToken = default)
+      => Task.FromResult(false);
 
     public Task<string> NextProformaAsync(DateTime invoiceDateUtc, CancellationToken cancellationToken)
       => Task.FromResult("SOL-202604-0001");
