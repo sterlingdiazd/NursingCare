@@ -36,8 +36,12 @@ public sealed record CareRequestResponse(
   decimal? SubtotalBeforeSupplies,
   // Billing fields — visible to the owning client (their own price + invoice/payment status only).
   // Nurse pay, cost, and margin internals are intentionally excluded from this DTO.
+  // InvoiceNumber is the non-fiscal proforma (SOL-); Ncf is the fiscal comprobante, set only once
+  // payment is confirmed in fiscal mode.
   string? InvoiceNumber,
   DateTime? InvoicedAtUtc,
+  string? Ncf,
+  DateTime? NcfIssuedAtUtc,
   DateTime? PaidAtUtc,
   DateTime? VoidedAtUtc,
   string PaymentStatus)
@@ -90,6 +94,8 @@ public sealed record CareRequestResponse(
       careRequest.SubtotalBeforeSupplies,
       careRequest.InvoiceNumber,
       careRequest.InvoicedAtUtc,
+      careRequest.Ncf,
+      careRequest.NcfIssuedAtUtc,
       careRequest.PaidAtUtc,
       careRequest.VoidedAtUtc,
       DerivePaymentStatus(careRequest));

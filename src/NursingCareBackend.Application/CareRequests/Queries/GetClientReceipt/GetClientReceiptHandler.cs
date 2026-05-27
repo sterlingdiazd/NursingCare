@@ -103,7 +103,9 @@ public sealed class GetClientReceiptHandler
       PaidAtUtc: careRequest.PaidAtUtc!.Value,
       BankReference: paymentValidation?.BankReference ?? string.Empty,
       GeneratedAtUtc: generatedAtUtc,
-      CompanyName: companyInfo.Name);
+      CompanyName: companyInfo.Name,
+      Ncf: careRequest.Ncf,
+      NcfIssuedAtUtc: careRequest.NcfIssuedAtUtc);
 
     var receipt = Receipt.Create(
       careRequestId: careRequest.Id,

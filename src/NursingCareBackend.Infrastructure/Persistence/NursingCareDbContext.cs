@@ -117,6 +117,8 @@ public sealed class NursingCareDbContext : DbContext
 
                      builder.Property(x => x.InvoiceNumber).HasMaxLength(50);
                      builder.Property(x => x.InvoicedAtUtc);
+                     builder.Property(x => x.Ncf).HasMaxLength(19);
+                     builder.Property(x => x.NcfIssuedAtUtc);
                      builder.Property(x => x.PaidAtUtc);
                      builder.Property(x => x.VoidedAtUtc);
                      builder.Property(x => x.VoidReason).HasMaxLength(500);

@@ -14,7 +14,12 @@ public sealed record ReceiptPdfData(
     DateTime PaidAtUtc,
     string BankReference,
     DateTime GeneratedAtUtc,
-    string CompanyName = "NursingCare"
+    string CompanyName = "NursingCare",
+    // Dominican fiscal comprobante (e-NCF). When non-null, the document is a formal fiscal receipt
+    // and shows the NCF + issuer RNC + ITBIS + legal footer. When null, it is a non-fiscal proforma
+    // / cuenta de cobro labelled with the SOL- InvoiceNumber.
+    string? Ncf = null,
+    DateTime? NcfIssuedAtUtc = null
 );
 
 public interface IReceiptPdfService
