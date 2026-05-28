@@ -114,7 +114,7 @@ public sealed class ConfirmNursePeriodPaymentHandler : IConfirmNursePeriodPaymen
         //    The nurse is a User, resolved the same way the handler resolves the admin user.
         var nurse = await _userRepository.GetByIdAsync(command.NurseUserId, cancellationToken);
         var nurseEmail = nurse?.Email;
-        var whatsappUrl = BuildWhatsappUrl(nurse?.Phone, periodLabel, out var whatsappRedirectedToDemo);
+        var whatsappUrl = BuildWhatsappUrl(_demoComms, nurse?.Phone, periodLabel, out var whatsappRedirectedToDemo);
 
         // 5. Generate the voucher PDF, GATE it through the financial-output validator, and only
         //    then email it to the NURSE. Delivery is best-effort for the demo, but a financial
@@ -283,21 +283,21 @@ public sealed class ConfirmNursePeriodPaymentHandler : IConfirmNursePeriodPaymen
     /// WhatsApps a real nurse. <paramref name="redirectedToDemo"/> reports whether the redirect
     /// applied. Returns "" when no usable phone is available.
     /// </summary>
-    private string BuildWhatsappUrl(string? nursePhone, string periodLabel, out bool redirectedToDemo)
+    internal static string BuildWhatsappUrl(DemoCommunicationsOptions demoComms, string? nursePhone, string periodLabel, out bool redirectedToDemo)
     {
         redirectedToDemo = false;
 
         // Fail-closed: demo mode ON but no demo phone configured -> suppress the link rather than
         // build a wa.me to the REAL nurse. A half-configured demo must never message a real recipient.
-        if (_demoComms.Enabled && string.IsNullOrWhiteSpace(_demoComms.ContactPhone))
+        if (demoComms.Enabled && string.IsNullOrWhiteSpace(demoComms.ContactPhone))
         {
             return string.Empty;
         }
 
         var targetPhone = nursePhone;
-        if (_demoComms.Enabled && !string.IsNullOrWhiteSpace(_demoComms.ContactPhone))
+        if (demoComms.Enabled && !string.IsNullOrWhiteSpace(demoComms.ContactPhone))
         {
-            targetPhone = _demoComms.ContactPhone;
+            targetPhone = demoComms.ContactPhone;
             redirectedToDemo = true;
         }
 

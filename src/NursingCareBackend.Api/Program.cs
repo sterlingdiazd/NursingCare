@@ -42,6 +42,16 @@ var app = builder.Build();
 
 app.LogDatabaseConfiguration();
 
+// Ops safety net: the background workers (push dispatch, payment reminders, daily overdue summary)
+// only register when BackgroundWorkers:Disabled is false (see Infrastructure DI). If the flag is set,
+// those run silently never — warn loudly at startup so a misconfigured demo/env is obvious.
+if (builder.Configuration.GetValue<bool>("BackgroundWorkers:Disabled"))
+{
+    app.Logger.LogWarning(
+        "Background workers are DISABLED (BackgroundWorkers:Disabled=true): push notifications, " +
+        "payment reminders, and the daily overdue summary will NOT run.");
+}
+
 // --- Begin automatic migration ---
 app.ApplyMigrations();
 // --- End automatic migration ---
