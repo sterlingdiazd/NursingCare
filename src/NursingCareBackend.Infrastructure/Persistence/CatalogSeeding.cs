@@ -499,6 +499,10 @@ public static class CatalogSeeding
             Name = "Test",
             LastName = "Client",
             DisplayName = "Test Client",
+            // Profile fields shown on the client "Mi perfil" screen — cédula (11 digits) and
+            // teléfono (10 digits) per the identity-validation rules, so the seeded client is complete.
+            IdentificationNumber = "40212345678",
+            Phone = "8095551234",
             PasswordHash = HashPassword("12345678"),
             IsActive = true,
             CreatedAtUtc = DateTime.UtcNow

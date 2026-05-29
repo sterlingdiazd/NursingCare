@@ -37,7 +37,11 @@ public sealed record PayrollScheduleConfig(
 /// </summary>
 public static class PayrollScheduleCalculator
 {
-    public static (DateOnly Cutoff, DateOnly Payment) Compute(DateOnly start, DateOnly end, PayrollScheduleConfig config)
+    public static (DateOnly Cutoff, DateOnly Payment) Compute(
+        DateOnly start,
+        DateOnly end,
+        PayrollScheduleConfig config,
+        int cutoffDaysBeforeEnd = 2)
     {
         config ??= PayrollScheduleConfig.Default;
 
@@ -71,9 +75,10 @@ public static class PayrollScheduleCalculator
             payment = start;
         }
 
-        // Backend invariant: cutoff in [start, end] and payment >= cutoff. Start from end − 2,
-        // then pull cutoff back so it never exceeds payment, and clamp to be >= start.
-        var cutoff = end.AddDays(-2);
+        // Backend invariant: cutoff in [start, end] and payment >= cutoff. Start from the
+        // owner-configured cutoff (end − cutoffDaysBeforeEnd), then pull it back so it never
+        // exceeds payment, and clamp to be >= start.
+        var cutoff = end.AddDays(-Math.Max(0, cutoffDaysBeforeEnd));
         if (cutoff > payment)
         {
             cutoff = payment;

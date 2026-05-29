@@ -17,20 +17,20 @@ public interface IAdminPayrollRepository
         DateOnly paymentDate,
         CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Closes a payroll period. Re-evaluates close warnings inside the close path: when warnings
+    /// exist and <paramref name="acknowledgeWarnings"/> is false, returns
+    /// <see cref="PeriodCloseResult.RequiresConfirmation"/> without locking the period. This keeps
+    /// the safe-close gate authoritative at close time regardless of any stale preflight.
+    /// </summary>
     Task<PeriodCloseResult> ClosePeriodAsync(
         Guid periodId,
+        bool acknowledgeWarnings,
         CancellationToken cancellationToken);
 
     /// <summary>Advisory checks an admin must acknowledge before closing a period.</summary>
     Task<PeriodCloseWarnings> GetCloseWarningsAsync(
         Guid periodId,
-        CancellationToken cancellationToken);
-
-    /// <summary>Reopens a closed period (audited). Returns the outcome of the transition.</summary>
-    Task<PeriodReopenResult> ReopenPeriodAsync(
-        Guid periodId,
-        string reason,
-        Guid? reopenedByUserId,
         CancellationToken cancellationToken);
 
     Task<PeriodMutationResult> UpdatePeriodAsync(

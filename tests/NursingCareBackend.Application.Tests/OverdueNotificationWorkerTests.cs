@@ -17,8 +17,10 @@ namespace NursingCareBackend.Application.Tests;
 /// and email composition with real SQL Server state.
 /// The template-only test is fully in-memory.
 /// </summary>
-public sealed class OverdueNotificationWorkerTests
+public sealed class OverdueNotificationWorkerTests : IDisposable
 {
+    private readonly List<string> _createdConnectionStrings = new();
+
     // -----------------------------------------------------------------------
     // Fakes
     // -----------------------------------------------------------------------
@@ -38,9 +40,10 @@ public sealed class OverdueNotificationWorkerTests
     // Helpers
     // -----------------------------------------------------------------------
 
-    private static NursingCareDbContext CreateSqlServerDbContext()
+    private NursingCareDbContext CreateSqlServerDbContext()
     {
         var connectionString = TestSqlConnectionResolver.CreateUniqueDatabaseConnectionString();
+        _createdConnectionStrings.Add(connectionString);
         var options = new DbContextOptionsBuilder<NursingCareDbContext>()
             .UseSqlServer(connectionString)
             .Options;
@@ -159,5 +162,25 @@ public sealed class OverdueNotificationWorkerTests
         Assert.Contains("12,600.00", html);
         Assert.Contains("/admin/care-requests?view=overdue", html);
         Assert.DoesNotContain("{{", html); // no unresolved placeholders
+    }
+
+    // -----------------------------------------------------------------------
+    // Teardown
+    // -----------------------------------------------------------------------
+
+    public void Dispose()
+    {
+        foreach (var connectionString in _createdConnectionStrings)
+        {
+            try
+            {
+                var options = new DbContextOptionsBuilder<NursingCareDbContext>()
+                    .UseSqlServer(connectionString)
+                    .Options;
+                using var db = new NursingCareDbContext(options);
+                db.Database.EnsureDeleted();
+            }
+            catch { /* best-effort teardown; never fail the run */ }
+        }
     }
 }

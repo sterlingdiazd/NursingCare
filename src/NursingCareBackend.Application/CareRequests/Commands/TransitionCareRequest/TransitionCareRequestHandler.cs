@@ -89,10 +89,12 @@ public sealed class TransitionCareRequestHandler
     {
       await _payrollCompensationService.RecordExecutionForCompletedCareRequestAsync(careRequest, cancellationToken);
 
-      // Auto-generate the invoice the moment the service is completed (Completed -> Invoiced),
-      // so the client can pay and report the payment. Number scheme is configurable (FiscalOptions).
-      var invoiceNumber = await _invoiceNumbers.NextAsync(transitionedAtUtc, cancellationToken);
-      careRequest.Invoice(invoiceNumber, transitionedAtUtc);
+      // On completion we ALWAYS assign a NON-fiscal proforma / cuenta de cobro (SOL-yyyyMM-####),
+      // never a DGII e-NCF — regardless of FiscalOptions.NcfEnabled. The formal e-NCF (when fiscal
+      // mode is on) is only emitted when the admin confirms payment, so voids before payment never
+      // burn a fiscal sequence number. Status flow is unchanged (Completed -> Invoiced).
+      var proformaNumber = await _invoiceNumbers.NextProformaAsync(transitionedAtUtc, cancellationToken);
+      careRequest.Invoice(proformaNumber, transitionedAtUtc);
       await _repository.UpdateAsync(careRequest, cancellationToken);
 
       await _auditService.WriteAsync(
@@ -102,7 +104,7 @@ public sealed class TransitionCareRequestHandler
           Action: "Invoice",
           EntityType: "CareRequest",
           EntityId: careRequest.Id.ToString(),
-          Notes: $"Factura {invoiceNumber} generada automaticamente al completar el servicio.",
+          Notes: $"Proforma {proformaNumber} generada automaticamente al completar el servicio.",
           MetadataJson: null),
         cancellationToken);
     }

@@ -22,6 +22,7 @@ public sealed class PayCareRequestHandler
     private readonly IUserNotificationPublisher _userNotifications;
     private readonly IGenerateReceiptHandler _generateReceipt;
     private readonly ILogger<PayCareRequestHandler> _logger;
+    private readonly IInvoiceNumberGenerator _invoiceNumbers;
 
     public PayCareRequestHandler(
         ICareRequestRepository repository,
@@ -29,7 +30,8 @@ public sealed class PayCareRequestHandler
         IAdminAuditService auditService,
         IUserNotificationPublisher userNotifications,
         IGenerateReceiptHandler generateReceipt,
-        ILogger<PayCareRequestHandler> logger)
+        ILogger<PayCareRequestHandler> logger,
+        IInvoiceNumberGenerator invoiceNumbers)
     {
         _repository = repository;
         _paymentValidationRepository = paymentValidationRepository;
@@ -37,6 +39,7 @@ public sealed class PayCareRequestHandler
         _userNotifications = userNotifications;
         _generateReceipt = generateReceipt;
         _logger = logger;
+        _invoiceNumbers = invoiceNumbers;
     }
 
     public async Task<PaidCareRequestResponse> Handle(
@@ -69,6 +72,28 @@ public sealed class PayCareRequestHandler
         careRequest.Pay(command.BankReference, command.PaymentDate);
 
         await _repository.UpdateAsync(careRequest, cancellationToken);
+
+        // Fiscal mode only: now that the money is confirmed received, emit the formal DGII e-NCF and
+        // persist it on the request. This is the single point where a fiscal sequence number is
+        // burned — completions and pre-payment voids never reach here, so the sequence has no gaps.
+        // When fiscal mode is off (today's default) nothing extra happens: Ncf stays null.
+        if (await _invoiceNumbers.IsFiscalModeEnabledAsync(cancellationToken) && careRequest.Ncf is null)
+        {
+            var ncf = await _invoiceNumbers.NextFiscalNcfAsync(command.PaymentDate, cancellationToken);
+            careRequest.IssueFiscalReceipt(ncf, command.PaymentDate);
+            await _repository.UpdateAsync(careRequest, cancellationToken);
+
+            await _auditService.WriteAsync(
+                new AdminAuditRecord(
+                    ActorUserId: command.ActingAdminUserId,
+                    ActorRole: "Admin",
+                    Action: "IssueFiscalReceipt",
+                    EntityType: "CareRequest",
+                    EntityId: careRequest.Id.ToString(),
+                    Notes: $"e-NCF {ncf} emitido al confirmar el pago.",
+                    MetadataJson: null),
+                cancellationToken);
+        }
 
         var paymentValidation = PaymentValidation.Create(
             careRequestId: careRequest.Id,

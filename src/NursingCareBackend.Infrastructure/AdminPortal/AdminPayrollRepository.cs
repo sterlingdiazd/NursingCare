@@ -291,7 +291,10 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
             .OrderBy(p => p.StartDate)
             .FirstOrDefaultAsync(cancellationToken);
 
-    public async Task<PeriodCloseResult> ClosePeriodAsync(Guid periodId, CancellationToken cancellationToken)
+    public async Task<PeriodCloseResult> ClosePeriodAsync(
+        Guid periodId,
+        bool acknowledgeWarnings,
+        CancellationToken cancellationToken)
     {
         var period = await _dbContext.PayrollPeriods
             .FirstOrDefaultAsync(p => p.Id == periodId, cancellationToken);
@@ -306,6 +309,21 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
         if (!await PeriodHasActivityAsync(periodId, cancellationToken))
         {
             return PeriodCloseResult.Empty;
+        }
+
+        // Safe-close gate, re-evaluated INSIDE the close path (not from a stale preflight).
+        // The controller's pre-close advisory call can race the actual close: unliquidated
+        // services or zero/negative net pay may appear (or be acknowledged against different
+        // data) between the preflight and now. Re-checking here makes the gate authoritative
+        // at close time and TOCTOU-safe — closing is irreversible-by-default, so an
+        // unacknowledged warning must block the lock regardless of what the preflight saw.
+        if (!acknowledgeWarnings)
+        {
+            var warnings = await GetCloseWarningsAsync(periodId, cancellationToken);
+            if (warnings.HasWarnings)
+            {
+                return PeriodCloseResult.RequiresConfirmation;
+            }
         }
 
         period.Close(DateTime.UtcNow);
@@ -373,37 +391,6 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
         }
 
         return new PeriodCloseWarnings(negativeNetNurses, unliquidatedServices, unpaidNurses);
-    }
-
-    public async Task<PeriodReopenResult> ReopenPeriodAsync(
-        Guid periodId,
-        string reason,
-        Guid? reopenedByUserId,
-        CancellationToken cancellationToken)
-    {
-        var period = await _dbContext.PayrollPeriods
-            .FirstOrDefaultAsync(p => p.Id == periodId, cancellationToken);
-
-        if (period is null) return PeriodReopenResult.NotFound;
-        if (!period.IsClosed) return PeriodReopenResult.NotClosed;
-
-        var now = DateTime.UtcNow;
-        period.Reopen(reason, reopenedByUserId, now);
-
-        // A reopened period's net may change, so any prior confirmed/sent nurse payment becomes
-        // stale (a "PAGADO" comprobante stamped against a net that will change). Reset those to
-        // Pending (preserving the bank reference) so the admin must re-confirm against the corrected
-        // net. ResetForReopen is a no-op for payments not in Confirmed/SentToBank.
-        var periodPayments = await _dbContext.NursePeriodPayments
-            .Where(p => p.PayrollPeriodId == periodId)
-            .ToListAsync(cancellationToken);
-        foreach (var payment in periodPayments)
-        {
-            payment.ResetForReopen(reopenedByUserId ?? Guid.Empty, now);
-        }
-
-        await _dbContext.SaveChangesAsync(cancellationToken);
-        return PeriodReopenResult.Success;
     }
 
     public async Task<PeriodMutationResult> UpdatePeriodAsync(

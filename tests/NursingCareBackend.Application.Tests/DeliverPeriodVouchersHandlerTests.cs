@@ -168,9 +168,8 @@ file sealed class FakeBulkRepository : IAdminPayrollRepository
     public Task<PayrollVoucherData?> GetVoucherDataAsync(Guid periodId, Guid nurseId, CancellationToken cancellationToken) => throw new NotImplementedException();
     public Task<AdminPayrollPeriodListResult> GetPeriodsAsync(AdminPayrollPeriodListFilter filter, CancellationToken cancellationToken) => throw new NotImplementedException();
     public Task<Guid> CreatePeriodAsync(DateOnly startDate, DateOnly endDate, DateOnly cutoffDate, DateOnly paymentDate, CancellationToken cancellationToken) => throw new NotImplementedException();
-    public Task<PeriodCloseResult> ClosePeriodAsync(Guid periodId, CancellationToken cancellationToken) => throw new NotImplementedException();
+    public Task<PeriodCloseResult> ClosePeriodAsync(Guid periodId, bool acknowledgeWarnings, CancellationToken cancellationToken) => throw new NotImplementedException();
     public Task<PeriodCloseWarnings> GetCloseWarningsAsync(Guid periodId, CancellationToken cancellationToken) => throw new NotImplementedException();
-    public Task<PeriodReopenResult> ReopenPeriodAsync(Guid periodId, string reason, Guid? reopenedByUserId, CancellationToken cancellationToken) => throw new NotImplementedException();
     public Task<PeriodMutationResult> UpdatePeriodAsync(Guid periodId, DateOnly startDate, DateOnly endDate, DateOnly cutoffDate, DateOnly paymentDate, CancellationToken cancellationToken) => throw new NotImplementedException();
     public Task<PeriodMutationResult> DeletePeriodAsync(Guid periodId, CancellationToken cancellationToken) => throw new NotImplementedException();
     public Task<IReadOnlyList<AdminPayrollLineItem>> GetPeriodLinesAsync(Guid periodId, CancellationToken cancellationToken) => throw new NotImplementedException();

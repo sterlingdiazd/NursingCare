@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NursingCareBackend.Infrastructure.Persistence;
 
@@ -11,9 +12,11 @@ using NursingCareBackend.Infrastructure.Persistence;
 namespace NursingCareBackend.Infrastructure.Migrations
 {
     [DbContext(typeof(NursingCareDbContext))]
-    partial class NursingCareDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260526021337_AddClientProfileContactFields")]
+    partial class AddClientProfileContactFields
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -206,28 +209,11 @@ namespace NursingCareBackend.Infrastructure.Migrations
                     b.Property<decimal?>("MedicalSuppliesCost")
                         .HasColumnType("decimal(10,2)");
 
-                    b.Property<string>("Ncf")
-                        .HasMaxLength(19)
-                        .HasColumnType("nvarchar(19)");
-
-                    b.Property<DateTime?>("NcfIssuedAtUtc")
-                        .HasColumnType("datetime2");
-
                     b.Property<DateTime?>("PaidAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("PaymentDueReminderSentAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("PaymentOverdueReminderSentAtUtc")
                         .HasColumnType("datetime2");
 
                     b.Property<Guid?>("PaymentProofId")
                         .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("PaymentRejectionReason")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
 
                     b.Property<DateTime?>("PaymentReportedAtUtc")
                         .HasColumnType("datetime2");
@@ -289,40 +275,6 @@ namespace NursingCareBackend.Infrastructure.Migrations
                     b.ToTable("CareRequests", (string)null);
                 });
 
-            modelBuilder.Entity("NursingCareBackend.Domain.CareRequests.CreditNote", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<decimal>("Amount")
-                        .HasColumnType("decimal(10,2)");
-
-                    b.Property<Guid>("CareRequestId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("IssuedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<Guid>("IssuedByUserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Reason")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<string>("Reference")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CareRequestId");
-
-                    b.ToTable("CreditNotes", (string)null);
-                });
-
             modelBuilder.Entity("NursingCareBackend.Domain.CareRequests.PaymentProof", b =>
                 {
                     b.Property<Guid>("Id")
@@ -331,16 +283,6 @@ namespace NursingCareBackend.Infrastructure.Migrations
 
                     b.Property<Guid>("CareRequestId")
                         .HasColumnType("uniqueidentifier");
-
-                    b.Property<decimal?>("ClaimedAmount")
-                        .HasColumnType("decimal(10,2)");
-
-                    b.Property<string>("ClaimedBankReference")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<DateOnly?>("ClaimedPaymentDate")
-                        .HasColumnType("date");
 
                     b.Property<byte[]>("Content")
                         .IsRequired()
@@ -355,45 +297,6 @@ namespace NursingCareBackend.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
-                    b.Property<DateTime?>("OcrAssessedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<bool>("OcrClientEdited")
-                        .HasColumnType("bit");
-
-                    b.Property<decimal?>("OcrConfidence")
-                        .HasColumnType("decimal(5,4)");
-
-                    b.Property<string>("OcrDraftSentence")
-                        .HasMaxLength(700)
-                        .HasColumnType("nvarchar(700)");
-
-                    b.Property<decimal?>("OcrExtractedAmount")
-                        .HasColumnType("decimal(10,2)");
-
-                    b.Property<string>("OcrExtractedBank")
-                        .HasMaxLength(120)
-                        .HasColumnType("nvarchar(120)");
-
-                    b.Property<string>("OcrExtractedBankReference")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<DateOnly?>("OcrExtractedPaymentDate")
-                        .HasColumnType("date");
-
-                    b.Property<string>("OcrProvider")
-                        .HasMaxLength(60)
-                        .HasColumnType("nvarchar(60)");
-
-                    b.Property<string>("OcrWarningsJson")
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
-
-                    b.Property<string>("PayingBank")
-                        .HasMaxLength(120)
-                        .HasColumnType("nvarchar(120)");
-
                     b.Property<DateTime>("UploadedAtUtc")
                         .HasColumnType("datetime2");
 
@@ -403,8 +306,6 @@ namespace NursingCareBackend.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CareRequestId");
-
-                    b.HasIndex("ClaimedBankReference");
 
                     b.ToTable("PaymentProofs", (string)null);
                 });
@@ -441,8 +342,6 @@ namespace NursingCareBackend.Infrastructure.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("BankReference");
 
                     b.HasIndex("CareRequestId")
                         .IsUnique();
@@ -763,17 +662,9 @@ namespace NursingCareBackend.Infrastructure.Migrations
                     b.Property<Guid>("UserId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<string>("AccountHolderName")
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
-
                     b.Property<string>("AccountNumber")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
-
-                    b.Property<string>("AccountType")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
 
                     b.Property<string>("BankName")
                         .HasMaxLength(150)
@@ -1351,22 +1242,7 @@ namespace NursingCareBackend.Infrastructure.Migrations
                     b.Property<Guid>("NurseUserId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<string>("PaymentStatus")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
-
-                    b.Property<string>("PaymentStatusReason")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
                     b.Property<Guid>("PayrollPeriodId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime?>("StatusChangedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<Guid?>("StatusChangedByUserId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime>("UpdatedAtUtc")

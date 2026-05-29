@@ -54,6 +54,105 @@ public class ArchivingEmailServiceTests
     }
 
     [Fact]
+    public void BuildEml_Skips_Oversized_Attachment_With_Text_Placeholder()
+    {
+        var big = new byte[2048];
+        for (var i = 0; i < big.Length; i++) big[i] = (byte)'A';
+
+        var eml = ArchivingEmailService.BuildEml(
+            SentAt, "NursingCare", "n@x.com", "ana@x.com", "Comprobante", "<p>x</p>",
+            new[] { new EmailAttachmentData("grande.pdf", "application/pdf", big) },
+            maxAttachmentBytes: 1024);
+
+        // The raw base64 of the oversized payload must NOT be embedded.
+        Assert.DoesNotContain(Convert.ToBase64String(big), eml);
+        // A placeholder text part recording the omission is written instead.
+        Assert.Contains("Content-Type: text/plain; charset=utf-8", eml);
+        // The placeholder text is base64-encoded (with line breaks); decode the whole .eml's
+        // base64 payloads back to text and assert the placeholder copy is present.
+        var decoded = DecodeAllBase64Parts(eml);
+        Assert.Contains("Adjunto omitido del archivo: \"grande.pdf\" (application/pdf, 2048 bytes)", decoded);
+        Assert.Contains("excede el límite de 1024 bytes", decoded);
+    }
+
+    // Concatenates every base64-decoded text part of a .eml, so assertions can match the
+    // human-readable copy regardless of MIME line-break wrapping.
+    private static string DecodeAllBase64Parts(string eml)
+    {
+        var sb = new StringBuilder();
+        var lines = eml.Replace("\r\n", "\n").Split('\n');
+        var buffer = new StringBuilder();
+
+        void Flush()
+        {
+            if (buffer.Length == 0) return;
+            try { sb.Append(Encoding.UTF8.GetString(Convert.FromBase64String(buffer.ToString()))).Append('\n'); }
+            catch (FormatException) { /* not a base64 block */ }
+            buffer.Clear();
+        }
+
+        var inBody = false;
+        foreach (var line in lines)
+        {
+            if (line.StartsWith("--") || line.Contains(": "))
+            {
+                Flush();
+                inBody = false;
+                continue;
+            }
+            if (line.Length == 0) { inBody = true; continue; }
+            if (inBody) buffer.Append(line);
+        }
+        Flush();
+        return sb.ToString();
+    }
+
+    [Fact]
+    public void BuildEml_Embeds_Attachment_Under_The_Size_Cap()
+    {
+        var pdf = new byte[] { 0x25, 0x50, 0x44, 0x46 };
+        var eml = ArchivingEmailService.BuildEml(
+            SentAt, "NursingCare", "n@x.com", "ana@x.com", "Comprobante", "<p>x</p>",
+            new[] { new EmailAttachmentData("comprobante.pdf", "application/pdf", pdf) },
+            maxAttachmentBytes: 1024);
+
+        Assert.Contains("Content-Disposition: attachment; filename=\"comprobante.pdf\"", eml);
+        Assert.Contains(Convert.ToBase64String(pdf), eml);
+    }
+
+    [Fact]
+    public async Task SendAsync_Prunes_DayFolders_Older_Than_RetentionDays()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "nc-email-archive-test-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var inner = new FakeEmailService();
+        var service = CreateService(inner, root, retentionDays: 30);
+
+        try
+        {
+            // Seed an expired day-folder (well past 30 days ago) and a recent one.
+            var expired = Path.Combine(root, "2000", "01", "01");
+            var recent = Path.Combine(
+                root,
+                DateTimeOffset.Now.ToString("yyyy"),
+                DateTimeOffset.Now.ToString("MM"),
+                DateTimeOffset.Now.ToString("dd"));
+            Directory.CreateDirectory(expired);
+            Directory.CreateDirectory(recent);
+            File.WriteAllText(Path.Combine(expired, "old.eml"), "old");
+
+            await service.SendAsync("ana@x.com", "Hola", "<p>cuerpo</p>");
+
+            Assert.False(Directory.Exists(expired)); // pruned
+            Assert.True(Directory.Exists(recent));    // kept
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void BuildFileName_Is_Date_Prefixed_And_Slugged()
     {
         var name = ArchivingEmailService.BuildFileName(SentAt, "Ana@X.com", "Período de Nómina");
@@ -150,10 +249,10 @@ public class ArchivingEmailServiceTests
         }
     }
 
-    private static ArchivingEmailService CreateService(IEmailService inner, string root, bool enabled = true) =>
+    private static ArchivingEmailService CreateService(IEmailService inner, string root, bool enabled = true, int retentionDays = 3650) =>
         new(
             inner,
-            Options.Create(new EmailArchiveOptions { Enabled = enabled, RootPath = root }),
+            Options.Create(new EmailArchiveOptions { Enabled = enabled, RootPath = root, RetentionDays = retentionDays }),
             Options.Create(new EmailOptions { SenderAddress = "noreply@sol.com", SenderDisplayName = "Sol y Luna" }),
             new StubHostEnvironment(),
             NullLogger<ArchivingEmailService>.Instance);

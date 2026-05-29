@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
@@ -8,15 +9,21 @@ using NursingCareBackend.Infrastructure.Persistence;
 namespace NursingCareBackend.Infrastructure.Payroll;
 
 /// <summary>
-/// Reads the owner-configured payment-date policy from the SystemSettings table and computes the
-/// authoritative (cutoff, payment) for a period via <see cref="PayrollScheduleCalculator"/>.
-/// Missing / blank / non-numeric values fall back to the policy defaults (see
-/// <see cref="PayrollScheduleConfig.Default"/>), so the behavior is robust even on a DB whose
-/// settings rows were never seeded.
+/// Resolves the owner-configurable payroll schedule policy from the editable SystemSettings
+/// (PAYROLL_*) at runtime, so the owner can adjust it from Menú → Configuración without a redeploy.
+/// The cutoff offset (PAYROLL_CUTOFF_DAYS_BEFORE_END) is the single source of truth for the cutoff;
+/// the payment date layers the configurable payment-date policy (mode, fixed payment days) on top
+/// of that same cutoff. Missing / blank / non-numeric values fall back to the defaults, so behavior
+/// is robust even on a DB whose settings rows were never seeded.
 /// </summary>
 public sealed class PayrollSchedulePolicy : IPayrollSchedulePolicy
 {
-    // System-setting keys — the single backend source of truth for these strings.
+    public const string CutoffDaysBeforeEndKey = "PAYROLL_CUTOFF_DAYS_BEFORE_END";
+
+    // Default reproduces the historical hardcoded behavior (cutoff = end − 2 days).
+    public const int DefaultCutoffDaysBeforeEnd = 2;
+
+    // Payment-date policy keys — the single backend source of truth for these strings.
     private const string KeyMode = "PAYROLL_PAYMENT_DATE_MODE";
     private const string KeyFirstHalfDay = "PAYROLL_FIRST_HALF_PAYMENT_DAY";
     private const string KeySecondHalfDay = "PAYROLL_SECOND_HALF_PAYMENT_DAY";
@@ -29,13 +36,35 @@ public sealed class PayrollSchedulePolicy : IPayrollSchedulePolicy
         _dbContext = dbContext;
     }
 
+    public async Task<int> GetCutoffDaysBeforeEndAsync(CancellationToken cancellationToken = default)
+    {
+        var raw = await _dbContext.SystemSettings.AsNoTracking()
+            .Where(s => s.Key == CutoffDaysBeforeEndKey)
+            .Select(s => s.Value)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (!string.IsNullOrWhiteSpace(raw) && int.TryParse(raw.Trim(), out var days) && days >= 0)
+        {
+            return days;
+        }
+
+        return DefaultCutoffDaysBeforeEnd;
+    }
+
+    public async Task<DateOnly> ResolveCutoffDateAsync(DateOnly endDate, CancellationToken cancellationToken = default)
+    {
+        var daysBefore = await GetCutoffDaysBeforeEndAsync(cancellationToken);
+        return endDate.AddDays(-daysBefore);
+    }
+
     public async Task<(DateOnly Cutoff, DateOnly Payment)> ComputeAsync(
         DateOnly start,
         DateOnly end,
         CancellationToken cancellationToken = default)
     {
+        var cutoffDaysBeforeEnd = await GetCutoffDaysBeforeEndAsync(cancellationToken);
         var config = await ReadConfigAsync(cancellationToken);
-        return PayrollScheduleCalculator.Compute(start, end, config);
+        return PayrollScheduleCalculator.Compute(start, end, config, cutoffDaysBeforeEnd);
     }
 
     private async Task<PayrollScheduleConfig> ReadConfigAsync(CancellationToken cancellationToken)

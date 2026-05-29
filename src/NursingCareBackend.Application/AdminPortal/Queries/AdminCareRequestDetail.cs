@@ -5,6 +5,10 @@ namespace NursingCareBackend.Application.AdminPortal.Queries;
 public sealed record AdminCareRequestBillingInfo(
   string? InvoiceNumber,
   DateTime? InvoicedAtUtc,
+  // Fiscal comprobante (e-NCF). Null until payment is confirmed in fiscal mode; InvoiceNumber stays
+  // the non-fiscal proforma (SOL-).
+  string? Ncf,
+  DateTime? NcfIssuedAtUtc,
   DateTime? PaidAtUtc,
   DateTime? VoidedAtUtc,
   string? VoidReason,

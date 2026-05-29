@@ -140,6 +140,8 @@ public sealed class AdminCareRequestRepository : IAdminCareRequestRepository
       billingInfo = new AdminCareRequestBillingInfo(
         InvoiceNumber: careRequest.InvoiceNumber,
         InvoicedAtUtc: careRequest.InvoicedAtUtc,
+        Ncf: careRequest.Ncf,
+        NcfIssuedAtUtc: careRequest.NcfIssuedAtUtc,
         PaidAtUtc: careRequest.PaidAtUtc,
         VoidedAtUtc: careRequest.VoidedAtUtc,
         VoidReason: careRequest.VoidReason,

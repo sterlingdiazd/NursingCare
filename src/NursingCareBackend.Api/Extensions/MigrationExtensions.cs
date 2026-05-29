@@ -434,6 +434,74 @@ namespace NursingCareBackend.Api.Extensions
           Category = "Nómina",
           ValueType = "Number",
           ModifiedAtUtc = DateTime.UtcNow
+        },
+        new() {
+          Key = "PAYROLL_CUTOFF_DAYS_BEFORE_END",
+          Value = "2",
+          Description = "Días antes del fin del período para el corte.",
+          Category = "Nómina",
+          ValueType = "Number",
+          ModifiedAtUtc = DateTime.UtcNow
+        },
+        // Configuración fiscal / de facturación (RNC, ITBIS, e-NCF, prefijo de proforma, moneda,
+        // pie legal). Editable por el dueño; afecta numeración de comprobantes y PDFs sin redeploy.
+        // Defaults reproducen el comportamiento informal actual (sin RNC/NCF, ITBIS exento).
+        new() {
+          Key = "FISCAL_RNC",
+          Value = "",
+          Description = "RNC de la empresa (vacío = modo informal).",
+          Category = "Facturación",
+          ValueType = "String",
+          ModifiedAtUtc = DateTime.UtcNow
+        },
+        new() {
+          Key = "FISCAL_ITBIS_RATE_PERCENT",
+          Value = "0",
+          Description = "Tasa de ITBIS % (0 = exento).",
+          Category = "Facturación",
+          ValueType = "Number",
+          ModifiedAtUtc = DateTime.UtcNow
+        },
+        new() {
+          Key = "FISCAL_NCF_ENABLED",
+          Value = "false",
+          Description = "Modo fiscal e-CF activado — afecta cumplimiento DGII.",
+          Category = "Facturación",
+          ValueType = "Boolean",
+          ModifiedAtUtc = DateTime.UtcNow
+        },
+        new() {
+          Key = "FISCAL_NCF_TYPE",
+          Value = "E32",
+          Description = "Tipo de e-NCF (E31 crédito fiscal, E32 consumo).",
+          Category = "Facturación",
+          ValueType = "Select",
+          AllowedValuesJson = "[\"E31\",\"E32\"]",
+          ModifiedAtUtc = DateTime.UtcNow
+        },
+        new() {
+          Key = "FISCAL_INVOICE_PREFIX",
+          Value = "SOL",
+          Description = "Prefijo de proforma/cuenta de cobro.",
+          Category = "Facturación",
+          ValueType = "String",
+          ModifiedAtUtc = DateTime.UtcNow
+        },
+        new() {
+          Key = "FISCAL_CURRENCY",
+          Value = "DOP",
+          Description = "Moneda.",
+          Category = "Facturación",
+          ValueType = "String",
+          ModifiedAtUtc = DateTime.UtcNow
+        },
+        new() {
+          Key = "FISCAL_LEGAL_FOOTER",
+          Value = "",
+          Description = "Pie legal del comprobante.",
+          Category = "Facturación",
+          ValueType = "String",
+          ModifiedAtUtc = DateTime.UtcNow
         }
       };
 

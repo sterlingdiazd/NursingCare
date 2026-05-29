@@ -39,10 +39,6 @@ public static class Messages
         ["errors.periodo_vacio_detalle"] = "No se puede cerrar un período sin valores. Recalcula la nómina o agrega deducciones antes de cerrarlo.",
         ["errors.fechas_periodo_detalle"] = "El corte debe estar entre el inicio y el fin del período, y el pago igual o posterior al corte.",
         ["errors.periodo_requiere_confirmacion"] = "Confirmación requerida para cerrar",
-        ["errors.periodo_no_cerrado"] = "Período no cerrado",
-        ["errors.periodo_no_cerrado_detalle"] = "Solo se puede reabrir un período que esté cerrado.",
-        ["errors.razon_requerida"] = "Razón requerida",
-        ["errors.razon_reapertura_detalle"] = "Debes indicar una razón para reabrir el período.",
 
         // Deductions
         ["errors.deduccion_no_encontrada"] = "Deducción no encontrada",

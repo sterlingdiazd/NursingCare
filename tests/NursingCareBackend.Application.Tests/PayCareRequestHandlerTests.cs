@@ -181,7 +181,8 @@ public sealed class PayCareRequestHandlerTests
             audit ?? new RecordingPayAudit(),
             notifier,
             receipt,
-            NullLogger<PayCareRequestHandler>.Instance);
+            NullLogger<PayCareRequestHandler>.Instance,
+            new FakePayInvoiceNumbers());
 
     private static CareRequest BuildInvoicedRequest()
     {
@@ -258,6 +259,15 @@ file sealed class RecordingPayNotifier : IUserNotificationPublisher
         Published = request;
         return Task.CompletedTask;
     }
+}
+
+file sealed class FakePayInvoiceNumbers : NursingCareBackend.Application.CareRequests.IInvoiceNumberGenerator
+{
+    // Non-fiscal mode by default: pay never burns an e-NCF, so these tests exercise the
+    // receipt/payment path without the DGII branch.
+    public Task<bool> IsFiscalModeEnabledAsync(CancellationToken cancellationToken = default) => Task.FromResult(false);
+    public Task<string> NextProformaAsync(DateTime invoiceDateUtc, CancellationToken cancellationToken) => Task.FromResult("SOL-202601-0001");
+    public Task<string> NextFiscalNcfAsync(DateTime issuedAtUtc, CancellationToken cancellationToken) => Task.FromResult("E320000000001");
 }
 
 file sealed class RecordingReceiptHandler : IGenerateReceiptHandler

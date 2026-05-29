@@ -45,9 +45,18 @@ public sealed class CareRequest
     public DateTime? CancelledAtUtc { get; private set; }
     public string? RejectionReason { get; private set; }
 
-    // Service lifecycle billing fields
+    // Service lifecycle billing fields.
+    // InvoiceNumber is the NON-fiscal proforma / cuenta de cobro (SOL-yyyyMM-####) assigned on
+    // completion. It is NOT a DGII fiscal comprobante.
     public string? InvoiceNumber { get; private set; }
     public DateTime? InvoicedAtUtc { get; private set; }
+
+    // Dominican fiscal comprobante (e-NCF). Stays null until payment is confirmed in fiscal mode;
+    // decoupling it from completion is what prevents burning a DGII sequence number on every
+    // completion/void (which would force Notas de Crédito and leave sequence gaps).
+    public string? Ncf { get; private set; }
+    public DateTime? NcfIssuedAtUtc { get; private set; }
+
     public DateTime? PaymentReportedAtUtc { get; private set; }
     public Guid? PaymentProofId { get; private set; }
     public DateTime? PaidAtUtc { get; private set; }
@@ -351,6 +360,37 @@ public sealed class CareRequest
 
     /// <summary>Records that the "payment overdue" reminder (next day) was sent. Does not change status.</summary>
     public void MarkPaymentOverdueReminderSent(DateTime at) => PaymentOverdueReminderSentAtUtc = at;
+
+    /// <summary>
+    /// Issues the formal Dominican fiscal comprobante (e-NCF) for this request. This is the ONLY
+    /// place a DGII sequence number is burned, and it happens at payment confirmation — not at
+    /// completion — so voiding/cancelling before payment never consumes a fiscal number. Invariants:
+    ///   * the request must already be <see cref="CareRequestStatus.Paid"/> (you only fiscally
+    ///     document money actually collected);
+    ///   * the e-NCF is write-once: re-issuing is rejected so a request can never carry two NCFs.
+    /// The <see cref="InvoiceNumber"/> proforma is left untouched.
+    /// </summary>
+    public void IssueFiscalReceipt(string ncf, DateTime issuedAtUtc)
+    {
+        if (Status != CareRequestStatus.Paid)
+        {
+            throw new InvalidOperationException(
+                $"A fiscal receipt (e-NCF) can only be issued for a Paid request. Current status is {Status}.");
+        }
+
+        if (Ncf is not null)
+        {
+            throw new InvalidOperationException(
+                $"A fiscal receipt (e-NCF '{Ncf}') has already been issued for this request.");
+        }
+
+        if (string.IsNullOrWhiteSpace(ncf))
+            throw new ArgumentException("e-NCF cannot be empty.", nameof(ncf));
+
+        Ncf = ncf;
+        NcfIssuedAtUtc = issuedAtUtc;
+        UpdatedAtUtc = issuedAtUtc;
+    }
 
     public void Void(string voidReason, DateTime voidedAtUtc)
     {

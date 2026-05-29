@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using NursingCareBackend.Application.AdminPortal.Payroll;
 using NursingCareBackend.Application.Payroll;
 using NursingCareBackend.Domain.CareRequests;
 using NursingCareBackend.Domain.Identity;
@@ -10,10 +11,12 @@ namespace NursingCareBackend.Infrastructure.Payroll;
 public sealed class PayrollCompensationService : IPayrollCompensationService
 {
     private readonly NursingCareDbContext _dbContext;
+    private readonly IPayrollSchedulePolicy _schedulePolicy;
 
-    public PayrollCompensationService(NursingCareDbContext dbContext)
+    public PayrollCompensationService(NursingCareDbContext dbContext, IPayrollSchedulePolicy schedulePolicy)
     {
         _dbContext = dbContext;
+        _schedulePolicy = schedulePolicy;
     }
 
     public async Task RecordExecutionForCompletedCareRequestAsync(CareRequest careRequest, CancellationToken cancellationToken)
@@ -231,22 +234,31 @@ public sealed class PayrollCompensationService : IPayrollCompensationService
 
     private async Task<PayrollPeriod> GetOrCreatePayrollPeriodAsync(DateOnly serviceDate, DateTime createdAtUtc, CancellationToken cancellationToken)
     {
+        // Bind the line to whichever existing period already CONTAINS the service date,
+        // including admin-created custom/non-standard periods. This prevents a second,
+        // auto-created standard quincena from competing with a custom period that already
+        // covers the date (which otherwise leaves orphaned lines and permanent
+        // false-positive close warnings). Prefer the most recent match when several overlap.
+        var containing = await _dbContext.PayrollPeriods
+            .Where(period => period.StartDate <= serviceDate && serviceDate <= period.EndDate)
+            .OrderByDescending(period => period.StartDate)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (containing is not null)
+        {
+            return containing;
+        }
+
+        // Fallback: no period covers the date — create the standard quincena.
         var startDate = serviceDate.Day <= 15
             ? new DateOnly(serviceDate.Year, serviceDate.Month, 1)
             : new DateOnly(serviceDate.Year, serviceDate.Month, 16);
         var endDate = serviceDate.Day <= 15
             ? new DateOnly(serviceDate.Year, serviceDate.Month, 15)
             : new DateOnly(serviceDate.Year, serviceDate.Month, DateTime.DaysInMonth(serviceDate.Year, serviceDate.Month));
-        var cutoffDate = endDate.AddDays(-2);
+        // Cutoff offset is owner-configurable (PAYROLL_CUTOFF_DAYS_BEFORE_END; default 2).
+        var cutoffDate = await _schedulePolicy.ResolveCutoffDateAsync(endDate, cancellationToken);
         var paymentDate = endDate;
-
-        var existing = await _dbContext.PayrollPeriods
-            .FirstOrDefaultAsync(period => period.StartDate == startDate && period.EndDate == endDate, cancellationToken);
-
-        if (existing is not null)
-        {
-            return existing;
-        }
 
         var created = PayrollPeriod.Create(startDate, endDate, cutoffDate, paymentDate, createdAtUtc);
         _dbContext.PayrollPeriods.Add(created);

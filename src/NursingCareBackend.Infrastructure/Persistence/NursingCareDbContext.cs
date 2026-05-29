@@ -144,6 +144,8 @@ public sealed class NursingCareDbContext : DbContext
 
                      builder.Property(x => x.InvoiceNumber).HasMaxLength(50);
                      builder.Property(x => x.InvoicedAtUtc);
+                     builder.Property(x => x.Ncf).HasMaxLength(19);
+                     builder.Property(x => x.NcfIssuedAtUtc);
                      builder.Property(x => x.PaidAtUtc);
                      builder.Property(x => x.VoidedAtUtc);
                      builder.Property(x => x.VoidReason).HasMaxLength(500);
@@ -213,6 +215,12 @@ public sealed class NursingCareDbContext : DbContext
                             table.HasCheckConstraint(
                              "CK_Users_Phone_ExactDigits",
                              "[Phone] IS NULL OR (LEN([Phone]) = 10 AND [Phone] NOT LIKE '%[^0-9]%')");
+                            table.HasCheckConstraint(
+                             "CK_Users_EmergencyContactName_TextOnly",
+                             "[EmergencyContactName] IS NULL OR (LEN(LTRIM(RTRIM([EmergencyContactName]))) > 0 AND [EmergencyContactName] NOT LIKE '%[^A-Za-zÁÉÍÓÚáéíóúÑñÜü ]%')");
+                            table.HasCheckConstraint(
+                             "CK_Users_EmergencyContactPhone_ExactDigits",
+                             "[EmergencyContactPhone] IS NULL OR (LEN([EmergencyContactPhone]) = 10 AND [EmergencyContactPhone] NOT LIKE '%[^0-9]%')");
                      });
 
                      builder.HasKey(x => x.Id);
@@ -245,6 +253,15 @@ public sealed class NursingCareDbContext : DbContext
 
                      builder.Property(x => x.DisplayName)
                       .HasMaxLength(256);
+
+                     builder.Property(x => x.PreferredAddress)
+                      .HasMaxLength(500);
+
+                     builder.Property(x => x.EmergencyContactName)
+                      .HasMaxLength(150);
+
+                     builder.Property(x => x.EmergencyContactPhone)
+                      .HasMaxLength(30);
 
                      builder.Property(x => x.GoogleSubjectId)
                       .HasMaxLength(256);

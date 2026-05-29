@@ -170,29 +170,37 @@ public sealed class AdminPayrollController : ControllerBase
         [FromBody] ClosePeriodRequest? request,
         CancellationToken cancellationToken)
     {
+        var acknowledgeWarnings = request?.AcknowledgeWarnings == true;
+
         // Closing is irreversible-by-default: surface unliquidated services and zero/negative
-        // net pay, and require explicit acknowledgement before locking the period.
+        // net pay, and require explicit acknowledgement before locking the period. This advisory
+        // pass produces the rich, per-warning Spanish detail the UI shows the admin. The gate is
+        // ALSO re-evaluated authoritatively inside ClosePeriodAsync (see RequiresConfirmation
+        // below) so a stale preflight can never let an unacknowledged close slip through.
         var warnings = await _repository.GetCloseWarningsAsync(id, cancellationToken);
-        if (request?.AcknowledgeWarnings != true)
+        if (!acknowledgeWarnings)
         {
             if (warnings.HasWarnings)
             {
-                var parts = new List<string>();
-                if (warnings.UnpaidNurses > 0)
-                    parts.Add($"{warnings.UnpaidNurses} enfermera(s) con pago aún NO confirmado (quedarían sin pagar)");
-                if (warnings.UnliquidatedServices > 0)
-                    parts.Add($"{warnings.UnliquidatedServices} servicio(s) completado(s) en el período sin línea de nómina (quedarían sin pagar)");
-                if (warnings.NegativeNetNurses > 0)
-                    parts.Add($"{warnings.NegativeNetNurses} enfermera(s) con pago neto en cero o negativo");
-
                 return this.ProblemResponse(
                     StatusCodes.Status409Conflict,
                     Messages.Get("errors.periodo_requiere_confirmacion"),
-                    $"Antes de cerrar revisa: {string.Join("; ", parts)}. Confirma para cerrar de todas formas (es irreversible).");
+                    BuildCloseWarningsDetail(warnings));
             }
         }
 
-        var result = await _repository.ClosePeriodAsync(id, cancellationToken);
+        var result = await _repository.ClosePeriodAsync(id, acknowledgeWarnings, cancellationToken);
+
+        if (result == PeriodCloseResult.RequiresConfirmation)
+        {
+            // Authoritative at-close-time gate: warnings appeared (or remained unacknowledged)
+            // between the preflight and the close. Re-read them so the detail stays accurate.
+            warnings = await _repository.GetCloseWarningsAsync(id, cancellationToken);
+            return this.ProblemResponse(
+                StatusCodes.Status409Conflict,
+                Messages.Get("errors.periodo_requiere_confirmacion"),
+                BuildCloseWarningsDetail(warnings));
+        }
 
         if (result == PeriodCloseResult.NotFound)
         {
@@ -229,61 +237,15 @@ public sealed class AdminPayrollController : ControllerBase
         return NoContent();
     }
 
-    // POST /api/admin/payroll/periods/{id}/reopen
-    // Reopens a closed period for correction (audited). Reverts to Open and recomputes
-    // installment settlement so cuotas in this period are no longer counted as paid.
-    [HttpPost("periods/{id:guid}/reopen")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> ReopenPeriod(
-        Guid id,
-        [FromBody] ReopenPeriodRequest? request,
-        CancellationToken cancellationToken)
+    private static string BuildCloseWarningsDetail(PeriodCloseWarnings warnings)
     {
-        var reason = request?.Reason?.Trim();
-        if (string.IsNullOrWhiteSpace(reason))
-        {
-            return this.ProblemResponse(
-                StatusCodes.Status400BadRequest,
-                Messages.Get("errors.razon_requerida"),
-                Messages.Get("errors.razon_reapertura_detalle"));
-        }
+        var parts = new List<string>();
+        if (warnings.UnliquidatedServices > 0)
+            parts.Add($"{warnings.UnliquidatedServices} servicio(s) completado(s) en el período sin línea de nómina (quedarían sin pagar)");
+        if (warnings.NegativeNetNurses > 0)
+            parts.Add($"{warnings.NegativeNetNurses} enfermera(s) con pago neto en cero o negativo");
 
-        var result = await _repository.ReopenPeriodAsync(id, reason, GetAdminUserId(), cancellationToken);
-
-        if (result == PeriodReopenResult.NotFound)
-        {
-            return this.ProblemResponse(
-                StatusCodes.Status404NotFound,
-                Messages.Get("errors.periodo_no_encontrado"),
-                $"No se encontró el período de nómina con id '{id}'.");
-        }
-
-        if (result == PeriodReopenResult.NotClosed)
-        {
-            return this.ProblemResponse(
-                StatusCodes.Status409Conflict,
-                Messages.Get("errors.periodo_no_cerrado"),
-                Messages.Get("errors.periodo_no_cerrado_detalle"));
-        }
-
-        // Recompute installment settlement: cuotas living in the now-open period drop out of "paid".
-        await _scheduledDeductionService.SettlePeriodInstallmentsAsync(id, cancellationToken);
-
-        await _auditService.WriteAsync(
-            new NursingCareBackend.Application.AdminPortal.Auditing.AdminAuditRecord(
-                ActorUserId: GetAdminUserId(),
-                ActorRole: "Admin",
-                Action: "ReopenPeriod",
-                EntityType: "PayrollPeriod",
-                EntityId: id.ToString(),
-                Notes: reason,
-                MetadataJson: null),
-            cancellationToken);
-
-        return NoContent();
+        return $"Antes de cerrar revisa: {string.Join("; ", parts)}. Confirma para cerrar de todas formas (es irreversible).";
     }
 
     // PUT /api/admin/payroll/periods/{id}
@@ -1186,9 +1148,4 @@ public sealed class ClosePeriodRequest
     // When true the admin has reviewed and accepted the pre-close warnings (unliquidated
     // services, zero/negative net pay) and the period is closed anyway.
     public bool AcknowledgeWarnings { get; set; }
-}
-
-public sealed class ReopenPeriodRequest
-{
-    public string? Reason { get; set; }
 }

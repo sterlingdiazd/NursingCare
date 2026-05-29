@@ -103,12 +103,16 @@ public sealed class GetClientReceiptHandler
       PaidAtUtc: careRequest.PaidAtUtc!.Value,
       BankReference: paymentValidation?.BankReference ?? string.Empty,
       GeneratedAtUtc: generatedAtUtc,
-      CompanyName: companyInfo.Name);
+      CompanyName: companyInfo.Name,
+      Ncf: careRequest.Ncf,
+      NcfIssuedAtUtc: careRequest.NcfIssuedAtUtc);
+
+    var pdfBytes = await _receiptPdfService.GenerateAsync(pdfData, cancellationToken);
 
     var receipt = Receipt.Create(
       careRequestId: careRequest.Id,
       receiptNumber: receiptNumber,
-      receiptContent: _receiptPdfService.Generate(pdfData),
+      receiptContent: pdfBytes,
       generatedByUserId: clientUserId,
       generatedAtUtc: generatedAtUtc);
 

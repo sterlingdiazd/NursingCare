@@ -10,6 +10,9 @@ public sealed class User
   public string? IdentificationNumber { get; set; }
   public string? Phone { get; set; }
   public string? DisplayName { get; set; }
+  public string? PreferredAddress { get; set; }
+  public string? EmergencyContactName { get; set; }
+  public string? EmergencyContactPhone { get; set; }
   public string? GoogleSubjectId { get; set; }
   public string PasswordHash { get; set; } = default!;
   public bool IsActive { get; set; }
