@@ -1,10 +1,13 @@
 using System.Text.RegularExpressions;
+using Microsoft.Data.SqlClient;
 
 namespace NursingCareBackend.Tests.Infrastructure;
 
 public static class TestSqlConnectionResolver
 {
   private const string EnvironmentVariableName = "NursingCare_TestSqlConnection";
+  private static readonly object SweepGate = new();
+  private static bool _sweptStaleDatabases;
 
   public static string GetBaseConnectionString()
   {
@@ -16,7 +19,59 @@ public static class TestSqlConnectionResolver
 
     var resolved = BuildConnectionStringFromBackendEnv() ?? BuildFallbackConnectionString();
     Environment.SetEnvironmentVariable(EnvironmentVariableName, resolved);
+    SweepStaleTestDatabasesOnce(resolved);
     return resolved;
+  }
+
+  /// <summary>
+  /// Self-healing guard against leaked test databases. Each test spins up a unique
+  /// <c>NursingCareDb_Test_run_*</c> database and drops it on teardown — but a killed or
+  /// crashed run (Ctrl-C, a failed pre-push hook, an OOM) never reaches teardown, so its
+  /// database leaks. Left unchecked these pile into the thousands and exhaust SQL Server's
+  /// 'internal' memory resource pool (Error 701), after which every new connection fails its
+  /// pre-login handshake and the whole suite goes red for reasons that have nothing to do with
+  /// the code under test. Once per test process we drop any test database older than the
+  /// current run, so leaks can never accumulate again. Scoped to stale (&gt;30 min) databases
+  /// so a concurrently-running suite's fresh databases are never touched, and best-effort so a
+  /// cleanup hiccup can never fail a test run.
+  /// </summary>
+  private static void SweepStaleTestDatabasesOnce(string baseConnectionString)
+  {
+    lock (SweepGate)
+    {
+      if (_sweptStaleDatabases)
+      {
+        return;
+      }
+
+      _sweptStaleDatabases = true;
+    }
+
+    try
+    {
+      var masterConnectionString = Regex.IsMatch(baseConnectionString, @"Database\s*=\s*[^;]+", RegexOptions.IgnoreCase)
+        ? Regex.Replace(baseConnectionString, @"Database\s*=\s*[^;]+", "Database=master", RegexOptions.IgnoreCase)
+        : $"{baseConnectionString.TrimEnd(';')};Database=master";
+
+      using var connection = new SqlConnection(masterConnectionString);
+      connection.Open();
+
+      using var command = connection.CreateCommand();
+      command.CommandTimeout = 180;
+      command.CommandText = @"
+SET NOCOUNT ON;
+DECLARE @sql nvarchar(max) = N'';
+SELECT @sql = @sql + N'ALTER DATABASE [' + name + N'] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [' + name + N'];'
+FROM sys.databases
+WHERE name LIKE 'NursingCareDb[_]Test[_]run[_]%'
+  AND create_date < DATEADD(MINUTE, -30, GETUTCDATE());
+IF LEN(@sql) > 0 EXEC sp_executesql @sql;";
+      command.ExecuteNonQuery();
+    }
+    catch
+    {
+      // Best-effort: never fail a test run because the stale-database sweep could not run.
+    }
   }
 
   public static string CreateUniqueDatabaseConnectionString()
