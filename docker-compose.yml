@@ -1,7 +1,9 @@
 services:
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
-    container_name: nursingcare-sql
+    # Default name preserved; per-session stacks override NC_SQL_CONTAINER (+ COMPOSE_PROJECT_NAME)
+    # so concurrent sessions never collide on the container or its named volume.
+    container_name: ${NC_SQL_CONTAINER:-nursingcare-sql}
     environment:
       SA_PASSWORD: "${DB_PASSWORD}"
       ACCEPT_EULA: "Y"
@@ -37,7 +39,7 @@ services:
 
   proxy:
     image: nginx:1.27-alpine
-    container_name: nursingcare-proxy
+    container_name: ${NC_PROXY_CONTAINER:-nursingcare-proxy}
     depends_on:
       - api
     ports:

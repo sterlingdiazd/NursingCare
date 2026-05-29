@@ -13,8 +13,10 @@ travels with the repo so the `/flow` workflow is available even when the repo is
 
 ## The `/flow` Workflow (provider-agnostic)
 
-Trigger: when a task message is prefixed with `/flow` (for example `/flow add X`), run this
-playbook end to end. It is intentionally model-, provider-, and CLI-agnostic: it carries no
+Trigger: this playbook is the DEFAULT agentic loop — run it end to end for every non-trivial change
+in every session, whether or not the message is prefixed with `/flow`. Typing `/flow ...` (for
+example `/flow add X`) only invokes the same loop explicitly; never wait for the prefix. Trivial
+typo/one-line fixes may skip steps 2-3 but never the step 5 local gate or the step 7-9 git discipline. It is intentionally model-, provider-, and CLI-agnostic: it carries no
 model name, API key, or tool-specific setting. The only machinery is this text plus `git` and
 `gh` (GitHub CLI). Any agent that reads this file and has a shell runs the same `/flow`.
 
