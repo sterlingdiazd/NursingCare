@@ -4,9 +4,11 @@ using System.Security.Claims;
 using NursingCareBackend.Api.Localization;
 using NursingCareBackend.Application.CareRequests;
 using NursingCareBackend.Application.CareRequests.Commands.AssignCareRequestNurse;
+using NursingCareBackend.Application.CareRequests.Commands.AssessPaymentProofOcr;
 using NursingCareBackend.Application.CareRequests.Commands.CreateCareRequest;
 using NursingCareBackend.Application.CareRequests.Commands.TransitionCareRequest;
 using NursingCareBackend.Application.CareRequests.Commands.ReportPayment;
+using NursingCareBackend.Application.CareRequests.PaymentOcr;
 using NursingCareBackend.Application.CareRequests.Queries;
 using NursingCareBackend.Application.CareRequests.Queries.GetClientReceipt;
 using NursingCareBackend.Application.Identity.Repositories;
@@ -25,6 +27,7 @@ public sealed class CareRequestsController : ControllerBase
     private readonly GetCareRequestsHandler _getAllHandler;
     private readonly GetCareRequestByIdHandler _getByIdHandler;
     private readonly VerifyPricingHandler _verifyPricingHandler;
+    private readonly AssessPaymentProofOcrHandler _assessPaymentProofOcrHandler;
     private readonly ReportPaymentHandler _reportPaymentHandler;
     private readonly GetClientReceiptHandler _getClientReceiptHandler;
     private readonly IUserRepository _userRepository;
@@ -36,6 +39,7 @@ public sealed class CareRequestsController : ControllerBase
         GetCareRequestsHandler getAllHandler,
         GetCareRequestByIdHandler getByIdHandler,
         VerifyPricingHandler verifyPricingHandler,
+        AssessPaymentProofOcrHandler assessPaymentProofOcrHandler,
         ReportPaymentHandler reportPaymentHandler,
         GetClientReceiptHandler getClientReceiptHandler,
         IUserRepository userRepository)
@@ -46,9 +50,54 @@ public sealed class CareRequestsController : ControllerBase
         _getAllHandler = getAllHandler;
         _getByIdHandler = getByIdHandler;
         _verifyPricingHandler = verifyPricingHandler;
+        _assessPaymentProofOcrHandler = assessPaymentProofOcrHandler;
         _reportPaymentHandler = reportPaymentHandler;
         _getClientReceiptHandler = getClientReceiptHandler;
         _userRepository = userRepository;
+    }
+
+    [HttpPost("{id:guid}/payment-proof/ocr")]
+    [Authorize(Policy = "CareRequestReader")]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(6_000_000)]
+    public async Task<IActionResult> AssessPaymentProofOcr(
+        Guid id,
+        [FromForm] PaymentProofOcrForm form,
+        CancellationToken cancellationToken)
+    {
+        var userId = ResolveCurrentUserId();
+        if (!userId.HasValue)
+        {
+            return Unauthorized();
+        }
+
+        var proof = form.Proof;
+        var validation = await ReadValidatedPaymentProofBytes(proof, cancellationToken);
+        if (validation.Error is not null)
+        {
+            return validation.Error;
+        }
+
+        try
+        {
+            var assessment = await _assessPaymentProofOcrHandler.Handle(
+                new AssessPaymentProofOcrCommand(
+                    id,
+                    userId.Value,
+                    validation.Content!,
+                    validation.ContentType!),
+                cancellationToken);
+
+            return Ok(PaymentOcrResponse.FromAssessment(assessment));
+        }
+        catch (KeyNotFoundException)
+        {
+            return this.ProblemResponse(StatusCodes.Status404NotFound, "Solicitud no encontrada", null);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return this.ProblemResponse(StatusCodes.Status400BadRequest, "Operación inválida", ex.Message);
+        }
     }
 
     [HttpGet("{id:guid}/receipt")]
@@ -257,25 +306,11 @@ public sealed class CareRequestsController : ControllerBase
             return Unauthorized();
         }
 
-        var proof = form.Proof;
         var note = form.Note;
-        if (proof is null || proof.Length == 0)
+        var validation = await ReadValidatedPaymentProofBytes(form.Proof, cancellationToken);
+        if (validation.Error is not null)
         {
-            return this.ProblemResponse(StatusCodes.Status400BadRequest, "Comprobante requerido",
-                "Debes adjuntar una imagen del comprobante de pago.");
-        }
-
-        if (proof.Length > 5_000_000)
-        {
-            return this.ProblemResponse(StatusCodes.Status400BadRequest, "Archivo muy grande",
-                "El comprobante no debe superar 5 MB.");
-        }
-
-        var contentType = (proof.ContentType ?? string.Empty).ToLowerInvariant();
-        if (contentType is not ("image/jpeg" or "image/jpg" or "image/png"))
-        {
-            return this.ProblemResponse(StatusCodes.Status400BadRequest, "Formato no soportado",
-                "El comprobante debe ser una imagen JPG o PNG.");
+            return validation.Error;
         }
 
         if (form.ClaimedAmount is <= 0m)
@@ -284,25 +319,24 @@ public sealed class CareRequestsController : ControllerBase
                 "El monto reportado debe ser mayor que cero.");
         }
 
-        using var ms = new MemoryStream();
-        await proof.CopyToAsync(ms, cancellationToken);
-        var bytes = ms.ToArray();
-
-        // Validate the actual file signature (magic bytes), not just the client-declared MIME.
-        if (!IsSupportedImage(bytes))
-        {
-            return this.ProblemResponse(StatusCodes.Status400BadRequest, "Formato no soportado",
-                "El comprobante debe ser una imagen JPG o PNG válida.");
-        }
-
         try
         {
             var updated = await _reportPaymentHandler.Handle(
-                new ReportPaymentCommand(id, userId.Value, bytes, contentType, note,
+                new ReportPaymentCommand(id, userId.Value, validation.Content!, validation.ContentType!, note,
                     ClaimedBankReference: form.ClaimedBankReference,
                     ClaimedAmount: form.ClaimedAmount,
                     ClaimedPaymentDate: form.ClaimedPaymentDate,
-                    PayingBank: form.PayingBank),
+                    PayingBank: form.PayingBank,
+                    OcrDraftSentence: form.OcrDraftSentence,
+                    OcrExtractedBankReference: form.OcrExtractedBankReference,
+                    OcrExtractedAmount: form.OcrExtractedAmount,
+                    OcrExtractedPaymentDate: form.OcrExtractedPaymentDate,
+                    OcrExtractedBank: form.OcrExtractedBank,
+                    OcrConfidence: form.OcrConfidence,
+                    OcrWarningsJson: form.OcrWarningsJson,
+                    OcrProvider: form.OcrProvider,
+                    OcrAssessedAtUtc: form.OcrAssessedAtUtc,
+                    OcrClientEdited: form.OcrClientEdited),
                 cancellationToken);
             return Ok(CareRequestResponse.FromDomain(updated));
         }
@@ -315,6 +349,46 @@ public sealed class CareRequestsController : ControllerBase
         {
             return this.ProblemResponse(StatusCodes.Status400BadRequest, "Operación inválida", ex.Message);
         }
+    }
+
+    private async Task<PaymentProofValidationResult> ReadValidatedPaymentProofBytes(
+        IFormFile? proof,
+        CancellationToken cancellationToken)
+    {
+        if (proof is null || proof.Length == 0)
+        {
+            return PaymentProofValidationResult.Fail(
+                this.ProblemResponse(StatusCodes.Status400BadRequest, "Comprobante requerido",
+                    "Debes adjuntar una imagen del comprobante de pago."));
+        }
+
+        if (proof.Length > 5_000_000)
+        {
+            return PaymentProofValidationResult.Fail(
+                this.ProblemResponse(StatusCodes.Status400BadRequest, "Archivo muy grande",
+                    "El comprobante no debe superar 5 MB."));
+        }
+
+        var contentType = (proof.ContentType ?? string.Empty).ToLowerInvariant();
+        if (contentType is not ("image/jpeg" or "image/jpg" or "image/png"))
+        {
+            return PaymentProofValidationResult.Fail(
+                this.ProblemResponse(StatusCodes.Status400BadRequest, "Formato no soportado",
+                    "El comprobante debe ser una imagen JPG o PNG."));
+        }
+
+        using var ms = new MemoryStream();
+        await proof.CopyToAsync(ms, cancellationToken);
+        var bytes = ms.ToArray();
+
+        if (!IsSupportedImage(bytes))
+        {
+            return PaymentProofValidationResult.Fail(
+                this.ProblemResponse(StatusCodes.Status400BadRequest, "Formato no soportado",
+                    "El comprobante debe ser una imagen JPG o PNG válida."));
+        }
+
+        return PaymentProofValidationResult.Success(bytes, contentType);
     }
 
     [HttpGet("{id:guid}/verify-pricing")]
@@ -425,4 +499,55 @@ public sealed class ReportPaymentForm
     public decimal? ClaimedAmount { get; set; }
     public DateOnly? ClaimedPaymentDate { get; set; }
     public string? PayingBank { get; set; }
+    public string? OcrDraftSentence { get; set; }
+    public string? OcrExtractedBankReference { get; set; }
+    public decimal? OcrExtractedAmount { get; set; }
+    public DateOnly? OcrExtractedPaymentDate { get; set; }
+    public string? OcrExtractedBank { get; set; }
+    public decimal? OcrConfidence { get; set; }
+    public string? OcrWarningsJson { get; set; }
+    public string? OcrProvider { get; set; }
+    public DateTime? OcrAssessedAtUtc { get; set; }
+    public bool OcrClientEdited { get; set; }
+}
+
+public sealed class PaymentProofOcrForm
+{
+    public IFormFile Proof { get; set; } = default!;
+}
+
+public sealed record PaymentOcrResponse(
+    string DraftSentence,
+    string? ExtractedBankReference,
+    decimal? ExtractedAmount,
+    DateOnly? ExtractedPaymentDate,
+    string? ExtractedBank,
+    decimal Confidence,
+    IReadOnlyList<string> Warnings,
+    string Provider,
+    DateTime AssessedAtUtc)
+{
+    public static PaymentOcrResponse FromAssessment(PaymentOcrAssessment assessment)
+        => new(
+            assessment.DraftSentence,
+            assessment.ExtractedBankReference,
+            assessment.ExtractedAmount,
+            assessment.ExtractedPaymentDate,
+            assessment.ExtractedBank,
+            assessment.Confidence,
+            assessment.Warnings,
+            assessment.Provider,
+            assessment.AssessedAtUtc);
+}
+
+internal sealed record PaymentProofValidationResult(
+    byte[]? Content,
+    string? ContentType,
+    IActionResult? Error)
+{
+    public static PaymentProofValidationResult Success(byte[] content, string contentType)
+        => new(content, contentType, null);
+
+    public static PaymentProofValidationResult Fail(IActionResult error)
+        => new(null, null, error);
 }

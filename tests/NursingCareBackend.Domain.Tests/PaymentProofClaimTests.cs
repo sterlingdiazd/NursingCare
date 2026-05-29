@@ -35,6 +35,36 @@ public class PaymentProofClaimTests
     }
 
     [Fact]
+    public void Create_StoresOcrDraftMetadata_ForAuditComparison()
+    {
+        var assessedAt = new DateTime(2026, 5, 27, 12, 0, 0, DateTimeKind.Utc);
+
+        var proof = PaymentProof.Create(
+            Guid.NewGuid(), new byte[] { 1 }, "image/png", null, Guid.NewGuid(), DateTime.UtcNow,
+            ocrDraftSentence: "  Borrador OCR: la app leyó un pago. Requiere confirmación bancaria.  ",
+            ocrExtractedBankReference: "  TRF-OCR  ",
+            ocrExtractedAmount: 1375m,
+            ocrExtractedPaymentDate: new DateOnly(2026, 5, 27),
+            ocrExtractedBank: "  Banreservas  ",
+            ocrConfidence: 0.75m,
+            ocrWarningsJson: "[\"Revisar monto\"]",
+            ocrProvider: "AzureVision",
+            ocrAssessedAtUtc: assessedAt,
+            ocrClientEdited: true);
+
+        Assert.Equal("Borrador OCR: la app leyó un pago. Requiere confirmación bancaria.", proof.OcrDraftSentence);
+        Assert.Equal("TRF-OCR", proof.OcrExtractedBankReference);
+        Assert.Equal(1375m, proof.OcrExtractedAmount);
+        Assert.Equal(new DateOnly(2026, 5, 27), proof.OcrExtractedPaymentDate);
+        Assert.Equal("Banreservas", proof.OcrExtractedBank);
+        Assert.Equal(0.75m, proof.OcrConfidence);
+        Assert.Equal("[\"Revisar monto\"]", proof.OcrWarningsJson);
+        Assert.Equal("AzureVision", proof.OcrProvider);
+        Assert.Equal(assessedAt, proof.OcrAssessedAtUtc);
+        Assert.True(proof.OcrClientEdited);
+    }
+
+    [Fact]
     public void Create_BlankClaimStrings_StoredAsNull()
     {
         var proof = PaymentProof.Create(
@@ -59,6 +89,16 @@ public class PaymentProofClaimTests
     public void Create_NonPositiveClaimedAmount_Throws(double amount)
     {
         Assert.Throws<ArgumentException>(() => CreateWithClaim((decimal)amount));
+    }
+
+    [Theory]
+    [InlineData(-0.1)]
+    [InlineData(1.1)]
+    public void Create_InvalidOcrConfidence_Throws(double confidence)
+    {
+        Assert.Throws<ArgumentException>(() => PaymentProof.Create(
+            Guid.NewGuid(), new byte[] { 1 }, "image/png", null, Guid.NewGuid(), DateTime.UtcNow,
+            ocrConfidence: (decimal)confidence));
     }
 
     [Fact]

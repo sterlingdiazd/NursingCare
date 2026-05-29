@@ -27,6 +27,19 @@ public sealed class PaymentProof
     public DateOnly? ClaimedPaymentDate { get; private set; }
     public string? PayingBank { get; private set; }
 
+    // OCR draft/audit metadata. These fields describe what automation thought it saw; they are not
+    // proof of funds and never move the request to Paid without admin bank confirmation.
+    public string? OcrDraftSentence { get; private set; }
+    public string? OcrExtractedBankReference { get; private set; }
+    public decimal? OcrExtractedAmount { get; private set; }
+    public DateOnly? OcrExtractedPaymentDate { get; private set; }
+    public string? OcrExtractedBank { get; private set; }
+    public decimal? OcrConfidence { get; private set; }
+    public string? OcrWarningsJson { get; private set; }
+    public string? OcrProvider { get; private set; }
+    public DateTime? OcrAssessedAtUtc { get; private set; }
+    public bool OcrClientEdited { get; private set; }
+
     private PaymentProof() { } // For ORM
 
     public static PaymentProof Create(
@@ -39,7 +52,17 @@ public sealed class PaymentProof
         string? claimedBankReference = null,
         decimal? claimedAmount = null,
         DateOnly? claimedPaymentDate = null,
-        string? payingBank = null)
+        string? payingBank = null,
+        string? ocrDraftSentence = null,
+        string? ocrExtractedBankReference = null,
+        decimal? ocrExtractedAmount = null,
+        DateOnly? ocrExtractedPaymentDate = null,
+        string? ocrExtractedBank = null,
+        decimal? ocrConfidence = null,
+        string? ocrWarningsJson = null,
+        string? ocrProvider = null,
+        DateTime? ocrAssessedAtUtc = null,
+        bool ocrClientEdited = false)
     {
         if (careRequestId == Guid.Empty)
             throw new ArgumentException("CareRequestId cannot be empty.", nameof(careRequestId));
@@ -56,6 +79,12 @@ public sealed class PaymentProof
         if (claimedAmount is <= 0m)
             throw new ArgumentException("Claimed amount must be positive when provided.", nameof(claimedAmount));
 
+        if (ocrExtractedAmount is <= 0m)
+            throw new ArgumentException("OCR extracted amount must be positive when provided.", nameof(ocrExtractedAmount));
+
+        if (ocrConfidence is < 0m or > 1m)
+            throw new ArgumentException("OCR confidence must be between 0 and 1.", nameof(ocrConfidence));
+
         return new PaymentProof
         {
             Id = Guid.NewGuid(),
@@ -69,6 +98,16 @@ public sealed class PaymentProof
             ClaimedAmount = claimedAmount,
             ClaimedPaymentDate = claimedPaymentDate,
             PayingBank = string.IsNullOrWhiteSpace(payingBank) ? null : payingBank.Trim(),
+            OcrDraftSentence = string.IsNullOrWhiteSpace(ocrDraftSentence) ? null : ocrDraftSentence.Trim(),
+            OcrExtractedBankReference = string.IsNullOrWhiteSpace(ocrExtractedBankReference) ? null : ocrExtractedBankReference.Trim(),
+            OcrExtractedAmount = ocrExtractedAmount,
+            OcrExtractedPaymentDate = ocrExtractedPaymentDate,
+            OcrExtractedBank = string.IsNullOrWhiteSpace(ocrExtractedBank) ? null : ocrExtractedBank.Trim(),
+            OcrConfidence = ocrConfidence,
+            OcrWarningsJson = string.IsNullOrWhiteSpace(ocrWarningsJson) ? null : ocrWarningsJson.Trim(),
+            OcrProvider = string.IsNullOrWhiteSpace(ocrProvider) ? null : ocrProvider.Trim(),
+            OcrAssessedAtUtc = ocrAssessedAtUtc,
+            OcrClientEdited = ocrClientEdited,
         };
     }
 

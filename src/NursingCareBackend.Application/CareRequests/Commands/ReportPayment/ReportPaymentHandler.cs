@@ -52,7 +52,17 @@ public sealed class ReportPaymentHandler
             claimedBankReference: command.ClaimedBankReference,
             claimedAmount: command.ClaimedAmount,
             claimedPaymentDate: command.ClaimedPaymentDate,
-            payingBank: command.PayingBank);
+            payingBank: command.PayingBank,
+            ocrDraftSentence: command.OcrDraftSentence,
+            ocrExtractedBankReference: command.OcrExtractedBankReference,
+            ocrExtractedAmount: command.OcrExtractedAmount,
+            ocrExtractedPaymentDate: command.OcrExtractedPaymentDate,
+            ocrExtractedBank: command.OcrExtractedBank,
+            ocrConfidence: command.OcrConfidence,
+            ocrWarningsJson: command.OcrWarningsJson,
+            ocrProvider: command.OcrProvider,
+            ocrAssessedAtUtc: command.OcrAssessedAtUtc,
+            ocrClientEdited: command.OcrClientEdited);
         await _proofs.AddAsync(proof, cancellationToken);
 
         careRequest.ReportPayment(proof.Id, now);

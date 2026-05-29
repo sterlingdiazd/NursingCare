@@ -30,6 +30,7 @@ using NursingCareBackend.Infrastructure.Catalogs;
 using NursingCareBackend.Infrastructure.Authentication;
 using NursingCareBackend.Infrastructure.Email;
 using NursingCareBackend.Application.CareRequests;
+using NursingCareBackend.Application.CareRequests.PaymentOcr;
 using NursingCareBackend.Infrastructure.CareRequests;
 using NursingCareBackend.Infrastructure.Identity;
 using NursingCareBackend.Infrastructure.Persistence;
@@ -101,6 +102,37 @@ public static class DependencyInjection
 
         services.Configure<EmailArchiveOptions>(
             configuration.GetSection(EmailArchiveOptions.SectionName));
+        services.Configure<PaymentOcrOptions>(options =>
+        {
+            var section = configuration.GetSection(PaymentOcrOptions.SectionName);
+            options.Provider = Environment.GetEnvironmentVariable("PAYMENT_OCR_PROVIDER")
+                ?? section["Provider"]
+                ?? "Auto";
+            options.AzureVisionEndpoint = Environment.GetEnvironmentVariable("PAYMENT_OCR_AZURE_VISION_ENDPOINT")
+                ?? section["AzureVisionEndpoint"]
+                ?? string.Empty;
+            options.AzureVisionKey = Environment.GetEnvironmentVariable("PAYMENT_OCR_AZURE_VISION_KEY")
+                ?? section["AzureVisionKey"]
+                ?? string.Empty;
+            options.GoogleVisionEndpoint = Environment.GetEnvironmentVariable("PAYMENT_OCR_GOOGLE_VISION_ENDPOINT")
+                ?? section["GoogleVisionEndpoint"]
+                ?? "https://vision.googleapis.com/v1/images:annotate";
+            options.GoogleVisionApiKey = Environment.GetEnvironmentVariable("PAYMENT_OCR_GOOGLE_VISION_KEY")
+                ?? section["GoogleVisionApiKey"]
+                ?? string.Empty;
+            options.OcrSpaceEndpoint = Environment.GetEnvironmentVariable("PAYMENT_OCR_OCRSPACE_ENDPOINT")
+                ?? section["OcrSpaceEndpoint"]
+                ?? "https://api.ocr.space/parse/image";
+            options.OcrSpaceApiKey = Environment.GetEnvironmentVariable("PAYMENT_OCR_OCRSPACE_KEY")
+                ?? section["OcrSpaceApiKey"]
+                ?? string.Empty;
+            options.TimeoutSeconds =
+                int.TryParse(
+                    Environment.GetEnvironmentVariable("PAYMENT_OCR_TIMEOUT_SECONDS") ?? section["TimeoutSeconds"],
+                    out var timeout) && timeout > 0
+                    ? timeout
+                    : 8;
+        });
 
         // DEMO communications redirect: when enabled, every outgoing email AND every wa.me
         // WhatsApp link is redirected to a single configured demo contact (the owner) so demos
@@ -127,6 +159,28 @@ public static class DependencyInjection
         services.AddScoped<IReceiptRepository, ReceiptRepository>();
         services.AddScoped<ICreditNoteRepository, CreditNoteRepository>();
         services.AddScoped<IPaymentProofRepository, PaymentProofRepository>();
+        // Payment-proof OCR: a stacked reader behind one orchestrator -
+        // Azure AI Vision (primary) -> Google Vision (high 20 MB image limit) ->
+        // OCR.space (free reserve). Each provider's HttpClient is bounded by
+        // PaymentOcr:TimeoutSeconds so a hung provider can never freeze the client; on
+        // timeout the extractor returns null and the orchestrator falls to the next one.
+        var ocrTimeoutSeconds =
+            int.TryParse(
+                Environment.GetEnvironmentVariable("PAYMENT_OCR_TIMEOUT_SECONDS")
+                    ?? configuration.GetSection(PaymentOcrOptions.SectionName)["TimeoutSeconds"],
+                out var parsedOcrTimeout) && parsedOcrTimeout > 0
+                ? parsedOcrTimeout
+                : 8;
+        services.AddHttpClient<AzureVisionTextExtractor>(client =>
+            client.Timeout = TimeSpan.FromSeconds(ocrTimeoutSeconds));
+        services.AddHttpClient<GoogleVisionTextExtractor>(client =>
+            client.Timeout = TimeSpan.FromSeconds(ocrTimeoutSeconds));
+        services.AddHttpClient<OcrSpaceTextExtractor>(client =>
+            client.Timeout = TimeSpan.FromSeconds(ocrTimeoutSeconds));
+        services.AddScoped<IPaymentProofTextExtractor>(sp => sp.GetRequiredService<AzureVisionTextExtractor>());
+        services.AddScoped<IPaymentProofTextExtractor>(sp => sp.GetRequiredService<GoogleVisionTextExtractor>());
+        services.AddScoped<IPaymentProofTextExtractor>(sp => sp.GetRequiredService<OcrSpaceTextExtractor>());
+        services.AddScoped<IPaymentProofOcrService, PaymentProofOcrService>();
         services.AddScoped<IReceiptPdfService, ReceiptPdfService>();
         services.AddScoped<IAdminDashboardRepository, AdminDashboardRepository>();
         services.AddScoped<NursingCareBackend.Application.AdminPortal.Finance.IAdminFinanceRepository, AdminFinanceRepository>();

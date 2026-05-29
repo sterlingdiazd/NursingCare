@@ -12,4 +12,14 @@ public sealed record ReportPaymentCommand(
     string? ClaimedBankReference = null,
     decimal? ClaimedAmount = null,
     DateOnly? ClaimedPaymentDate = null,
-    string? PayingBank = null);
+    string? PayingBank = null,
+    string? OcrDraftSentence = null,
+    string? OcrExtractedBankReference = null,
+    decimal? OcrExtractedAmount = null,
+    DateOnly? OcrExtractedPaymentDate = null,
+    string? OcrExtractedBank = null,
+    decimal? OcrConfidence = null,
+    string? OcrWarningsJson = null,
+    string? OcrProvider = null,
+    DateTime? OcrAssessedAtUtc = null,
+    bool OcrClientEdited = false);

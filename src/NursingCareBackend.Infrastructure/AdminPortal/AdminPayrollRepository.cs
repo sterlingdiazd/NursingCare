@@ -116,6 +116,7 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
         var nurseIds = lines.Select(l => l.NurseUserId).Distinct().ToList();
         var nurseLookup = await BuildNurseLookupAsync(nurseIds, cancellationToken);
         var subtotalLookup = await BuildServiceSubtotalLookupAsync(lines, cancellationToken);
+        var careRequestLookup = await BuildServiceCareRequestLookupAsync(lines, cancellationToken);
 
         // Deductions are period-level per nurse, subtracted once — not summed across service lines.
         var deductionsByNurse = await _dbContext.DeductionRecords
@@ -141,6 +142,7 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
                 l.NurseUserId,
                 nurseLookup.GetValueOrDefault(l.NurseUserId, l.NurseUserId.ToString()),
                 l.ServiceExecutionId,
+                l.ServiceExecutionId.HasValue ? careRequestLookup.GetValueOrDefault(l.ServiceExecutionId.Value) : null,
                 l.Description,
                 l.BaseCompensation,
                 l.TransportIncentive,
@@ -470,6 +472,7 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
         var nurseIds = lines.Select(l => l.NurseUserId).Distinct().ToList();
         var nurseLookup = await BuildNurseLookupAsync(nurseIds, cancellationToken);
         var subtotalLookup = await BuildServiceSubtotalLookupAsync(lines, cancellationToken);
+        var careRequestLookup = await BuildServiceCareRequestLookupAsync(lines, cancellationToken);
 
         return lines
             .Select(l => new AdminPayrollLineItem(
@@ -477,6 +480,7 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
                 l.NurseUserId,
                 nurseLookup.GetValueOrDefault(l.NurseUserId, l.NurseUserId.ToString()),
                 l.ServiceExecutionId,
+                l.ServiceExecutionId.HasValue ? careRequestLookup.GetValueOrDefault(l.ServiceExecutionId.Value) : null,
                 l.Description,
                 l.BaseCompensation,
                 l.TransportIncentive,
@@ -489,6 +493,25 @@ public sealed class AdminPayrollRepository : IAdminPayrollRepository, INursePayr
                 l.CreatedAtUtc))
             .ToList()
             .AsReadOnly();
+    }
+
+    private async Task<Dictionary<Guid, Guid>> BuildServiceCareRequestLookupAsync(
+        IReadOnlyCollection<NursingCareBackend.Domain.Payroll.PayrollLine> lines,
+        CancellationToken cancellationToken)
+    {
+        var executionIds = lines
+            .Where(l => l.ServiceExecutionId.HasValue)
+            .Select(l => l.ServiceExecutionId!.Value)
+            .Distinct()
+            .ToList();
+
+        if (executionIds.Count == 0)
+            return new Dictionary<Guid, Guid>();
+
+        return await _dbContext.ServiceExecutions
+            .AsNoTracking()
+            .Where(e => executionIds.Contains(e.Id))
+            .ToDictionaryAsync(e => e.Id, e => e.CareRequestId, cancellationToken);
     }
 
     private async Task<Dictionary<Guid, decimal>> BuildServiceSubtotalLookupAsync(

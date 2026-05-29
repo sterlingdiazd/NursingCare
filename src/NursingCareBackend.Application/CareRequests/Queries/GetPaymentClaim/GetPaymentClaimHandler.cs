@@ -19,7 +19,17 @@ public sealed record PaymentClaimReview(
     // Anti-fraud flags the admin should heed before confirming.
     bool AmountReported,
     bool AmountMatches,
-    bool ReusedReference
+    bool ReusedReference,
+    string? OcrDraftSentence,
+    string? OcrExtractedBankReference,
+    decimal? OcrExtractedAmount,
+    DateOnly? OcrExtractedPaymentDate,
+    string? OcrExtractedBank,
+    decimal? OcrConfidence,
+    string? OcrWarningsJson,
+    string? OcrProvider,
+    DateTime? OcrAssessedAtUtc,
+    bool OcrClientEdited
 );
 
 public sealed class GetPaymentClaimHandler
@@ -61,7 +71,17 @@ public sealed class GetPaymentClaimHandler
                 InvoiceTotal: careRequest.Total,
                 AmountReported: false,
                 AmountMatches: false,
-                ReusedReference: false);
+                ReusedReference: false,
+                OcrDraftSentence: null,
+                OcrExtractedBankReference: null,
+                OcrExtractedAmount: null,
+                OcrExtractedPaymentDate: null,
+                OcrExtractedBank: null,
+                OcrConfidence: null,
+                OcrWarningsJson: null,
+                OcrProvider: null,
+                OcrAssessedAtUtc: null,
+                OcrClientEdited: false);
         }
 
         var reusedReference = !string.IsNullOrWhiteSpace(proof.ClaimedBankReference)
@@ -79,6 +99,16 @@ public sealed class GetPaymentClaimHandler
             InvoiceTotal: careRequest.Total,
             AmountReported: proof.ClaimedAmount.HasValue,
             AmountMatches: proof.AmountMatches(careRequest.Total),
-            ReusedReference: reusedReference);
+            ReusedReference: reusedReference,
+            OcrDraftSentence: proof.OcrDraftSentence,
+            OcrExtractedBankReference: proof.OcrExtractedBankReference,
+            OcrExtractedAmount: proof.OcrExtractedAmount,
+            OcrExtractedPaymentDate: proof.OcrExtractedPaymentDate,
+            OcrExtractedBank: proof.OcrExtractedBank,
+            OcrConfidence: proof.OcrConfidence,
+            OcrWarningsJson: proof.OcrWarningsJson,
+            OcrProvider: proof.OcrProvider,
+            OcrAssessedAtUtc: proof.OcrAssessedAtUtc,
+            OcrClientEdited: proof.OcrClientEdited);
     }
 }

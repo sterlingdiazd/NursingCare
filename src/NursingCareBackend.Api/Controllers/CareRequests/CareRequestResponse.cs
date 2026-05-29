@@ -50,6 +50,7 @@ public sealed record CareRequestResponse(
   {
     if (careRequest.VoidedAtUtc.HasValue) return "Anulado";
     if (careRequest.PaidAtUtc.HasValue) return "Pagado";
+    if (careRequest.Status == CareRequestStatus.PaymentReported) return "Pago reportado";
     if (careRequest.InvoicedAtUtc.HasValue) return "Facturado";
     return "Pendiente de factura";
   }

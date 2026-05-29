@@ -107,6 +107,13 @@ public sealed class NursingCareDbContext : DbContext
                      builder.Property(x => x.ClaimedBankReference).HasMaxLength(100);
                      builder.Property(x => x.ClaimedAmount).HasColumnType("decimal(10,2)");
                      builder.Property(x => x.PayingBank).HasMaxLength(120);
+                     builder.Property(x => x.OcrDraftSentence).HasMaxLength(700);
+                     builder.Property(x => x.OcrExtractedBankReference).HasMaxLength(100);
+                     builder.Property(x => x.OcrExtractedAmount).HasColumnType("decimal(10,2)");
+                     builder.Property(x => x.OcrExtractedBank).HasMaxLength(120);
+                     builder.Property(x => x.OcrConfidence).HasColumnType("decimal(5,4)");
+                     builder.Property(x => x.OcrWarningsJson).HasMaxLength(2000);
+                     builder.Property(x => x.OcrProvider).HasMaxLength(60);
                      builder.HasIndex(x => x.ClaimedBankReference);
               });
 

@@ -17,6 +17,7 @@
     <StaticWebAssetsEnabled>false</StaticWebAssetsEnabled>
     <EnableDefaultContentItems>false</EnableDefaultContentItems>
     <DefaultItemExcludes>$(DefaultItemExcludes);bin/**;obj/**;.azure-deploy/**</DefaultItemExcludes>
+    <UserSecretsId>f8e8f3da-58f6-4be0-b7be-7588f9c1278f</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>

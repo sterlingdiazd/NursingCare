@@ -5,6 +5,7 @@ public sealed record AdminPayrollLineItem(
     Guid NurseUserId,
     string NurseDisplayName,
     Guid? ServiceExecutionId,
+    Guid? CareRequestId,
     string Description,
     decimal BaseCompensation,
     decimal TransportIncentive,
