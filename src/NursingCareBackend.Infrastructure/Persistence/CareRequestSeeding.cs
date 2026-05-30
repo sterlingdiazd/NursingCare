@@ -19,7 +19,16 @@ public static class CareRequestSeeding
         var now = DateTime.UtcNow;
         var seedPeriodStart = new DateOnly(now.Year, now.Month, 1);
         var seedPeriodEnd = new DateOnly(now.Year, now.Month, 15);
-        var createdAtUtc = now.AddDays(-5);
+
+        // Anchor completion INSIDE the current month so the finance dashboard (which derives
+        // revenue/margin from ServiceExecutions dated in the current month) always sees these,
+        // regardless of which day of the month the seed runs. On the 1st–5th, now-5d would fall
+        // in the previous month and the dashboard would read zero — clamp up to the month start.
+        var monthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var completedAt = now.AddHours(-6);
+        if (completedAt < monthStart) completedAt = monthStart;
+        // Request created 12h before completion (preserves the original create→complete spacing).
+        var createdAtUtc = completedAt.AddHours(-12);
 
         var payrollPeriod = PayrollPeriod.Create(
             startDate: seedPeriodStart,
@@ -69,6 +78,9 @@ public static class CareRequestSeeding
 
         var ruleLookup = rules.ToDictionary(r => r.CareRequestCategoryCode ?? "");
 
+        // Each completed request gets a linked ServiceExecution (as the real complete-flow does).
+        // Without these, the finance dashboard — which derives revenue/margin from ServiceExecutions
+        // dated in the current month — reads zero even though payroll lines exist.
         var payrollLines = new List<PayrollLine>();
         foreach (var cr in careRequests)
         {
@@ -81,11 +93,51 @@ public static class CareRequestSeeding
             var complexity = decimal.Round(subtotalBeforeSupplies * Math.Max(0m, (cr.ComplexityMultiplierSnapshot ?? 1m) - 1m) * (rule.ComplexityBonusPercent / 100m), 2, MidpointRounding.AwayFromZero);
             var supplies = decimal.Round((cr.MedicalSuppliesCost ?? 0m) * (rule.MedicalSuppliesPercent / 100m), 2, MidpointRounding.AwayFromZero);
 
+            var exec = ServiceExecution.Create(
+                careRequestId: cr.Id,
+                nurseUserId: cr.AssignedNurse!.Value,
+                shiftRecordId: null,
+                compensationRuleId: rule.Id,
+                employmentType: rule.EmploymentType,
+                variant: ServiceExecutionVariant.Standard,
+                executedAtUtc: executedAt,
+                careRequestType: cr.CareRequestType,
+                unitType: cr.UnitType,
+                unit: cr.Unit,
+                pricingCategoryCode: cr.PricingCategoryCode,
+                distanceFactorCode: cr.DistanceFactor,
+                complexityLevelCode: cr.ComplexityLevel,
+                basePrice: cr.Price,
+                careRequestTotal: cr.Total,
+                clientBasePrice: cr.ClientBasePrice ?? cr.Price,
+                categoryFactorSnapshot: cr.CategoryFactorSnapshot ?? 1m,
+                distanceMultiplierSnapshot: cr.DistanceFactorMultiplierSnapshot ?? 1m,
+                complexityMultiplierSnapshot: cr.ComplexityMultiplierSnapshot ?? 1m,
+                volumeDiscountPercentSnapshot: cr.VolumeDiscountPercentSnapshot ?? 0,
+                subtotalBeforeSupplies: subtotalBeforeSupplies,
+                medicalSuppliesCost: cr.MedicalSuppliesCost ?? 0m,
+                ruleBaseCompensationPercent: rule.BaseCompensationPercent,
+                ruleFixedAmountPerUnit: rule.FixedAmountPerUnit,
+                ruleTransportIncentivePercent: rule.TransportIncentivePercent,
+                ruleComplexityBonusPercent: rule.ComplexityBonusPercent,
+                ruleMedicalSuppliesPercent: rule.MedicalSuppliesPercent,
+                ruleVariantPercent: rule.BaseCompensationPercent,
+                baseCompensation: baseComp,
+                transportIncentive: transport,
+                complexityBonus: complexity,
+                medicalSuppliesCompensation: supplies,
+                adjustmentsTotal: 0m,
+                deductionsTotal: 0m,
+                manualOverrideAmount: null,
+                notes: "Servicio completado conforme a lo programado.",
+                createdAtUtc: executedAt);
+            db.ServiceExecutions.Add(exec);
+
             payrollLines.Add(PayrollLine.Create(
                 payrollPeriodId: payrollPeriod.Id,
                 nurseUserId: cr.AssignedNurse!.Value,
-                serviceExecutionId: null,
-                description: $"Servicio {cr.CareRequestType}",
+                serviceExecutionId: exec.Id,
+                description: SeedText.Label(cr.CareRequestType),
                 baseCompensation: baseComp,
                 transportIncentive: transport,
                 complexityBonus: complexity,
@@ -96,6 +148,18 @@ public static class CareRequestSeeding
         }
 
         db.PayrollLines.AddRange(payrollLines);
+        await db.SaveChangesAsync(cancellationToken);
+
+        // Invoice + pay a couple of current-month requests so the finance dashboard's
+        // "Cobrado" (collected) is non-zero on a fresh seed, not only revenue/margin. Keep the
+        // dates inside the current month and never in the future (matters near month start).
+        var invoiceAt = completedAt.AddHours(1) > now ? now : completedAt.AddHours(1);
+        var payAt = completedAt.AddHours(2) > now ? now : completedAt.AddHours(2);
+        for (int i = 0; i < Math.Min(2, careRequests.Length); i++)
+        {
+            careRequests[i].Invoice($"SOL-{now:yyyyMM}-{(i + 1):D4}", invoiceAt);
+            careRequests[i].Pay($"TRF-BHD-{(i + 1):D5}", payAt);
+        }
         await db.SaveChangesAsync(cancellationToken);
     }
 
@@ -184,8 +248,8 @@ public static class CareRequestSeeding
         var careRequest = CareRequest.Create(new CareRequestCreateParams
         {
             UserID = clientId,
-            Description = $"Care service for {careRequestTypeCode}",
-            CareRequestReason = $"Care request requiring {careRequestTypeCode} service",
+            Description = SeedText.Label(careRequestTypeCode),
+            CareRequestReason = $"Solicitud de {SeedText.Label(careRequestTypeCode).ToLowerInvariant()} a domicilio.",
             CareRequestType = careRequestTypeCode,
             UnitType = unitTypeCode,
             SuggestedNurse = null,

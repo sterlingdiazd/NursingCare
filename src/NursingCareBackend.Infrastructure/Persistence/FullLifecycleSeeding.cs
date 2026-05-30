@@ -98,11 +98,11 @@ public static class FullLifecycleSeeding
         // Phone must be exactly 10 digits.
         var clientData = new[]
         {
-            (Id: ClientCarmenId,   Name: "Carmen",  LastName: "Lopez Rodriguez",  Cedula: "40212345678", Phone: "8095551234", Email: "carmen.lopez@ejemplo.com"),
-            (Id: ClientAnaId,      Name: "Ana",     LastName: "Reyes Martinez",   Cedula: "40298765432", Phone: "8295554321", Email: "ana.reyes@ejemplo.com"),
-            (Id: ClientRosaId,     Name: "Rosa",    LastName: "Mendez Familia",   Cedula: "40187654321", Phone: "8495553456", Email: "rosa.mendez@ejemplo.com"),
-            (Id: ClientLuisaId,    Name: "Luisa",   LastName: "Santana Torres",   Cedula: "40176543210", Phone: "8095557890", Email: "luisa.santana@ejemplo.com"),
-            (Id: ClientBeatrizId,  Name: "Beatriz", LastName: "Garcia Pena",      Cedula: "40165432109", Phone: "8295556789", Email: "beatriz.garcia@ejemplo.com"),
+            (Id: ClientCarmenId,   Name: "Carmen",  LastName: "Lopez Rodriguez",  Cedula: "40212345678", Phone: "8095551234", Email: "carmen.lopez@gmail.com"),
+            (Id: ClientAnaId,      Name: "Ana",     LastName: "Reyes Martinez",   Cedula: "40298765432", Phone: "8295554321", Email: "ana.reyes@gmail.com"),
+            (Id: ClientRosaId,     Name: "Rosa",    LastName: "Mendez Familia",   Cedula: "40187654321", Phone: "8495553456", Email: "rosa.mendez@gmail.com"),
+            (Id: ClientLuisaId,    Name: "Luisa",   LastName: "Santana Torres",   Cedula: "40176543210", Phone: "8095557890", Email: "luisa.santana@gmail.com"),
+            (Id: ClientBeatrizId,  Name: "Beatriz", LastName: "Garcia Pena",      Cedula: "40165432109", Phone: "8295556789", Email: "beatriz.garcia@gmail.com"),
         };
 
         foreach (var cd in clientData)
@@ -540,7 +540,7 @@ public static class FullLifecycleSeeding
                 adjustmentsTotal:             0m,
                 deductionsTotal:              0m,
                 manualOverrideAmount:         null,
-                notes:                        "Ejecucion seed — lifecycle con ajuste",
+                notes:                        "Servicio completado conforme a lo programado.",
                 createdAtUtc:                 executedAt);
 
             db.ServiceExecutions.Add(exec);
@@ -563,7 +563,7 @@ public static class FullLifecycleSeeding
                 payrollPeriodId:            marchPeriod.Id,
                 nurseUserId:                cr.AssignedNurse!.Value,
                 serviceExecutionId:         exec.Id,
-                description:                $"Servicio {cr.CareRequestType} — lifecycle seed (ajustado)",
+                description:                $"{SeedText.Label(cr.CareRequestType)} (con ajuste)",
                 baseCompensation:           baseComp,
                 transportIncentive:         transport,
                 complexityBonus:            complexity,
@@ -593,7 +593,7 @@ public static class FullLifecycleSeeding
                 payrollPeriodId:            marchPeriod.Id,
                 nurseUserId:                cr.AssignedNurse!.Value,
                 serviceExecutionId:         null,
-                description:                $"Servicio {cr.CareRequestType} — lifecycle seed",
+                description:                SeedText.Label(cr.CareRequestType),
                 baseCompensation:           baseComp,
                 transportIncentive:         transport,
                 complexityBonus:            complexity,
@@ -624,26 +624,26 @@ public static class FullLifecycleSeeding
 
         var logs = new List<AuditLog>
         {
-            AuditEntry(adminId, "Admin", "ApproveRequest",    "CareRequest",    "lifecycle-approved-1",  "Solicitud aprobada y enfermera asignada.",                     march10),
-            AuditEntry(adminId, "Admin", "ApproveRequest",    "CareRequest",    "lifecycle-approved-2",  "Solicitud aprobada.",                                          march10.AddMinutes(5)),
-            AuditEntry(adminId, "Admin", "RejectRequest",     "CareRequest",    "lifecycle-rejected-1",  "Solicitud rechazada: zona fuera de cobertura.",                march10.AddMinutes(10)),
-            AuditEntry(adminId, "Admin", "RejectRequest",     "CareRequest",    "lifecycle-rejected-2",  "Solicitud rechazada: documentación incompleta.",               march10.AddMinutes(15)),
-            AuditEntry(adminId, "Admin", "CompleteRequest",   "CareRequest",    "lifecycle-completed-1", "Servicio marcado como completado.",                            march10.AddMinutes(20)),
-            AuditEntry(adminId, "Admin", "CompleteRequest",   "CareRequest",    "lifecycle-completed-2", "Servicio completado por enfermera asignada.",                  march10.AddMinutes(25)),
-            AuditEntry(adminId, "Admin", "InvoiceRequest",    "CareRequest",    "lifecycle-invoiced-1",  "Factura SOL-202603-0031 generada.",                            march10.AddMinutes(30)),
-            AuditEntry(adminId, "Admin", "InvoiceRequest",    "CareRequest",    "lifecycle-invoiced-2",  "Factura SOL-202603-0032 generada.",                            march10.AddMinutes(35)),
-            AuditEntry(adminId, "Admin", "RecordPayment",     "CareRequest",    "lifecycle-paid-1",      "Pago registrado: TRF-BHD-00201.",                              march10.AddMinutes(40)),
-            AuditEntry(adminId, "Admin", "RecordPayment",     "CareRequest",    "lifecycle-paid-2",      "Pago registrado: TRF-BHD-00202.",                              march10.AddMinutes(45)),
-            AuditEntry(adminId, "Admin", "VoidRequest",       "CareRequest",    "lifecycle-voided-1",    "Solicitud anulada: paciente hospitalizado.",                   march10.AddMinutes(50)),
-            AuditEntry(adminId, "Admin", "VoidRequest",       "CareRequest",    "lifecycle-voided-2",    "Solicitud anulada: cambio de tratamiento médico.",             march10.AddMinutes(55)),
+            AuditEntry(adminId, "Admin", "ApproveRequest",    "CareRequest",    Guid.NewGuid().ToString(), "Solicitud aprobada y enfermera asignada.",                   march10),
+            AuditEntry(adminId, "Admin", "ApproveRequest",    "CareRequest",    Guid.NewGuid().ToString(), "Solicitud aprobada.",                                        march10.AddMinutes(5)),
+            AuditEntry(adminId, "Admin", "RejectRequest",     "CareRequest",    Guid.NewGuid().ToString(), "Solicitud rechazada: zona fuera de cobertura.",              march10.AddMinutes(10)),
+            AuditEntry(adminId, "Admin", "RejectRequest",     "CareRequest",    Guid.NewGuid().ToString(), "Solicitud rechazada: documentación incompleta.",             march10.AddMinutes(15)),
+            AuditEntry(adminId, "Admin", "CompleteRequest",   "CareRequest",    Guid.NewGuid().ToString(), "Servicio marcado como completado.",                          march10.AddMinutes(20)),
+            AuditEntry(adminId, "Admin", "CompleteRequest",   "CareRequest",    Guid.NewGuid().ToString(), "Servicio completado por enfermera asignada.",                march10.AddMinutes(25)),
+            AuditEntry(adminId, "Admin", "InvoiceRequest",    "CareRequest",    Guid.NewGuid().ToString(), "Factura SOL-202603-0031 generada.",                          march10.AddMinutes(30)),
+            AuditEntry(adminId, "Admin", "InvoiceRequest",    "CareRequest",    Guid.NewGuid().ToString(), "Factura SOL-202603-0032 generada.",                          march10.AddMinutes(35)),
+            AuditEntry(adminId, "Admin", "RecordPayment",     "CareRequest",    Guid.NewGuid().ToString(), "Pago registrado: TRF-BHD-00201.",                            march10.AddMinutes(40)),
+            AuditEntry(adminId, "Admin", "RecordPayment",     "CareRequest",    Guid.NewGuid().ToString(), "Pago registrado: TRF-BHD-00202.",                            march10.AddMinutes(45)),
+            AuditEntry(adminId, "Admin", "VoidRequest",       "CareRequest",    Guid.NewGuid().ToString(), "Solicitud anulada: paciente hospitalizado.",                 march10.AddMinutes(50)),
+            AuditEntry(adminId, "Admin", "VoidRequest",       "CareRequest",    Guid.NewGuid().ToString(), "Solicitud anulada: cambio de tratamiento médico.",           march10.AddMinutes(55)),
             AuditEntry(adminId, "Admin", "UserLogin",         "User",           adminId.ToString(),      "Inicio de sesión exitoso desde portal de administración.",     march10.AddHours(1)),
             AuditEntry(adminId, "Admin", "UserLogin",         "User",           adminId.ToString(),      "Inicio de sesión exitoso.",                                    march10.AddHours(2)),
             AuditEntry(adminId, "Admin", "UpdateSetting",     "SystemSetting",  "CARE_REQUEST_AGING_THRESHOLD_HOURS", "Umbral de envejecimiento actualizado de 48 a 72 horas.", march10.AddHours(3)),
             AuditEntry(adminId, "Admin", "UpdateSetting",     "SystemSetting",  "DASHBOARD_HIGH_SEVERITY_THRESHOLD",  "Umbral de severidad actualizado a 85.",              march10.AddHours(4)),
-            AuditEntry(adminId, "Admin", "ClosePayrollPeriod","PayrollPeriod",  "march-2026",            "Período de nómina de marzo 2026 cerrado.",                     april1),
-            AuditEntry(adminId, "Admin", "ApproveOverride",   "PayrollLineOverride","lifecycle-override-1","Override de línea de nómina aprobado.",                      april2),
+            AuditEntry(adminId, "Admin", "ClosePayrollPeriod","PayrollPeriod",  Guid.NewGuid().ToString(), "Período de nómina de marzo 2026 cerrado.",                   april1),
+            AuditEntry(adminId, "Admin", "ApproveOverride",   "PayrollLineOverride",Guid.NewGuid().ToString(),"Override de línea de nómina aprobado.",                    april2),
             AuditEntry(adminId, "Admin", "NurseProfileReview","Nurse",          CatalogSeeding.NurseIds["Lorea"].ToString(), "Perfil de enfermera revisado y actualizado.", april3),
-            AuditEntry(adminId, "Admin", "CancelRequest",     "CareRequest",    "lifecycle-cancelled-1", "Solicitud cancelada a pedido del cliente.",                    march10.AddMinutes(60)),
+            AuditEntry(adminId, "Admin", "CancelRequest",     "CareRequest",    Guid.NewGuid().ToString(), "Solicitud cancelada a pedido del cliente.",                  march10.AddMinutes(60)),
         };
 
         db.AuditLogs.AddRange(logs);
@@ -1047,9 +1047,9 @@ public static class FullLifecycleSeeding
 
         var pendingData = new[]
         {
-            (Id: PendingNurse1Id, Name: "Raquel",  LastName: "Familia Perez",   Phone: "8095560023", Cedula: "40234500023", Email: "raquel.familia@nurses.test",  License: "200023", Specialty: "Cuidado de adultos"),
-            (Id: PendingNurse2Id, Name: "Xiomara", LastName: "Reyes Sanchez",   Phone: "8295560024", Cedula: "40234500024", Email: "xiomara.reyes@nurses.test",   License: "200024", Specialty: "Cuidado geriatrico"),
-            (Id: PendingNurse3Id, Name: "Patricia",LastName: "Gomez Arias",     Phone: "8495560025", Cedula: "40234500025", Email: "patricia.gomez@nurses.test",  License: "200025", Specialty: "Cuidado pediatrico"),
+            (Id: PendingNurse1Id, Name: "Raquel",  LastName: "Familia Perez",   Phone: "8095560023", Cedula: "40234500023", Email: "raquel.familia@gmail.com",  License: "200023", Specialty: "Cuidado de adultos"),
+            (Id: PendingNurse2Id, Name: "Xiomara", LastName: "Reyes Sanchez",   Phone: "8295560024", Cedula: "40234500024", Email: "xiomara.reyes@gmail.com",   License: "200024", Specialty: "Cuidado geriatrico"),
+            (Id: PendingNurse3Id, Name: "Patricia",LastName: "Gomez Arias",     Phone: "8495560025", Cedula: "40234500025", Email: "patricia.gomez@gmail.com",  License: "200025", Specialty: "Cuidado pediatrico"),
         };
 
         foreach (var pd in pendingData)

@@ -59,6 +59,41 @@ public static class CatalogSeeding
         { "De Los Santos", Guid.Parse("f0000000-0000-0000-0000-000000000022") },
     };
 
+    // Realistic Dominican first/last names per nurse (keyed by the same NurseIds key). Drives
+    // Name / LastName / DisplayName / email so seeded nurses never read as placeholder data.
+    private static readonly Dictionary<string, (string First, string Last)> NurseNames = new()
+    {
+        { "Lorea",        ("Lorea",   "Martínez") },
+        { "Charleny",     ("Charleny", "Reyes") },
+        { "Valentin",     ("Valentín", "Peña") },
+        { "Marel",        ("Marel",   "Jiménez") },
+        { "Liliana",      ("Liliana", "Núñez") },
+        { "Clari",        ("Clari",   "Mejía") },
+        { "Solano",       ("Solano",  "Castillo") },
+        { "Angela Maria", ("Ángela",  "Severino") },
+        { "Karen",        ("Karen",   "Fernández") },
+        { "Cristina",     ("Cristina", "Rodríguez") },
+        { "Figueredo",    ("Génesis", "Figueredo") },
+        { "Annie",        ("Annie",   "Vásquez") },
+        { "Zoila",        ("Zoila",   "Sánchez") },
+        { "Maria Isabel", ("María",   "Brito") },
+        { "Emilina",      ("Emilina", "Ramírez") },
+        { "Cindy",        ("Cindy",   "Féliz") },
+        { "Agustina",     ("Agustina", "De la Cruz") },
+        { "Johanna",      ("Johanna", "Polanco") },
+        { "Miranda",      ("Miranda", "Encarnación") },
+        { "Miguelina",    ("Miguelina", "Santana") },
+        { "Celai",        ("Celai",   "Herrera") },
+        { "De Los Santos",("Mariana", "De los Santos") },
+    };
+
+    // Real Dominican banks, distributed deterministically across nurses.
+    private static readonly string[] DrBanks =
+    {
+        "Banco Popular Dominicano", "Banco de Reservas", "Banco BHD",
+        "Scotiabank", "Banco Santa Cruz", "Asociación Popular de Ahorros y Préstamos",
+    };
+
     public static readonly Guid TestClientId = Guid.Parse("e0000000-0000-0000-0000-000000000001");
 
     public static async Task EnsureSeededAsync(NursingCareDbContext db, CancellationToken cancellationToken = default)
@@ -494,11 +529,11 @@ public static class CatalogSeeding
         var clientUser = new User
         {
             Id = TestClientId,
-            Email = "client@test.com",
+            Email = "mercedes.fernandez@gmail.com",
             ProfileType = UserProfileType.CLIENT,
-            Name = "Test",
-            LastName = "Client",
-            DisplayName = "Test Client",
+            Name = "Mercedes",
+            LastName = "Fernández Castro",
+            DisplayName = "Mercedes Fernández Castro",
             // Profile fields shown on the client "Mi perfil" screen — cédula (11 digits) and
             // teléfono (10 digits) per the identity-validation rules, so the seeded client is complete.
             IdentificationNumber = "40212345678",
@@ -534,14 +569,19 @@ public static class CatalogSeeding
         int nurseIndex = 0;
         foreach (var (nurseName, nurseId) in NurseIds)
         {
+            var hasName = NurseNames.TryGetValue(nurseName, out var nm);
+            var (firstName, lastName) = hasName ? nm : (nurseName.Split(' ')[0], "Pérez");
+            // Append the index for any unmapped nurse so the generated email stays unique
+            // (the Email column is uniquely indexed; two fallbacks would otherwise collide).
+            var emailLocal = hasName ? EmailLocalPart(firstName, lastName) : $"{EmailLocalPart(firstName, lastName)}{nurseIndex}";
             var nurseUser = new User
             {
                 Id = nurseId,
-                Email = $"{nurseName.ToLower().Replace(" ", ".")}@nurses.test",
+                Email = $"{emailLocal}@gmail.com",
                 ProfileType = UserProfileType.NURSE,
-                Name = nurseName.Split(' ')[0],
-                LastName = nurseName.Contains(' ') ? string.Join(" ", nurseName.Split(' ').Skip(1)) : "Nurse",
-                DisplayName = nurseName,
+                Name = firstName,
+                LastName = lastName,
+                DisplayName = $"{firstName} {lastName}",
                 Phone = $"809555{(nurseIndex + 1000):D4}",
                 IdentificationNumber = $"402000{(nurseIndex + 10000):D5}",
                 PasswordHash = HashPassword("12345678"),
@@ -572,7 +612,7 @@ public static class CatalogSeeding
                 HireDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(-6)),
                 Specialty = specialty,
                 LicenseId = $"{nurseIndex + 100000}",
-                BankName = "Bank Test",
+                BankName = DrBanks[nurseIndex % DrBanks.Length],
                 AccountNumber = $"{nurseIndex + 100000000}",
                 Category = category,
                 VisitDailyRate = 1700m,
@@ -585,6 +625,23 @@ public static class CatalogSeeding
         }
 
         await db.SaveChangesAsync(cancellationToken);
+    }
+
+    // Builds an email local part like "valentin.pena" from accented names: strip diacritics,
+    // lowercase, collapse spaces to dots, keep only [a-z0-9.].
+    private static string EmailLocalPart(string first, string last)
+    {
+        var raw = $"{first}.{last}".Normalize(System.Text.NormalizationForm.FormD);
+        var sb = new StringBuilder(raw.Length);
+        foreach (var ch in raw)
+        {
+            var cat = System.Globalization.CharUnicodeInfo.GetUnicodeCategory(ch);
+            if (cat == System.Globalization.UnicodeCategory.NonSpacingMark) continue;
+            if (char.IsLetterOrDigit(ch)) sb.Append(char.ToLowerInvariant(ch));
+            else if (ch == ' ' || ch == '.') sb.Append('.');
+        }
+        // Collapse any accidental double dots.
+        return string.Join('.', sb.ToString().Split('.', StringSplitOptions.RemoveEmptyEntries));
     }
 
     private static string HashPassword(string password)
