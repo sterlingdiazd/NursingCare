@@ -23,7 +23,10 @@ public sealed record AdminCompleteNurseProfileRequest(
     [Required]
     [EmailAddress]
     string Email,
-    DateOnly HireDate,
+    // Nullable: the review form does not expose a hire-date input, and a pending nurse may have
+    // no recorded hire date. When omitted, completion defaults it to the existing date or today
+    // (the activation date) — see CompleteNurseProfileCreationAsync.
+    DateOnly? HireDate,
     [Required]
     string Specialty,
     [RegularExpression(IdentityInputRules.NumericOnlyPattern, ErrorMessage = "La licencia solo puede contener digitos.")]

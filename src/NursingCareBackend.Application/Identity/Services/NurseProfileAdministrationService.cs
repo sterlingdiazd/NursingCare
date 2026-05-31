@@ -318,13 +318,18 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
     {
         EnsureActorUserId(actorUserId);
         var user = await GetRequiredNurseUserAsync(userId, cancellationToken);
+        // The review form has no hire-date input; if the request omits it, keep the nurse's existing
+        // hire date, or default to today (the activation date) so the profile can be completed.
+        var hireDate = request.HireDate
+            ?? user.NurseProfile?.HireDate
+            ?? DateOnly.FromDateTime(DateTime.UtcNow);
         await ValidateProfileRequestAsync(
             request.Name,
             request.LastName,
             request.IdentificationNumber,
             request.Phone,
             request.Email,
-            request.HireDate,
+            hireDate,
             request.Specialty,
             request.LicenseId,
             request.BankName,
@@ -342,7 +347,7 @@ public sealed class NurseProfileAdministrationService : INurseProfileAdministrat
             request.IdentificationNumber,
             request.Phone,
             request.Email,
-            request.HireDate,
+            hireDate,
             request.Specialty,
             request.LicenseId,
             request.BankName,
